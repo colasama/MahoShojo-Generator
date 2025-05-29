@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 魔法少女生成器 ✨
 
-## Getting Started
+一个可爱的魔法少女角色生成器，使用 Next.js + React + TypeScript 构建，完美适配手机页面。
 
-First, run the development server:
+## 功能特性
+
+- 🌸 **个性化生成**：输入你的名字，生成独特的魔法少女角色
+- 💝 **花卉主题名字**：基于各种花卉的魔法少女名字
+- 👗 **详细外貌特征**：包括身高、体重、发色、发型、瞳色等
+- ✨ **专属变身咒语**：每个角色都有独特的变身咒语
+- ⭐ **等级系统**：种芽 → 叶 → 蕾 → 花 → 满开 五个等级
+- 📱 **手机友好**：响应式设计，完美适配移动设备
+- 🖼️ **图片保存**：支持将生成结果保存为图片
+
+## 开始使用
+
+### 安装依赖
+
+```bash
+npm install
+# 或
+yarn install
+```
+
+### 运行开发服务器
 
 ```bash
 npm run dev
-# or
+# 或
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+在浏览器中打开 [http://localhost:3000](http://localhost:3000) 查看应用。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 构建生产版本
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+# 或
+yarn build
+yarn start
+```
 
-## Learn More
+## To-Do
 
-To learn more about Next.js, take a look at the following resources:
+- [ ] 接入 AI：变身咒语，特征，性格
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [ ] 增加底色变化
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [ ] 头像生成
 
-## Deploy on Vercel
+- [ ] 更多花和体态选择
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 技术栈
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Next.js 14** - React 框架
+- **React 18** - 用户界面库
+- **TypeScript** - 类型安全的 JavaScript
+- **html2canvas** - 生成图片功能
+- **CSS3** - 魔法少女主题样式
+
+## 使用方法
+
+1. 在输入框中输入你的名字
+2. 点击"生成我的魔法少女"按钮
+3. 查看生成的魔法少女信息
+4. 点击"保存为图片"按钮下载结果
+5. 或者长按结果卡片进行截图保存
+
+## 特色功能
+
+### 确定性生成
+基于输入名字的哈希值，确保同样的名字总是生成相同的角色，让每个人都有专属的魔法少女形象。
+
+### 魔法等级系统
+- 🌱 **种芽** - 初学者级别
+- 🍃 **叶** - 成长中的魔法少女
+- 🌿 **蕾** - 即将绽放的力量
+- 🌸 **花** - 成熟的魔法少女
+- 🌺 **满开** - 最强等级
+
+### 移动端优化
+- 响应式布局
+- 触摸友好的交互
+- 针对小屏幕优化的字体和间距
+- 渐变背景和动画效果
+
+## 项目结构
+
+```
+├── pages/
+│   ├── _app.tsx          # 应用根组件
+│   └── index.tsx         # 主页面
+├── styles/
+│   └── globals.css       # 全局样式
+├── types/
+│   └── html2canvas.d.ts  # TypeScript 类型声明
+├── package.json
+├── tsconfig.json
+├── next.config.js
+└── README.md
+```
+
+## 许可证
+
+MIT License
+
+---
+
+🌸 享受你的魔法少女生成之旅！ ✨
