@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import html2canvas from 'html2canvas'
+import { generateMagicalGirlWithAI, type AIGeneratedMagicalGirl } from '../lib/ai'
 
 interface MagicalGirl {
   realName: string
@@ -18,19 +19,7 @@ interface MagicalGirl {
   levelEmoji: string
 }
 
-const flowerNames = [
-  '樱花', '玫瑰', '百合', '茉莉', '牡丹', '芍药', '紫罗兰', '薰衣草',
-  '向日葵', '郁金香', '水仙', '康乃馨', '栀子花', '桔梗', '风信子',
-  '绣球花', '茶花', '杜鹃', '蔷薇', '丁香', '海棠', '梅花', '兰花',
-  '菊花', '莲花', '桃花', '梨花', '杏花', '紫藤', '月季'
-]
-
-const hairColors = ['银白色', '金黄色', '粉红色', '紫色', '蓝色', '绿色', '红色', '棕色', '黑色', '彩虹色']
-const hairStyles = ['长直发', '卷发', '双马尾', '单马尾', '短发', '波浪卷', '辫子', '丸子头']
-const eyeColors = ['蓝色', '绿色', '紫色', '金色', '银色', '红色', '粉色', '琥珀色', '异色瞳']
-const skinTones = ['白皙', '小麦色', '健康肤色', '象牙白', '蜜桃色']
-const specialFeatures = ['星星形胎记', '月牙形印记', '闪亮的眼睛', '柔和的光环', '花瓣般的唇色', '珍珠般的肌肤']
-
+// 保留原有的 levels 数组和相关函数
 const levels = [
   { name: '种', emoji: '🌱' },
   { name: '芽', emoji: '🍃' },
@@ -38,17 +27,6 @@ const levels = [
   { name: '蕾', emoji: '🌸' },
   { name: '花', emoji: '🌺' },
   { name: '宝石权杖', emoji: '💎' }
-]
-
-const spellTemplates = [
-  '星光闪耀，{name}变身！',
-  '花瓣飞舞，{name}守护之力！',
-  '月光祝福，{name}觉醒！',
-  '彩虹之光，{name}变身完成！',
-  '爱与希望，{name}出现！',
-  '梦想之力，{name}登场！',
-  '纯净之心，{name}变身！',
-  '奇迹绽放，{name}出击！'
 ]
 
 function seedRandom(str: string): number {
@@ -66,38 +44,20 @@ function getRandomFromSeed<T>(array: T[], seed: number, offset: number = 0): T {
   return array[index]
 }
 
-function generateMagicalGirl(inputName: string): MagicalGirl {
+// 使用 AI 生成魔法少女（除了 level）
+async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
+  // 使用 AI 生成大部分属性
+  const aiGenerated: AIGeneratedMagicalGirl = await generateMagicalGirlWithAI(inputName)
+  
+  // 保留原有的随机 level 生成逻辑
   const seed = seedRandom(inputName)
-  
-  const flowerName = getRandomFromSeed(flowerNames, seed, 0)
-  const realName = `${inputName}`
-  const magicalName = `${flowerName}`
-  
-  const height = `${150 + (seed % 25)}cm`
-  const weight = `${40 + (seed % 15)}kg`
-  const hairColor = getRandomFromSeed(hairColors, seed, 1)
-  const hairStyle = getRandomFromSeed(hairStyles, seed, 2)
-  const eyeColor = getRandomFromSeed(eyeColors, seed, 3)
-  const skinTone = getRandomFromSeed(skinTones, seed, 4)
-  const specialFeature = getRandomFromSeed(specialFeatures, seed, 5)
-  
   const level = getRandomFromSeed(levels, seed, 6)
-  const spellTemplate = getRandomFromSeed(spellTemplates, seed, 7)
-  const spell = spellTemplate.replace('{name}', magicalName)
   
   return {
-    realName,
-    name: magicalName,
-    appearance: {
-      height,
-      weight,
-      hairColor,
-      hairStyle,
-      eyeColor,
-      skinTone,
-      specialFeature
-    },
-    spell,
+    realName: inputName,
+    name: aiGenerated.name,
+    appearance: aiGenerated.appearance,
+    spell: aiGenerated.spell,
     level: level.name,
     levelEmoji: level.emoji
   }
@@ -107,18 +67,24 @@ export default function Home() {
   const [inputName, setInputName] = useState('')
   const [magicalGirl, setMagicalGirl] = useState<MagicalGirl | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const resultRef = useRef<HTMLDivElement>(null)
 
   const handleGenerate = async () => {
     if (!inputName.trim()) return
     
     setIsGenerating(true)
-    // 添加一点延迟效果让用户感受到"生成"的过程
-    setTimeout(() => {
-      const result = generateMagicalGirl(inputName.trim())
+    setError(null)
+    
+    try {
+      const result = await generateMagicalGirl(inputName.trim())
       setMagicalGirl(result)
+    } catch (err) {
+      console.error('生成魔法少女失败:', err)
+      setError('生成失败，请检查网络连接和 API 配置后重试')
+    } finally {
       setIsGenerating(false)
-    }, 1000)
+    }
   }
 
   const handleSaveImage = async () => {
@@ -146,6 +112,7 @@ export default function Home() {
       <div className="container">
         <div className="card">
           <h1 className="title">✨ 魔法少女生成器 ✨</h1>
+          <p className="subtitle">🤖 AI 驱动的个性化魔法少女角色生成</p>
           
           <div className="input-group">
             <label htmlFor="name" className="input-label">
@@ -167,8 +134,14 @@ export default function Home() {
             disabled={!inputName.trim() || isGenerating}
             className="generate-button"
           >
-            {isGenerating ? '✨ 魔法生成中... ✨' : '🌸 生成我的魔法少女 🌸'}
+            {isGenerating ? '🤖 AI 魔法生成中... ✨' : '🌸 生成我的魔法少女 🌸'}
           </button>
+          
+          {error && (
+            <div className="error-message">
+              ⚠️ {error}
+            </div>
+          )}
           
           {magicalGirl && (
             <div ref={resultRef} className="result-card">
