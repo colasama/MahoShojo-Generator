@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 * {
     box-sizing: border-box;
     padding: 0;
@@ -258,4 +260,24 @@ a {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.footer {
+    text-align: center;
+    padding: 20px 0;
+    margin-top: 30px;
+    color: #666;
+    font-size: 14px;
+}
+
+.footer-link {
+    color: #ff6b6b;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.footer-link:hover {
+    color: #ee5a6f;
+    text-decoration: underline;
 }
