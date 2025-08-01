@@ -104,11 +104,9 @@ export default function Home() {
     try {
       const result = await generateMagicalGirl(inputName.trim())
       setMagicalGirl(result)
-    } catch (err) {
-      console.error('生成魔法少女失败:', err)
+    } catch {
       // 显示错误提示
-      const errorMessage = err instanceof Error ? err.message : '生成失败，请稍后重试'
-      alert(`✨ 魔法失效了！\n\n${errorMessage}\n\n请检查网络连接后重试~`)
+      alert(`✨ 魔法失效了！请再生成一次试试吧~`)
     } finally {
       setIsGenerating(false)
     }
@@ -128,8 +126,7 @@ export default function Home() {
       link.download = `${magicalGirl?.name || '魔法少女'}.png`
       link.href = canvas.toDataURL()
       link.click()
-    } catch (error) {
-      console.error('保存图片失败:', error)
+    } catch {
       alert('保存图片失败，请重试')
     }
   }
@@ -141,7 +138,7 @@ export default function Home() {
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem' }}>
             <Image src="/logo.svg" width={250} height={160} alt="Logo" style={{ display: 'block' }} />
           </div>
-          <p className="subtitle text-center">让我康康你是什么魔法少女！</p>
+          <p className="subtitle text-center">你是什么魔法少女呢！</p>
 
           <div className="input-group">
             <label htmlFor="name" className="input-label">
@@ -193,7 +190,7 @@ export default function Home() {
                 </div>
 
                 <div className="result-item">
-                  <div className="result-label">👗 外貌特征</div>
+                  <div className="result-label">👗 外貌</div>
                   <div className="result-value">
                     身高：{magicalGirl.appearance.height}<br />
                     体重：{magicalGirl.appearance.weight}<br />
