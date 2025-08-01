@@ -114,6 +114,12 @@ export async function generateMagicalGirlWithAI(
   for (let providerIndex = 1; providerIndex < providers.length; providerIndex++) {
     const provider = providers[providerIndex];
 
+    // 增加 0.3 - 0.1 * providerIndex 的几率跳过这个提供商
+    if (Math.random() < 0.4 - 0.1 * providerIndex) {
+      console.log(`跳过提供商: ${provider.name}`);
+      continue;
+    }
+
     try {
       console.log(`尝试提供商: ${provider.name}，模型: ${provider.model}`);
 

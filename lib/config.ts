@@ -57,7 +57,7 @@ const getDefaultModel = (): string => {
   if (providers.length > 0) {
     return providers[0].model;
   }
-  return 'gemini-2.0-flash';
+  return 'gemini-2.5-flash';
 };
 
 export const config = {
