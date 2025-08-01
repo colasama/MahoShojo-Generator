@@ -162,6 +162,14 @@ a {
     background-size: 100px 100px;
 }
 
+.title-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1rem;
+    background: transparent;
+}
+
 .result-content {
     position: relative;
     z-index: 1;

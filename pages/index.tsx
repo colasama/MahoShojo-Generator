@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import html2canvas from 'html2canvas'
+import { snapdom } from '@zumer/snapdom'
 import { type AIGeneratedMagicalGirl, MainColor } from '../lib/ai'
 import Image from 'next/image'
 
@@ -120,18 +120,38 @@ export default function Home() {
     if (!resultRef.current) return
 
     try {
-      const canvas = await html2canvas(resultRef.current, {
-        backgroundColor: null,
-        scale: 3,
-        useCORS: true,
+      // 临时隐藏保存按钮和说明文字
+      const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement
+      const saveInstructions = resultRef.current.querySelector('.save-instructions') as HTMLElement
+      const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement
+
+      if (saveButton) saveButton.style.display = 'none'
+      if (saveInstructions) saveInstructions.style.display = 'none'
+      if (logoPlaceholder) logoPlaceholder.style.display = 'flex'
+
+      const result = await snapdom(resultRef.current, {
+        scale: 2,
       })
 
-      const link = document.createElement('a')
-      link.download = `现役魔法少女登记表_${magicalGirl?.name || '魔法少女'}.png`
-      link.href = canvas.toDataURL()
-      link.click()
+      // 恢复按钮显示
+      if (saveButton) saveButton.style.display = 'block'
+      if (saveInstructions) saveInstructions.style.display = 'block'
+      if (logoPlaceholder) logoPlaceholder.style.display = 'none'
+
+      const pngFile = await result.toPng()
+      document.body.appendChild(pngFile);
+      await result.download({ format: 'png', filename: `现役魔法少女登记表_${magicalGirl?.name || '魔法少女'}` });
+      document.body.removeChild(pngFile);
     } catch {
       alert('保存图片失败，请重试')
+      // 确保在失败时也恢复按钮显示
+      const saveButton = resultRef.current?.querySelector('.save-button') as HTMLElement
+      const saveInstructions = resultRef.current?.querySelector('.save-instructions') as HTMLElement
+      const logoPlaceholder = resultRef.current?.querySelector('.logo-placeholder') as HTMLElement
+
+      if (saveButton) saveButton.style.display = 'block'
+      if (saveInstructions) saveInstructions.style.display = 'block'
+      if (logoPlaceholder) logoPlaceholder.style.display = 'none'
     }
   }
 
@@ -140,7 +160,7 @@ export default function Home() {
       <div className="container">
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem' }}>
-            <Image src="/logo.svg" width={250} height={160} alt="Logo" style={{ display: 'block' }} />
+            <img src="/logo.svg" width={250} height={160} alt="Logo" />
           </div>
           <p className="subtitle text-center">你是什么魔法少女呢！</p>
 
@@ -183,7 +203,7 @@ export default function Home() {
               </div>
               <div className="result-content">
                 <div className="result-item">
-                  <div className="result-label">💝 真名解放</div>
+                  <div className="result-label">✨ 真名解放</div>
                   <div className="result-value">{magicalGirl.realName}</div>
                 </div>
                 <div className="result-item">
@@ -231,6 +251,21 @@ export default function Home() {
                 </button>
                 <div className="save-instructions">
                   点击按钮下载图片，或长按结果卡片截图保存
+                </div>
+
+                {/* Logo placeholder for saved images */}
+                <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
+                  <img
+                    src="/logo-white.svg"
+                    width={120}
+                    height={80}
+                    alt="Logo"
+                    style={{
+                      display: 'block',
+                      maxWidth: '100%',
+                      height: 'auto'
+                    }}
+                  />
                 </div>
               </div>
             </div>
