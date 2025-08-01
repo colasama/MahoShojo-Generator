@@ -122,12 +122,12 @@ export default function Home() {
     try {
       const canvas = await html2canvas(resultRef.current, {
         backgroundColor: null,
-        scale: 2,
+        scale: 3,
         useCORS: true,
       })
 
       const link = document.createElement('a')
-      link.download = `${magicalGirl?.name || '魔法少女'}.png`
+      link.download = `现役魔法少女登记表_${magicalGirl?.name || '魔法少女'}.png`
       link.href = canvas.toDataURL()
       link.click()
     } catch {
@@ -179,7 +179,7 @@ export default function Home() {
               }}
             >
               <div className="flex justify-center items-center" style={{ marginBottom: '1rem' }}>
-                <Image src="/mahou-title.svg" width={300} height={180} alt="Logo" style={{ display: 'block' }} />
+                <img src="/mahou-title.svg" width={300} height={70} alt="Logo" style={{ display: 'block' }} />
               </div>
               <div className="result-content">
                 <div className="result-item">
