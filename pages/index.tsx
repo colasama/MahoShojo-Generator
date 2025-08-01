@@ -138,10 +138,11 @@ export default function Home() {
       if (saveInstructions) saveInstructions.style.display = 'block'
       if (logoPlaceholder) logoPlaceholder.style.display = 'none'
 
-      const pngFile = await result.toPng()
-      document.body.appendChild(pngFile);
-      await result.download({ format: 'png', filename: `现役魔法少女登记表_${magicalGirl?.name || '魔法少女'}` });
-      document.body.removeChild(pngFile);
+      await result.download({
+        type: 'jpg',
+        scale: 2,
+        filename: `现役魔法少女登记表_${magicalGirl?.name || '魔法少女'}`
+      });
     } catch {
       alert('保存图片失败，请重试')
       // 确保在失败时也恢复按钮显示
@@ -184,7 +185,7 @@ export default function Home() {
             disabled={!inputName.trim() || isGenerating}
             className="generate-button"
           >
-            {isGenerating ? '舞台创造中，请稍后捏 (≖ᴗ≖)✧✨' : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
+            {isGenerating ? '少女创造中，请稍后捏 (≖ᴗ≖)✧✨' : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
           </button>
 
           {magicalGirl && (
@@ -198,10 +199,10 @@ export default function Home() {
                 })()
               }}
             >
-              <div className="flex justify-center items-center" style={{ marginBottom: '1rem' }}>
-                <img src="/mahou-title.svg" width={300} height={70} alt="Logo" style={{ display: 'block' }} />
-              </div>
               <div className="result-content">
+                <div className="flex justify-center items-center" style={{ marginBottom: '1rem', background: 'transparent' }}>
+                  <img src="/mahou-title.svg" width={300} height={70} alt="Logo" style={{ display: 'block', background: 'transparent' }} />
+                </div>
                 <div className="result-item">
                   <div className="result-label">✨ 真名解放</div>
                   <div className="result-value">{magicalGirl.realName}</div>
