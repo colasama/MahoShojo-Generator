@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import html2canvas from 'html2canvas'
-import { generateMagicalGirlWithAI, type AIGeneratedMagicalGirl } from '../lib/ai'
+import { type AIGeneratedMagicalGirl, MainColor } from '../lib/ai'
 import Image from 'next/image'
 
 interface MagicalGirl {
@@ -16,7 +16,7 @@ interface MagicalGirl {
     skinTone: string
     wearing: string
     specialFeature: string
-    mainColor: number
+    mainColor: string // 写法有点诡异，但是能用就行.jpg
     firstPageColor: string
     secondPageColor: string
   }
@@ -35,25 +35,17 @@ const levels = [
   { name: '宝石权杖', emoji: '💎' }
 ]
 
-// 定义8套渐变配色方案
-const gradientColors = [
-  // 0 - 红色系
-  { first: '#ff6b6b', second: '#ee5a6f' },
-  // 1 - 橙色系
-  { first: '#ff922b', second: '#ffa94d' },
-  // 2 - 青色系
-  { first: '#22b8cf', second: '#66d9e8' },
-  // 3 - 蓝色系
-  { first: '#5c7cfa', second: '#748ffc' },
-  // 4 - 紫色系
-  { first: '#9775fa', second: '#b197fc' },
-  // 5 - 粉色系
-  { first: '#ff9a9e', second: '#fecfef' },
-  // 6 - 黄色系
-  { first: '#f59f00', second: '#fcc419' },
-  // 7 - 绿色系
-  { first: '#51cf66', second: '#8ce99a' }
-]
+// 定义8套渐变配色方案，与 MainColor 枚举顺序对应
+const gradientColors: Record<MainColor, { first: string; second: string }> = {
+  [MainColor.Red]: { first: '#ff6b6b', second: '#ee5a6f' },
+  [MainColor.Orange]: { first: '#ff922b', second: '#ffa94d' },
+  [MainColor.Cyan]: { first: '#22b8cf', second: '#66d9e8' },
+  [MainColor.Blue]: { first: '#5c7cfa', second: '#748ffc' },
+  [MainColor.Purple]: { first: '#9775fa', second: '#b197fc' },
+  [MainColor.Pink]: { first: '#ff9a9e', second: '#fecfef' },
+  [MainColor.Yellow]: { first: '#f59f00', second: '#fcc419' },
+  [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
+}
 
 function seedRandom(str: string): number {
   let hash = 0
@@ -70,10 +62,22 @@ function getRandomFromSeed<T>(array: T[], seed: number, offset: number = 0): T {
   return array[index]
 }
 
-// 使用 AI 生成魔法少女（除了 level）
+// 使用 API 路由生成魔法少女
 async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
-  // 使用 AI 生成大部分属性
-  const aiGenerated: AIGeneratedMagicalGirl = await generateMagicalGirlWithAI(inputName)
+  const response = await fetch('/api/generate-magical-girl', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name: inputName }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || '生成失败')
+  }
+
+  const aiGenerated: AIGeneratedMagicalGirl = await response.json()
 
   // 保留原有的随机 level 生成逻辑
   const seed = seedRandom(aiGenerated.flowerName + inputName)
@@ -160,7 +164,7 @@ export default function Home() {
             disabled={!inputName.trim() || isGenerating}
             className="generate-button"
           >
-            {isGenerating ? '(≖ᴗ≖)✧✨' : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
+            {isGenerating ? '舞台创造中，请稍后捏 (≖ᴗ≖)✧✨' : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
           </button>
 
           {magicalGirl && (
@@ -168,7 +172,10 @@ export default function Home() {
               ref={resultRef}
               className="result-card"
               style={{
-                background: `linear-gradient(135deg, ${gradientColors[magicalGirl.appearance.mainColor]?.first || gradientColors[5].first} 0%, ${gradientColors[magicalGirl.appearance.mainColor]?.second || gradientColors[5].second} 100%)`
+                background: (() => {
+                  const colors = gradientColors[magicalGirl.appearance.mainColor as MainColor] || gradientColors[MainColor.Pink];
+                  return `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
+                })()
               }}
             >
               <div className="flex justify-center items-center" style={{ marginBottom: '1rem' }}>
@@ -205,7 +212,9 @@ export default function Home() {
 
                 <div className="result-item">
                   <div className="result-label">✨ 变身咒语</div>
-                  <div className="result-value">&ldquo;{magicalGirl.spell}&rdquo;</div>
+                  <div className="result-value">
+                    <div style={{ whiteSpace: 'pre-line' }}>{magicalGirl.spell}</div>
+                  </div>
                 </div>
 
                 <div className="result-item">

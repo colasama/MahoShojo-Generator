@@ -1,28 +1,70 @@
-// 解析环境变量中的数组
-const parseApiPairs = () => {
-  const apiKeys = (process.env.NEXT_PUBLIC_AI_API_KEYS || '').split(',').filter(Boolean);
-  const baseUrls = (process.env.NEXT_PUBLIC_AI_BASE_URLS || '').split(',').filter(Boolean);
+// AI 提供商配置接口
+interface AIProvider {
+  name: string;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
 
-  // 如果没有配置数组，fallback 到旧的单个配置
-  if (apiKeys.length === 0) {
-    const singleKey = process.env.NEXT_PUBLIC_AI_API_KEY;
-    const singleUrl = process.env.NEXT_PUBLIC_AI_BASE_URL || 'https://api.openai.com/v1';
-    return singleKey ? [{ apiKey: singleKey, baseUrl: singleUrl }] : [];
+// 解析 AI 提供商配置的函数
+const parseAIProviders = (): AIProvider[] => {
+  // JSON 配置方式
+  if (process.env.AI_PROVIDERS_CONFIG) {
+    try {
+      const providers = JSON.parse(process.env.AI_PROVIDERS_CONFIG) as AIProvider[];
+      return providers.filter(p => p.apiKey && p.baseUrl && p.model);
+    } catch (error) {
+      console.warn('解析 AI_PROVIDERS_CONFIG 失败，回退到简单配置:', error);
+    }
   }
 
-  // 确保 API keys 和 URLs 数量匹配
-  const pairs = apiKeys.map((apiKey, index) => ({
-    apiKey: apiKey.trim(),
-    baseUrl: (baseUrls[index] || 'https://api.openai.com/v1').trim()
-  }));
+  // 向后兼容：单个 API Key 方式
+  const singleKey = process.env.AI_API_KEY;
+  const singleUrl = process.env.AI_BASE_URL || 'https://api.openai.com/v1';
+  const singleModel = process.env.AI_MODEL || 'gemini-2.0-flash';
 
-  return pairs;
+  if (singleKey) {
+    return [{
+      name: 'default_provider',
+      apiKey: singleKey,
+      baseUrl: singleUrl,
+      model: singleModel
+    }];
+  }
+
+  return [];
+};
+
+// 获取有效的 API 提供商（按配置顺序）
+const getAPIProviders = (): AIProvider[] => {
+  return parseAIProviders();
+};
+
+// 为了保持向后兼容，转换为原有的格式
+const parseApiPairs = () => {
+  const providers = getAPIProviders();
+  return providers.map(provider => ({
+    apiKey: provider.apiKey,
+    baseUrl: provider.baseUrl,
+    name: provider.name,
+    model: provider.model
+  }));
+};
+
+// 获取第一个提供商的模型
+const getDefaultModel = (): string => {
+  const providers = getAPIProviders();
+  if (providers.length > 0) {
+    return providers[0].model;
+  }
+  return 'gemini-2.0-flash';
 };
 
 export const config = {
   // Vercel AI 配置
   API_PAIRS: parseApiPairs(),
-  MODEL: process.env.NEXT_PUBLIC_AI_MODEL || 'gemini-2.0-flash',
+  MODEL: getDefaultModel(),
+  PROVIDERS: getAPIProviders(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {

@@ -1,8 +1,4 @@
-# 修改为 .env.local 来使用捏
-
-# AI 提供商配置（JSON 格式）
-# 按顺序配置多个提供商，每个配置一个模型
-AI_PROVIDERS_CONFIG='[
+[
   {
     "name": "primary_openai",
     "apiKey": "your_openai_api_key_here",
@@ -21,9 +17,4 @@ AI_PROVIDERS_CONFIG='[
     "baseUrl": "https://api.backup-provider.com/v1",
     "model": "gpt-3.5-turbo"
   }
-]'
-
-# ===== 向后兼容配置（不推荐，建议使用上面的 JSON 配置） =====
-# AI_API_KEY=your_openai_api_key_here
-# AI_BASE_URL=https://api.openai.com/v1
-# AI_MODEL=gemini-2.0-flash 
+]

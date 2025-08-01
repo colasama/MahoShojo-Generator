@@ -3,6 +3,19 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { config } from "./config";
 
+export const MainColor = {
+  Red: '红色',
+  Orange: '橙色',
+  Cyan: '青色',
+  Blue: '蓝色',
+  Purple: '紫色',
+  Pink: '粉色',
+  Yellow: '黄色',
+  Green: '绿色'
+} as const;
+
+export type MainColor = typeof MainColor[keyof typeof MainColor];
+
 // 定义魔法少女生成的 schema（排除 level 相关字段）
 const MagicalGirlGenerationSchema = z.object({
   flowerName: z.string().describe(`魔法少女的花名，应该与真实姓名有一定关联，但是不能包含真实姓名，
@@ -19,12 +32,15 @@ const MagicalGirlGenerationSchema = z.object({
     skinTone: z.string().describe("肤色，通常是白皙，但是偶尔会出现其他肤色，根据人物设定生成"),
     wearing: z.string().describe('人物身穿的服装样式，需要描述具体的颜色和式样款式，一般比较华丽，不要拘泥于花形状，符合主色调即可，其他形制在符合花语的情况下自由发挥'),
     specialFeature: z.string().describe("特征，一般是反映人物性格的常见表情、动作、特征等"),
-    mainColor: z.number().describe(`魔法少女的主色调，可选项有 红色、橙色、青色、蓝色、紫色、粉色、黄色、绿色，
-      分别对应 0-7，请参考 hairColor 选择最接近的一项，如果 hairColor 是渐变，请选择最接近的渐变主色调`),
+    mainColor: z.enum(Object.values(MainColor) as [string, ...string[]]).describe(
+      `魔法少女的主色调，请参考 hairColor 选择最接近的一项，如果 hairColor 是渐变，请选择最接近的渐变主色调`),
     firstPageColor: z.string().describe("根据 mainColor 产生第一个渐变色，格式以 #000000 给出"),
     secondPageColor: z.string().describe("根据 mainColor 产生第二个渐变色，格式以 #000000 给出"),
   }),
-  spell: z.string().describe("变身咒语，参考常见的日本魔法少女中的变身"),
+  spell: z.string().describe(`很酷的变身咒语，提供日语版和对应的中文翻译，使用 \n 换行，参考常见的日本魔法少女中的变身，通常 20 字到 40 字左右。
+    - 参考格式1：
+        "黒よりも黒く、闇よりも暗い。ここに我が真の真紅の黄金の光を託す。目覚めの時が来た。不条理な教会の腐敗した論理" \n
+        "比黑色更黑 比黑暗更暗的漆黑 在此寄讬吾真红的金光吧 觉醒之时的到来 荒谬教会的堕落章理"`),
 });
 
 export type AIGeneratedMagicalGirl = z.infer<
@@ -38,44 +54,42 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function generateMagicalGirlWithAI(
   realName: string
 ): Promise<AIGeneratedMagicalGirl> {
-  const apiPairs = config.API_PAIRS;
+  const providers = config.PROVIDERS;
 
-  if (apiPairs.length === 0) {
+  if (providers.length === 0) {
     console.error("没有配置 API Key");
     throw new Error("没有配置 API Key");
   }
 
-  // 随机打乱 API pairs 顺序
-  const shuffledPairs = [...apiPairs].sort(() => Math.random() - 0.5);
-
   let lastError: unknown = null;
 
-  // 尝试最多 5 次，使用不同的 API Key 和 URL 对
-  for (let attempt = 0; attempt < Math.min(5, shuffledPairs.length); attempt++) {
-    const { apiKey, baseUrl } = shuffledPairs[attempt % shuffledPairs.length];
+  // 第一阶段：优先使用第一个配置，尝试3次
+  const firstProvider = providers[0];
+  console.log(`优先使用第一个提供商: ${firstProvider.name}，模型: ${firstProvider.model}`);
 
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      console.log(`尝试第 ${attempt + 1} 次，使用 API: ${baseUrl}`);
+      console.log(`第一个提供商第 ${attempt + 1} 次尝试`);
 
       const llm = createOpenAI({
-        apiKey,
-        baseURL: baseUrl,
+        apiKey: firstProvider.apiKey,
+        baseURL: firstProvider.baseUrl,
         compatibility: "compatible",
       });
 
       const { object } = await generateObject({
-        model: llm(config.MODEL),
+        model: llm(firstProvider.model),
         system: config.MAGICAL_GIRL_GENERATION.systemPrompt,
         prompt: `请为名叫"${realName}"的人设计一个魔法少女角色。真实姓名：${realName}`,
         schema: MagicalGirlGenerationSchema,
         temperature: config.MAGICAL_GIRL_GENERATION.temperature,
       });
 
-      console.log(`第 ${attempt + 1} 次尝试成功`);
+      console.log(`第一个提供商第 ${attempt + 1} 次尝试成功`);
       return object;
     } catch (error) {
       lastError = error;
-      console.error(`第 ${attempt + 1} 次尝试失败:`, error);
+      console.error(`第一个提供商第 ${attempt + 1} 次尝试失败:`, error);
 
       if (NoObjectGeneratedError.isInstance(error)) {
         console.log("NoObjectGeneratedError 详情:");
@@ -86,17 +100,54 @@ export async function generateMagicalGirlWithAI(
         console.log("Finish Reason:", error.finishReason);
       }
 
-      // 如果不是最后一次尝试，等待 5 秒后再重试
-      if (attempt < Math.min(5, shuffledPairs.length) - 1) {
-        console.log(`等待 5 秒后进行第 ${attempt + 2} 次尝试...`);
-        await sleep(5000);
+      // 如果不是最后一次尝试，等待2秒后再重试
+      if (attempt < 2) {
+        console.log(`等待 2 秒后重试...`);
+        await sleep(2000);
       }
-
-      // 继续下一次尝试
-      continue;
     }
   }
 
-  console.error("所有 API 尝试都失败了", lastError);
-  throw new Error("生成魔法少女失败：所有 API 尝试都失败了");
+  // 第二阶段：如果第一个配置3次都失败，按顺序使用后续配置，每个配置尝试一次
+  console.log(`第一个提供商失败，开始尝试后续提供商`);
+
+  for (let providerIndex = 1; providerIndex < providers.length; providerIndex++) {
+    const provider = providers[providerIndex];
+
+    try {
+      console.log(`尝试提供商: ${provider.name}，模型: ${provider.model}`);
+
+      const llm = createOpenAI({
+        apiKey: provider.apiKey,
+        baseURL: provider.baseUrl,
+        compatibility: "compatible",
+      });
+
+      const { object } = await generateObject({
+        model: llm(provider.model),
+        system: config.MAGICAL_GIRL_GENERATION.systemPrompt,
+        prompt: `请为名叫"${realName}"的人设计一个魔法少女角色。真实姓名：${realName}`,
+        schema: MagicalGirlGenerationSchema,
+        temperature: config.MAGICAL_GIRL_GENERATION.temperature,
+      });
+
+      console.log(`提供商 ${provider.name} 尝试成功`);
+      return object;
+    } catch (error) {
+      lastError = error;
+      console.error(`提供商 ${provider.name} 尝试失败:`, error);
+
+      if (NoObjectGeneratedError.isInstance(error)) {
+        console.log("NoObjectGeneratedError 详情:");
+        console.log("Cause:", error.cause);
+        console.log("Text:", error.text);
+        console.log("Response:", error.response);
+        console.log("Usage:", error.usage);
+        console.log("Finish Reason:", error.finishReason);
+      }
+    }
+  }
+
+  console.error("所有提供商都失败了:", lastError);
+  throw new Error(`生成魔法少女失败: ${lastError}`);
 }
