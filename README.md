@@ -44,7 +44,7 @@ cp env.example .env.local
 
 编辑 `.env.local`，配置 AI 提供商（支持多提供商自动故障转移）：
 
-```json
+```shell
 AI_PROVIDERS_CONFIG='[
   {{
     "name": "gemini_provider", 
