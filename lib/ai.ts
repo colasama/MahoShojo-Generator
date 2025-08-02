@@ -102,8 +102,8 @@ export async function generateMagicalGirlWithAI(
 
       // 如果不是最后一次尝试，等待2秒后再重试
       if (attempt < 2) {
-        console.log(`等待 2 秒后重试...`);
-        await sleep(2000);
+        console.log(`等待 0.2 秒后重试...`);
+        await sleep(200);
       }
     }
   }

@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { snapdom } from '@zumer/snapdom'
 import { type AIGeneratedMagicalGirl, MainColor } from '../lib/ai'
-import Image from 'next/image'
 
 interface MagicalGirl {
   realName: string
