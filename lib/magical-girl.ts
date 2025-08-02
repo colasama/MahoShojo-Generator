@@ -18,7 +18,7 @@ export type MainColor = typeof MainColor[keyof typeof MainColor];
 // 定义魔法少女生成的 schema（排除 level 相关字段）
 const MagicalGirlGenerationSchema = z.object({
   flowerName: z.string().describe(`魔法少女的花名，应该与真实姓名有一定关联，如果真实姓名中有花则大概率用名字中的花名。
-    必须是一种花比如百合 / 丁香 / 茉莉，可以增加冷门的小众的花名概率，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度，
+    必须是一种花比如百合 / 丁香 / 茉莉，可以增加冷门的小众的花名概率，减少鸢尾的出现次数，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度，
     但是不要出现魔法少女字样`),
   flowerDescription: z.string().describe("生成的 flowerName 在大众文化中的花语，大概 20 字左右，不要出现魔法少女字样"),
   appearance: z.object({
