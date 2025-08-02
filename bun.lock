@@ -5,6 +5,7 @@
       "name": "if-mahou-shoujo",
       "dependencies": {
         "@ai-sdk/openai": "^1.3.22",
+        "@vercel/analytics": "^1.5.0",
         "@zumer/snapdom": "^1.9.7",
         "ai": "^4.3.16",
         "class-variance-authority": "^0.7.1",
@@ -270,6 +271,8 @@
     "@unrs/resolver-binding-win32-ia32-msvc": ["@unrs/resolver-binding-win32-ia32-msvc@1.7.3", "", { "os": "win32", "cpu": "ia32" }, "sha512-Yu3fhFh8vJzzKMkFu+At4rWgbc7BBBqjRz6TAscXYvpSwhGyhHP7AXv6jDT+thZYZHXFlC8NK7RAXgssS/m/Zg=="],
 
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.7.3", "", { "os": "win32", "cpu": "x64" }, "sha512-G3aLTm98U9LUGMxVwedEaqWSYID78u1Bxvi5w72GdDpb1DD9pVXc5fRdqzDCApQ657mnEbLZ5YzCoe3zKH8NVQ=="],
+
+    "@vercel/analytics": ["@vercel/analytics@1.5.0", "", { "peerDependencies": { "@remix-run/react": "^2", "@sveltejs/kit": "^1 || ^2", "next": ">= 13", "react": "^18 || ^19 || ^19.0.0-rc", "svelte": ">= 4", "vue": "^3", "vue-router": "^4" }, "optionalPeers": ["@remix-run/react", "@sveltejs/kit", "next", "react", "svelte", "vue", "vue-router"] }, "sha512-MYsBzfPki4gthY5HnYN7jgInhAZ7Ac1cYDoRWFomwGHWEX7odTEzbtg9kf/QSo7XEsEAqlQugA6gJ2WS2DEa3g=="],
 
     "@zumer/snapdom": ["@zumer/snapdom@1.9.7", "", {}, "sha512-tZvEq0e0NYn1gEyPCPZPOVQ5ihSFEGi2ppvpzi0dRL9vruPh8JrpPkcoG4IdqJHnF4y68wU0GZvlsQqEoeMCsg=="],
 
