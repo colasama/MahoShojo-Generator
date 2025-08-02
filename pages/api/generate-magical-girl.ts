@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { generateMagicalGirlWithAI } from '../../lib/ai'
+import { generateMagicalGirlWithAI } from '../../lib/magical-girl'
 
 export default async function handler(
   req: NextApiRequest,
