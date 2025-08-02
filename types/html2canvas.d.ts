@@ -1,3 +1,4 @@
+// TODO: 无用，可删
 declare module 'html2canvas' {
   interface Html2CanvasOptions {
     backgroundColor?: string | null

@@ -175,155 +175,155 @@ export default function Home() {
         <link rel="preload" href="/logo-white.svg" as="image" type="image/svg+xml" />
       </Head>
       <div className="magic-background">
-      <div className="container">
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem' }}>
-            <img src="/logo.svg" width={250} height={160} alt="Logo" />
-          </div>
-          <p className="subtitle text-center">你是什么魔法少女呢！</p>
-
-          <div className="input-group">
-            <label htmlFor="name" className="input-label">
-              请输入你的名字：
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={inputName}
-              onChange={(e) => setInputName(e.target.value)}
-              className="input-field"
-              placeholder="例如：鹿目圆香"
-              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-            />
-          </div>
-
-          <button
-            onClick={handleGenerate}
-            disabled={!inputName.trim() || isGenerating}
-            className="generate-button"
-          >
-            {isGenerating ? '少女创造中，请稍后捏 (≖ᴗ≖)✧✨' : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
-          </button>
-
-          {magicalGirl && (
-            <div
-              ref={resultRef}
-              className="result-card"
-              style={{
-                background: (() => {
-                  const colors = gradientColors[magicalGirl.appearance.mainColor as MainColor] || gradientColors[MainColor.Pink];
-                  return `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
-                })()
-              }}
-            >
-              <div className="result-content">
-                <div className="flex justify-center items-center" style={{ marginBottom: '1rem', background: 'transparent' }}>
-                  <img src="/mahou-title.svg" width={300} height={70} alt="Logo" style={{ display: 'block', background: 'transparent' }} />
-                </div>
-                <div className="result-item">
-                  <div className="result-label">✨ 真名解放</div>
-                  <div className="result-value">{magicalGirl.realName}</div>
-                </div>
-                <div className="result-item">
-                  <div className="result-label">💝 魔法少女名</div>
-                  <div className="result-value">
-                    {magicalGirl.name}
-                    <div style={{ fontStyle: 'italic', marginTop: '8px', fontSize: '14px', opacity: 0.9 }}>
-                      「{magicalGirl.flowerDescription}」
-                    </div>
-                  </div>
-                </div>
-
-                <div className="result-item">
-                  <div className="result-label">👗 外貌</div>
-                  <div className="result-value">
-                    身高：{magicalGirl.appearance.height}<br />
-                    体重：{magicalGirl.appearance.weight}<br />
-                    发色：{magicalGirl.appearance.hairColor}<br />
-                    发型：{magicalGirl.appearance.hairStyle}<br />
-                    瞳色：{magicalGirl.appearance.eyeColor}<br />
-                    肤色：{magicalGirl.appearance.skinTone}<br />
-                    穿着：{magicalGirl.appearance.wearing}<br />
-                    特征：{magicalGirl.appearance.specialFeature}
-                  </div>
-                </div>
-
-                <div className="result-item">
-                  <div className="result-label">✨ 变身咒语</div>
-                  <div className="result-value">
-                    <div style={{ whiteSpace: 'pre-line' }}>{magicalGirl.spell}</div>
-                  </div>
-                </div>
-
-                <div className="result-item">
-                  <div className="result-label">⭐ 魔法等级</div>
-                  <div className="result-value">
-                    <span className="level-badge">
-                      {magicalGirl.levelEmoji} {magicalGirl.level}
-                    </span>
-                  </div>
-                </div>
-
-                <button onClick={handleSaveImage} className="save-button">
-                  📱 保存为图片
-                </button>
-
-                {/* Logo placeholder for saved images */}
-                <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
-                  <img
-                    src="/logo-white.svg"
-                    width={120}
-                    height={80}
-                    alt="Logo"
-                    style={{
-                      display: 'block',
-                      maxWidth: '100%',
-                      height: 'auto'
-                    }}
-                  />
-                </div>
-              </div>
+        <div className="container">
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem' }}>
+              <img src="/logo.svg" width={250} height={160} alt="Logo" />
             </div>
-          )}
-          <div className="text-center w-full text-sm text-gray-500" style={{ marginTop: '8px' }}> 立绘生成功能开发中（大概）... </div>
-        </div>
+            <p className="subtitle text-center">你是什么魔法少女呢！</p>
 
-        <footer className="footer">
-          <p>
-            <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
-          </p>
-        </footer>
-      </div>
-
-      {/* Image Modal */}
-      {showImageModal && savedImageUrl && (
-        <div className="fixed inset-0 bg-black flex items-center justify-center z-50"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
-        >
-          <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
-            <div className="flex justify-between items-center m-0">
-              <div></div>
-              <button
-                onClick={() => setShowImageModal(false)}
-                className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
-                style={{ marginRight: '0.5rem' }}
-              >
-                ×
-              </button>
-            </div>
-            <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
-              💫 长按图片保存到相册
-            </p>
-            <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
-              <img
-                src={savedImageUrl}
-                alt="魔法少女登记表"
-                className="w-1/2 h-auto rounded-lg mx-auto"
+            <div className="input-group">
+              <label htmlFor="name" className="input-label">
+                请输入你的名字：
+              </label>
+              <input
+                id="name"
+                type="text"
+                value={inputName}
+                onChange={(e) => setInputName(e.target.value)}
+                className="input-field"
+                placeholder="例如：鹿目圆香"
+                onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
               />
             </div>
+
+            <button
+              onClick={handleGenerate}
+              disabled={!inputName.trim() || isGenerating}
+              className="generate-button"
+            >
+              {isGenerating ? '少女创造中，请稍后捏 (≖ᴗ≖)✧✨' : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
+            </button>
+
+            {magicalGirl && (
+              <div
+                ref={resultRef}
+                className="result-card"
+                style={{
+                  background: (() => {
+                    const colors = gradientColors[magicalGirl.appearance.mainColor as MainColor] || gradientColors[MainColor.Pink];
+                    return `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
+                  })()
+                }}
+              >
+                <div className="result-content">
+                  <div className="flex justify-center items-center" style={{ marginBottom: '1rem', background: 'transparent' }}>
+                    <img src="/mahou-title.svg" width={300} height={70} alt="Logo" style={{ display: 'block', background: 'transparent' }} />
+                  </div>
+                  <div className="result-item">
+                    <div className="result-label">✨ 真名解放</div>
+                    <div className="result-value">{magicalGirl.realName}</div>
+                  </div>
+                  <div className="result-item">
+                    <div className="result-label">💝 魔法少女名</div>
+                    <div className="result-value">
+                      {magicalGirl.name}
+                      <div style={{ fontStyle: 'italic', marginTop: '8px', fontSize: '14px', opacity: 0.9 }}>
+                        「{magicalGirl.flowerDescription}」
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="result-item">
+                    <div className="result-label">👗 外貌</div>
+                    <div className="result-value">
+                      身高：{magicalGirl.appearance.height}<br />
+                      体重：{magicalGirl.appearance.weight}<br />
+                      发色：{magicalGirl.appearance.hairColor}<br />
+                      发型：{magicalGirl.appearance.hairStyle}<br />
+                      瞳色：{magicalGirl.appearance.eyeColor}<br />
+                      肤色：{magicalGirl.appearance.skinTone}<br />
+                      穿着：{magicalGirl.appearance.wearing}<br />
+                      特征：{magicalGirl.appearance.specialFeature}
+                    </div>
+                  </div>
+
+                  <div className="result-item">
+                    <div className="result-label">✨ 变身咒语</div>
+                    <div className="result-value">
+                      <div style={{ whiteSpace: 'pre-line' }}>{magicalGirl.spell}</div>
+                    </div>
+                  </div>
+
+                  <div className="result-item">
+                    <div className="result-label">⭐ 魔法等级</div>
+                    <div className="result-value">
+                      <span className="level-badge">
+                        {magicalGirl.levelEmoji} {magicalGirl.level}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button onClick={handleSaveImage} className="save-button">
+                    📱 保存为图片
+                  </button>
+
+                  {/* Logo placeholder for saved images */}
+                  <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
+                    <img
+                      src="/logo-white.svg"
+                      width={120}
+                      height={80}
+                      alt="Logo"
+                      style={{
+                        display: 'block',
+                        maxWidth: '100%',
+                        height: 'auto'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="text-center w-full text-sm text-gray-500" style={{ marginTop: '8px' }}> 立绘生成功能开发中（大概）... </div>
           </div>
+
+          <footer className="footer">
+            <p>
+              <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
+            </p>
+          </footer>
         </div>
-      )}
+
+        {/* Image Modal */}
+        {showImageModal && savedImageUrl && (
+          <div className="fixed inset-0 bg-black flex items-center justify-center z-50"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
+          >
+            <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
+              <div className="flex justify-between items-center m-0">
+                <div></div>
+                <button
+                  onClick={() => setShowImageModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
+                  style={{ marginRight: '0.5rem' }}
+                >
+                  ×
+                </button>
+              </div>
+              <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
+                💫 长按图片保存到相册
+              </p>
+              <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
+                <img
+                  src={savedImageUrl}
+                  alt="魔法少女登记表"
+                  className="w-1/2 h-auto rounded-lg mx-auto"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
