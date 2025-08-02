@@ -184,7 +184,7 @@ export default function Home() {
               value={inputName}
               onChange={(e) => setInputName(e.target.value)}
               className="input-field"
-              placeholder="例如："
+              placeholder="例如：鹿目圆香"
               onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
             />
           </div>

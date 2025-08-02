@@ -67,7 +67,7 @@ export async function generateMagicalGirlWithAI(
   const firstProvider = providers[0];
   console.log(`优先使用第一个提供商: ${firstProvider.name}，模型: ${firstProvider.model}`);
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 1; attempt++) {
     try {
       console.log(`第一个提供商第 ${attempt + 1} 次尝试`);
 
@@ -115,7 +115,7 @@ export async function generateMagicalGirlWithAI(
     const provider = providers[providerIndex];
 
     // 增加 0.3 - 0.1 * providerIndex 的几率跳过这个提供商
-    if (Math.random() < 0.4 - 0.1 * providerIndex) {
+    if (Math.random() < 0.3 - 0.1 * providerIndex) {
       console.log(`跳过提供商: ${provider.name}`);
       continue;
     }
