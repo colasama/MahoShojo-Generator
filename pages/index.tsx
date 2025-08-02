@@ -56,9 +56,20 @@ function seedRandom(str: string): number {
   return Math.abs(hash)
 }
 
-function getRandomFromSeed<T>(array: T[], seed: number, offset: number = 0): T {
-  const index = (seed + offset) % array.length
-  return array[index]
+function getWeightedRandomFromSeed<T>(array: T[], weights: number[], seed: number, offset: number = 0): T {
+  // 使用种子生成 0-1 之间的伪随机数
+  const pseudoRandom = ((seed + offset) * 9301 + 49297) % 233280 / 233280.0
+
+  // 累计权重
+  let cumulativeWeight = 0
+  const cumulativeWeights = weights.map(weight => cumulativeWeight += weight)
+  const totalWeight = cumulativeWeights[cumulativeWeights.length - 1]
+
+  // 找到对应的索引
+  const randomValue = pseudoRandom * totalWeight
+  const index = cumulativeWeights.findIndex(weight => randomValue <= weight)
+
+  return array[index >= 0 ? index : 0]
 }
 
 // 使用 API 路由生成魔法少女
@@ -78,9 +89,12 @@ async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
 
   const aiGenerated: AIGeneratedMagicalGirl = await response.json()
 
-  // 保留原有的随机 level 生成逻辑
+  // 等级概率配置: [种, 芽, 叶, 蕾, 花, 宝石权杖]
+  const levelProbabilities = [0.1, 0.2, 0.3, 0.3, 0.07, 0.03]
+
+  // 使用加权随机选择生成 level
   const seed = seedRandom(aiGenerated.flowerName + inputName)
-  const level = getRandomFromSeed(levels, seed, 6)
+  const level = getWeightedRandomFromSeed(levels, levelProbabilities, seed, 6)
 
   return {
     realName: inputName,
@@ -97,6 +111,8 @@ export default function Home() {
   const [inputName, setInputName] = useState('')
   const [magicalGirl, setMagicalGirl] = useState<MagicalGirl | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [showImageModal, setShowImageModal] = useState(false)
+  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null)
   const resultRef = useRef<HTMLDivElement>(null)
 
   const handleGenerate = async () => {
@@ -121,36 +137,30 @@ export default function Home() {
     try {
       // 临时隐藏保存按钮和说明文字
       const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement
-      const saveInstructions = resultRef.current.querySelector('.save-instructions') as HTMLElement
       const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement
 
       if (saveButton) saveButton.style.display = 'none'
-      if (saveInstructions) saveInstructions.style.display = 'none'
       if (logoPlaceholder) logoPlaceholder.style.display = 'flex'
 
       const result = await snapdom(resultRef.current, {
-        scale: 2,
+        scale: 2.5,
       })
 
       // 恢复按钮显示
       if (saveButton) saveButton.style.display = 'block'
-      if (saveInstructions) saveInstructions.style.display = 'block'
       if (logoPlaceholder) logoPlaceholder.style.display = 'none'
 
-      await result.download({
-        type: 'jpg',
-        scale: 2,
-        filename: `现役魔法少女登记表_${magicalGirl?.name || '魔法少女'}`
-      });
+      // 获取生成的图片URL并显示在modal中
+      const imageUrl = result.url;
+      setSavedImageUrl(imageUrl)
+      setShowImageModal(true)
     } catch {
-      alert('保存图片失败，请重试')
+      alert('生成图片失败，请重试')
       // 确保在失败时也恢复按钮显示
       const saveButton = resultRef.current?.querySelector('.save-button') as HTMLElement
-      const saveInstructions = resultRef.current?.querySelector('.save-instructions') as HTMLElement
       const logoPlaceholder = resultRef.current?.querySelector('.logo-placeholder') as HTMLElement
 
       if (saveButton) saveButton.style.display = 'block'
-      if (saveInstructions) saveInstructions.style.display = 'block'
       if (logoPlaceholder) logoPlaceholder.style.display = 'none'
     }
   }
@@ -249,9 +259,6 @@ export default function Home() {
                 <button onClick={handleSaveImage} className="save-button">
                   📱 保存为图片
                 </button>
-                <div className="save-instructions">
-                  点击按钮下载图片，或长按结果卡片截图保存
-                </div>
 
                 {/* Logo placeholder for saved images */}
                 <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
@@ -279,6 +286,36 @@ export default function Home() {
           </p>
         </footer>
       </div>
+
+      {/* Image Modal */}
+      {showImageModal && savedImageUrl && (
+        <div className="fixed inset-0 bg-black flex items-center justify-center z-50"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
+        >
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
+            <div className="flex justify-between items-center m-0">
+              <div></div>
+              <button
+                onClick={() => setShowImageModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
+                style={{ marginRight: '0.5rem' }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
+              <img
+                src={savedImageUrl}
+                alt="魔法少女登记表"
+                className="w-1/2 h-auto rounded-lg mx-auto"
+              />
+              <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
+                💫 长按图片保存到相册
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
