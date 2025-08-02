@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import Head from 'next/head'
 import { snapdom } from '@zumer/snapdom'
 import { type AIGeneratedMagicalGirl, MainColor } from '../lib/ai'
 
@@ -168,7 +169,12 @@ export default function Home() {
   }
 
   return (
-    <div className="magic-background">
+    <>
+      <Head>
+        <link rel="preload" href="/logo.svg" as="image" type="image/svg+xml" />
+        <link rel="preload" href="/logo-white.svg" as="image" type="image/svg+xml" />
+      </Head>
+      <div className="magic-background">
       <div className="container">
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem' }}>
@@ -318,6 +324,7 @@ export default function Home() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 } 
