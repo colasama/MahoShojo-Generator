@@ -143,7 +143,7 @@ export default function Home() {
       if (logoPlaceholder) logoPlaceholder.style.display = 'flex'
 
       const result = await snapdom(resultRef.current, {
-        scale: 1.5,
+        scale: 1,
       })
 
       // 恢复按钮显示
