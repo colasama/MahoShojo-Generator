@@ -143,15 +143,17 @@ export default function Home() {
       if (logoPlaceholder) logoPlaceholder.style.display = 'flex'
 
       const result = await snapdom(resultRef.current, {
-        scale: 2.5,
+        scale: 1.5,
       })
 
       // 恢复按钮显示
       if (saveButton) saveButton.style.display = 'block'
       if (logoPlaceholder) logoPlaceholder.style.display = 'none'
 
-      // 获取生成的图片URL并显示在modal中
-      const imageUrl = result.url;
+      // 获取 result.toPng() 生成的 HTMLImageElement 的图片 URL
+      // toPng() 返回 Promise<HTMLImageElement>，可通过 .src 获取图片的 base64 url
+      const imgElement = await result.toPng();
+      const imageUrl = imgElement.src;
       setSavedImageUrl(imageUrl)
       setShowImageModal(true)
     } catch {
@@ -310,7 +312,7 @@ export default function Home() {
               <img
                 src={savedImageUrl}
                 alt="魔法少女登记表"
-                className="h-auto rounded-lg mx-auto"
+                className="w-1/2 h-auto rounded-lg mx-auto"
               />
             </div>
           </div>
