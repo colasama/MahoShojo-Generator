@@ -301,6 +301,9 @@ export default function Home() {
             <p>
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
             </p>
+            <p>
+              <a href="https://github.com/colasama/MahoShojo-Generator" target="_blank" rel="noopener noreferrer" className="footer-link">colasama/MahoShojo-Generator</a>
+            </p>
           </footer>
         </div>
 
