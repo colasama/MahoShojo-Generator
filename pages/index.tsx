@@ -303,15 +303,15 @@ export default function Home() {
                 ×
               </button>
             </div>
+            <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
+              💫 长按图片保存到相册
+            </p>
             <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
               <img
                 src={savedImageUrl}
                 alt="魔法少女登记表"
-                className="w-1/2 h-auto rounded-lg mx-auto"
+                className="h-auto rounded-lg mx-auto"
               />
-              <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
-                💫 长按图片保存到相册
-              </p>
             </div>
           </div>
         </div>
