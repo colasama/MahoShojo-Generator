@@ -73,6 +73,10 @@ function getWeightedRandomFromSeed<T>(array: T[], weights: number[], seed: numbe
   return array[index >= 0 ? index : 0]
 }
 
+function checkNameLength(name: string): boolean {
+  return name.length <= 300;
+}
+
 // 使用 API 路由生成魔法少女
 async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
   const response = await fetch('/api/generate-magical-girl', {
@@ -118,6 +122,11 @@ export default function Home() {
 
   const handleGenerate = async () => {
     if (!inputName.trim()) return
+
+    if (!checkNameLength(inputName)) {
+      alert('名字太长啦，你怎么回事！');
+      return
+    }
 
     setIsGenerating(true)
 
