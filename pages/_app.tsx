@@ -1,8 +1,13 @@
 import type { AppProps } from 'next/app'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
 import '@/styles/globals.css'
+import '@/styles/blue-theme.css'
 
 export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter()
+  const isDetailsPage = router.pathname === '/details'
+
   return (
     <>
       <Head>
@@ -11,7 +16,9 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.svg" />
       </Head>
-      <Component {...pageProps} />
+      <div className={isDetailsPage ? 'blue-theme' : ''}>
+        <Component {...pageProps} />
+      </div>
     </>
   )
 } 
