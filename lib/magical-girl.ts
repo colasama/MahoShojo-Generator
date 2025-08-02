@@ -22,8 +22,8 @@ const MagicalGirlGenerationSchema = z.object({
     但是不要出现魔法少女字样`),
   flowerDescription: z.string().describe("生成的 flowerName 在大众文化中的花语，大概 20 字左右，不要出现魔法少女字样"),
   appearance: z.object({
-    height: z.string().describe('身高，格式如 "160cm"，数据在 130cm 到 190cm 之间，参考角色设定来生成'),
-    weight: z.string().describe('体重，格式如 "45kg"，数据在 30kg 到 60kg 之间，参考角色设定来生成'),
+    height: z.string().describe('身高，格式如 "155cm"，数据在 130cm 到 190cm 之间，减少使用 165cm，参考角色设定来生成'),
+    weight: z.string().describe('体重，格式如 "45kg"，数据在 30kg 到 60kg 之间，减少使用 48kg，参考角色设定来生成'),
     hairColor: z.string().describe("头发颜色，会出现渐变和挑染"),
     hairStyle: z.string().describe(`发型，具体到头发长度、发型样式、发饰等，可以是各种各样形状和颜色的发卡，
       发挥你的想象力，符合审美即可，尽量不出现花形状的发饰，也可能是帽子、发卡、发箍之类的`),
