@@ -19,12 +19,12 @@ export type MainColor = typeof MainColor[keyof typeof MainColor];
 // 定义魔法少女生成的 schema（排除 level 相关字段）
 const MagicalGirlGenerationSchema = z.object({
   flowerName: z.string().describe(`魔法少女的花名，应该与真实姓名有一定关联，但是不能包含真实姓名，
-    必须是一种花比如百合 / 丁香 / 茉莉，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度，
+    必须是一种花比如百合 / 丁香 / 茉莉，可以增加冷门的小众的花名概率，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度，
     但是不要出现魔法少女字样`),
   flowerDescription: z.string().describe("生成的 flowerName 在大众文化中的花语，大概 20 字左右，不要出现魔法少女字样"),
   appearance: z.object({
-    height: z.string().describe('身高，格式如 "160cm"'),
-    weight: z.string().describe('体重，格式如 "45kg"'),
+    height: z.string().describe('身高，格式如 "160cm"，数据在 130cm 到 190cm 之间，参考角色设定来生成'),
+    weight: z.string().describe('体重，格式如 "45kg"，数据在 30kg 到 60kg 之间，参考角色设定来生成'),
     hairColor: z.string().describe("头发颜色，会出现渐变和挑染"),
     hairStyle: z.string().describe(`发型，具体到头发长度、发型样式、发饰等，可以是各种各样形状和颜色的发卡，
       发挥你的想象力，符合审美即可，尽量不出现花形状的发饰，也可能是帽子、发卡、发箍之类的`),
