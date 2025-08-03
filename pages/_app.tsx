@@ -1,12 +1,12 @@
-import type { AppProps } from 'next/app'
-import Head from 'next/head'
-import { useRouter } from 'next/router'
-import '@/styles/globals.css'
-import '@/styles/blue-theme.css'
+import type { AppProps } from 'next/app';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import '@/styles/globals.css';
+import '@/styles/blue-theme.css';
 
 export default function App({ Component, pageProps }: AppProps) {
-  const router = useRouter()
-  const isDetailsPage = router.pathname === '/details'
+  const router = useRouter();
+  const isDetailsPage = router.pathname === '/details';
 
   return (
     <>
@@ -20,5 +20,5 @@ export default function App({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
       </div>
     </>
-  )
+  );
 } 

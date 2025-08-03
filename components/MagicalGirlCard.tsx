@@ -1,43 +1,43 @@
-import React, { useRef } from 'react'
-import { snapdom } from '@zumer/snapdom'
+import React, { useRef } from 'react';
+import { snapdom } from '@zumer/snapdom';
 
 interface MagicalGirlCardProps {
   magicalGirl: {
-    codename: string
+    codename: string;
     appearance: {
-      outfit: string
-      accessories: string
-      colorScheme: string
-      overallLook: string
-    }
+      outfit: string;
+      accessories: string;
+      colorScheme: string;
+      overallLook: string;
+    };
     magicConstruct: {
-      name: string
-      form: string
-      basicAbilities: string[]
-      description: string
-    }
+      name: string;
+      form: string;
+      basicAbilities: string[];
+      description: string;
+    };
     wonderlandRule: {
-      name: string
-      description: string
-      tendency: string
-      activation: string
-    }
+      name: string;
+      description: string;
+      tendency: string;
+      activation: string;
+    };
     blooming: {
-      name: string
-      evolvedAbilities: string[]
-      evolvedForm: string
-      evolvedOutfit: string
-      powerLevel: string
-    }
+      name: string;
+      evolvedAbilities: string[];
+      evolvedForm: string;
+      evolvedOutfit: string;
+      powerLevel: string;
+    };
     analysis: {
-      personalityAnalysis: string
-      abilityReasoning: string
-      coreTraits: string[]
-      predictionBasis: string
-    }
-  }
-  gradientStyle: string
-  onSaveImage?: (imageUrl: string) => void
+      personalityAnalysis: string;
+      abilityReasoning: string;
+      coreTraits: string[];
+      predictionBasis: string;
+    };
+  };
+  gradientStyle: string;
+  onSaveImage?: (imageUrl: string) => void;
 }
 
 const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({ 
@@ -45,40 +45,40 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
   gradientStyle,
   onSaveImage 
 }) => {
-  const resultRef = useRef<HTMLDivElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const handleSaveImage = async () => {
-    if (!resultRef.current) return
+    if (!resultRef.current) return;
 
     try {
-      const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement
-      const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement
+      const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement;
+      const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement;
 
-      if (saveButton) saveButton.style.display = 'none'
-      if (logoPlaceholder) logoPlaceholder.style.display = 'flex'
+      if (saveButton) saveButton.style.display = 'none';
+      if (logoPlaceholder) logoPlaceholder.style.display = 'flex';
 
       const result = await snapdom(resultRef.current, {
         scale: 1,
-      })
+      });
 
-      if (saveButton) saveButton.style.display = 'block'
-      if (logoPlaceholder) logoPlaceholder.style.display = 'none'
+      if (saveButton) saveButton.style.display = 'block';
+      if (logoPlaceholder) logoPlaceholder.style.display = 'none';
 
-      const imgElement = await result.toPng()
-      const imageUrl = imgElement.src
+      const imgElement = await result.toPng();
+      const imageUrl = imgElement.src;
       
       if (onSaveImage) {
-        onSaveImage(imageUrl)
+        onSaveImage(imageUrl);
       }
     } catch {
-      alert('生成图片失败，请重试')
-      const saveButton = resultRef.current?.querySelector('.save-button') as HTMLElement
-      const logoPlaceholder = resultRef.current?.querySelector('.logo-placeholder') as HTMLElement
+      alert('生成图片失败，请重试');
+      const saveButton = resultRef.current?.querySelector('.save-button') as HTMLElement;
+      const logoPlaceholder = resultRef.current?.querySelector('.logo-placeholder') as HTMLElement;
 
-      if (saveButton) saveButton.style.display = 'block'
-      if (logoPlaceholder) logoPlaceholder.style.display = 'none'
+      if (saveButton) saveButton.style.display = 'block';
+      if (logoPlaceholder) logoPlaceholder.style.display = 'none';
     }
-  }
+  };
 
   return (
     <div
@@ -182,7 +182,7 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MagicalGirlCard
+export default MagicalGirlCard;

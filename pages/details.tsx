@@ -1,121 +1,121 @@
-import React, { useState, useEffect } from 'react'
-import Head from 'next/head'
-import { useRouter } from 'next/router'
-import MagicalGirlCard from '../components/MagicalGirlCard'
+import React, { useState, useEffect } from 'react';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import MagicalGirlCard from '../components/MagicalGirlCard';
 
 interface Questionnaire {
-  questions: string[]
+  questions: string[];
 }
 
 interface MagicalGirlDetails {
-  codename: string
+  codename: string;
   appearance: {
-    outfit: string
-    accessories: string
-    colorScheme: string
-    overallLook: string
-  }
+    outfit: string;
+    accessories: string;
+    colorScheme: string;
+    overallLook: string;
+  };
   magicConstruct: {
-    name: string
-    form: string
-    basicAbilities: string[]
-    description: string
-  }
+    name: string;
+    form: string;
+    basicAbilities: string[];
+    description: string;
+  };
   wonderlandRule: {
-    name: string
-    description: string
-    tendency: string
-    activation: string
-  }
+    name: string;
+    description: string;
+    tendency: string;
+    activation: string;
+  };
   blooming: {
-    name: string
-    evolvedAbilities: string[]
-    evolvedForm: string
-    evolvedOutfit: string
-    powerLevel: string
-  }
+    name: string;
+    evolvedAbilities: string[];
+    evolvedForm: string;
+    evolvedOutfit: string;
+    powerLevel: string;
+  };
   analysis: {
-    personalityAnalysis: string
-    abilityReasoning: string
-    coreTraits: string[]
-    predictionBasis: string
-  }
+    personalityAnalysis: string;
+    abilityReasoning: string;
+    coreTraits: string[];
+    predictionBasis: string;
+  };
 }
 
 const DetailsPage: React.FC = () => {
-  const router = useRouter()
-  const [questions, setQuestions] = useState<string[]>([])
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [answers, setAnswers] = useState<string[]>([])
-  const [currentAnswer, setCurrentAnswer] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [magicalGirlDetails, setMagicalGirlDetails] = useState<MagicalGirlDetails | null>(null)
-  const [showImageModal, setShowImageModal] = useState(false)
-  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null)
+  const router = useRouter();
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [currentAnswer, setCurrentAnswer] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [magicalGirlDetails, setMagicalGirlDetails] = useState<MagicalGirlDetails | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     // 加载问卷数据
     fetch('/questionnaire.json')
       .then(response => response.json())
       .then((data: Questionnaire) => {
-        setQuestions(data.questions)
-        setAnswers(new Array(data.questions.length).fill(''))
-        setLoading(false)
+        setQuestions(data.questions);
+        setAnswers(new Array(data.questions.length).fill(''));
+        setLoading(false);
       })
       .catch(error => {
-        console.error('加载问卷失败:', error)
-        setLoading(false)
-      })
-  }, [])
+        console.error('加载问卷失败:', error);
+        setLoading(false);
+      });
+  }, []);
 
   const handleNext = () => {
     if (currentAnswer.trim().length === 0) {
-      alert('请输入答案')
-      return
+      alert('请输入答案');
+      return;
     }
 
     if (currentAnswer.length > 30) {
-      alert('答案不得超过30字')
-      return
+      alert('答案不得超过30字');
+      return;
     }
 
-    proceedToNextQuestion(currentAnswer.trim())
-  }
+    proceedToNextQuestion(currentAnswer.trim());
+  };
 
   const handleQuickOption = (option: string) => {
-    proceedToNextQuestion(option)
-  }
+    proceedToNextQuestion(option);
+  };
 
   const proceedToNextQuestion = (answer: string) => {
     // 保存当前答案
-    const newAnswers = [...answers]
-    newAnswers[currentQuestionIndex] = answer
-    setAnswers(newAnswers)
+    const newAnswers = [...answers];
+    newAnswers[currentQuestionIndex] = answer;
+    setAnswers(newAnswers);
 
     if (currentQuestionIndex < questions.length - 1) {
       // 开始渐变动画
-      setIsTransitioning(true)
+      setIsTransitioning(true);
 
       // 延迟切换题目，让淡出动画完成
       setTimeout(() => {
-        setCurrentQuestionIndex(currentQuestionIndex + 1)
-        setCurrentAnswer(newAnswers[currentQuestionIndex + 1] || '')
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setCurrentAnswer(newAnswers[currentQuestionIndex + 1] || '');
 
         // 短暂延迟后开始淡入动画
         setTimeout(() => {
-          setIsTransitioning(false)
-        }, 50)
-      }, 250)
+          setIsTransitioning(false);
+        }, 50);
+      }, 250);
     } else {
       // 提交
-      handleSubmit(newAnswers)
+      handleSubmit(newAnswers);
     }
-  }
+  };
 
   const handleSubmit = async (finalAnswers: string[]) => {
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       console.log('提交答案:', finalAnswers);
       const response = await fetch('/api/generate-magical-girl-details', {
@@ -124,27 +124,27 @@ const DetailsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ answers: finalAnswers })
-      })
+      });
 
       if (response.ok) {
-        const result: MagicalGirlDetails = await response.json()
-        console.log('生成结果:', result)
-        setMagicalGirlDetails(result)
+        const result: MagicalGirlDetails = await response.json();
+        console.log('生成结果:', result);
+        setMagicalGirlDetails(result);
       } else {
-        throw new Error('生成失败')
+        throw new Error('生成失败');
       }
     } catch (error) {
-      console.error('提交失败:', error)
-      alert('提交失败，请重试')
+      console.error('提交失败:', error);
+      alert('提交失败，请重试');
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleSaveImage = (imageUrl: string) => {
-    setSavedImageUrl(imageUrl)
-    setShowImageModal(true)
-  }
+    setSavedImageUrl(imageUrl);
+    setShowImageModal(true);
+  };
 
 
   if (loading) {
@@ -156,7 +156,7 @@ const DetailsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (questions.length === 0) {
@@ -168,15 +168,15 @@ const DetailsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  const isLastQuestion = currentQuestionIndex === questions.length - 1
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
   return (
     <>
       <Head>
-        <title>魔法少女问卷 - IFMahouShoujo</title>
+        <title>魔法少女调查问卷 ~ 奇妙妖精大调查</title>
         <meta name="description" content="回答问卷，生成您的专属魔法少女" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
@@ -292,7 +292,7 @@ const DetailsPage: React.FC = () => {
 
           {/* 显示魔法少女详细信息结果 */}
           {magicalGirlDetails && (
-            <MagicalGirlCard 
+            <MagicalGirlCard
               magicalGirl={magicalGirlDetails}
               gradientStyle="linear-gradient(135deg, #9775fa 0%, #b197fc 100%)"
               onSaveImage={handleSaveImage}
@@ -301,10 +301,10 @@ const DetailsPage: React.FC = () => {
 
           <footer className="footer text-white">
             <p className="text-white">
-              <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
+              问卷与系统设计 <a className="footer-link">@末伏之夜</a>
             </p>
             <p className="text-white">
-              问卷与系统设计 <a className="footer-link">@末伏之夜</a>
+              <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
             </p>
             <p className="text-white">
               <a href="https://github.com/colasama/MahoShojo-Generator" target="_blank" rel="noopener noreferrer" className="footer-link">colasama/MahoShojo-Generator</a>
@@ -343,7 +343,7 @@ const DetailsPage: React.FC = () => {
         )}
       </div>
     </>
-  )
-}
+  );
+};
 
-export default DetailsPage
+export default DetailsPage;
