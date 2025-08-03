@@ -1,9 +1,45 @@
 import React, { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
+import MagicalGirlCard from '../components/MagicalGirlCard'
 
 interface Questionnaire {
   questions: string[]
+}
+
+interface MagicalGirlDetails {
+  codename: string
+  appearance: {
+    outfit: string
+    accessories: string
+    colorScheme: string
+    overallLook: string
+  }
+  magicConstruct: {
+    name: string
+    form: string
+    basicAbilities: string[]
+    description: string
+  }
+  wonderlandRule: {
+    name: string
+    description: string
+    tendency: string
+    activation: string
+  }
+  blooming: {
+    name: string
+    evolvedAbilities: string[]
+    evolvedForm: string
+    evolvedOutfit: string
+    powerLevel: string
+  }
+  analysis: {
+    personalityAnalysis: string
+    abilityReasoning: string
+    coreTraits: string[]
+    predictionBasis: string
+  }
 }
 
 const DetailsPage: React.FC = () => {
@@ -15,6 +51,9 @@ const DetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [magicalGirlDetails, setMagicalGirlDetails] = useState<MagicalGirlDetails | null>(null)
+  const [showImageModal, setShowImageModal] = useState(false)
+  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     // 加载问卷数据
@@ -88,10 +127,9 @@ const DetailsPage: React.FC = () => {
       })
 
       if (response.ok) {
-        const result = await response.json()
+        const result: MagicalGirlDetails = await response.json()
         console.log('生成结果:', result)
-        // 这里可以跳转到结果页面或显示结果
-        alert('生成成功!')
+        setMagicalGirlDetails(result)
       } else {
         throw new Error('生成失败')
       }
@@ -101,6 +139,11 @@ const DetailsPage: React.FC = () => {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleSaveImage = (imageUrl: string) => {
+    setSavedImageUrl(imageUrl)
+    setShowImageModal(true)
   }
 
 
@@ -247,6 +290,15 @@ const DetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* 显示魔法少女详细信息结果 */}
+          {magicalGirlDetails && (
+            <MagicalGirlCard 
+              magicalGirl={magicalGirlDetails}
+              gradientStyle="linear-gradient(135deg, #9775fa 0%, #b197fc 100%)"
+              onSaveImage={handleSaveImage}
+            />
+          )}
+
           <footer className="footer text-white">
             <p className="text-white">
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
@@ -259,6 +311,36 @@ const DetailsPage: React.FC = () => {
             </p>
           </footer>
         </div>
+
+        {/* Image Modal */}
+        {showImageModal && savedImageUrl && (
+          <div className="fixed inset-0 bg-black flex items-center justify-center z-50"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
+          >
+            <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
+              <div className="flex justify-between items-center m-0">
+                <div></div>
+                <button
+                  onClick={() => setShowImageModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
+                  style={{ marginRight: '0.5rem' }}
+                >
+                  ×
+                </button>
+              </div>
+              <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
+                💫 长按图片保存到相册
+              </p>
+              <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
+                <img
+                  src={savedImageUrl}
+                  alt="魔法少女详细档案"
+                  className="w-1/2 h-auto rounded-lg mx-auto"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
