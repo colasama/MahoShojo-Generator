@@ -6,12 +6,13 @@ import { z } from 'zod';
 // 定义基于问卷的魔法少女详细信息生成 schema
 const MagicalGirlDetailsSchema = z.object({
   codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名，
-    必须是一种现实中存在的花比如百合 / 丁香 / 茉莉，可以增加冷门的小众的花名概率。
-    减少鸢尾和曼陀罗的出现概率，可以在预测列表的 top-5 中选取，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度`),
+    推荐使用一些不那么常见的会开花的植物，比如树、果、草的花，只要是能开花的植物都行，增加冷门的小众的植物名概率。
+    减少鸢尾和曼陀罗的出现概率，可以在预测列表的 top-5 中选取，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度
+    参考：矢车菊 / 翠雀 / 苹果 / 艾草 / 白玫 / 朝颜 / 玛格丽特 / 翠雀 / 木百合 / 曙草`),
   appearance: z.object({
     outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，大约50字左右"),
     accessories: z.string().describe("变身后的饰品细节描述，大约50字左右"),
-    colorScheme: z.string().describe("主要色调和配色方案"),
+    colorScheme: z.string().describe("参考问卷生成主要色调和配色方案"),
     overallLook: z.string().describe("整体外观风格，大约50字左右")
   }),
   magicConstruct: z.object({
