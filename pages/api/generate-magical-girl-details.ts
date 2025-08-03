@@ -7,7 +7,7 @@ import { z } from 'zod';
 const MagicalGirlDetailsSchema = z.object({
   codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名，
     必须是一种现实中存在的花比如百合 / 丁香 / 茉莉，可以增加冷门的小众的花名概率。
-    尽可能不要出现鸢尾，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度`),
+    减少鸢尾和曼陀罗的出现概率，可以在预测列表的 top-5 中选取，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度`),
   appearance: z.object({
     outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，大约50字左右"),
     accessories: z.string().describe("变身后的饰品细节描述，大约50字左右"),
