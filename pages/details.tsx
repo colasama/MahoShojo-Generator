@@ -42,6 +42,70 @@ interface MagicalGirlDetails {
   };
 }
 
+const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails }> = ({ magicalGirlDetails }) => {
+  const [isMobile, setIsMobile] = useState(false);
+  const [showJsonText, setShowJsonText] = useState(false);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
+    setIsMobile(isMobileDevice);
+  }, []);
+
+  const downloadJson = () => {
+    const jsonData = JSON.stringify(magicalGirlDetails, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `魔法少女_${magicalGirlDetails.codename || 'data'}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSave = () => {
+    if (isMobile) {
+      setShowJsonText(true);
+    } else {
+      downloadJson();
+    }
+  };
+
+  if (showJsonText) {
+    return (
+      <div className="text-left">
+        <div className="mb-4 text-center">
+          <p className="text-sm text-gray-600 mb-2">请复制以下数据并保存</p>
+          <button
+            onClick={() => setShowJsonText(false)}
+            className="text-blue-600 text-sm"
+          >
+            返回
+          </button>
+        </div>
+        <textarea
+          value={JSON.stringify(magicalGirlDetails, null, 2)}
+          readOnly
+          className="w-full h-64 p-3 border rounded-lg text-xs font-mono bg-gray-50"
+          onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+        />
+        <p className="text-xs text-gray-500 mt-2 text-center">点击文本框可全选内容</p>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleSave}
+      className="generate-button"
+    >
+      {isMobile ? '查看原始数据' : '下载设定文件'}
+    </button>
+  );
+};
+
 const DetailsPage: React.FC = () => {
   const router = useRouter();
   const [questions, setQuestions] = useState<string[]>([]);
@@ -328,11 +392,21 @@ const DetailsPage: React.FC = () => {
 
           {/* 显示魔法少女详细信息结果 */}
           {magicalGirlDetails && (
-            <MagicalGirlCard
-              magicalGirl={magicalGirlDetails}
-              gradientStyle="linear-gradient(135deg, #9775fa 0%, #b197fc 100%)"
-              onSaveImage={handleSaveImage}
-            />
+            <>
+              <MagicalGirlCard
+                magicalGirl={magicalGirlDetails}
+                gradientStyle="linear-gradient(135deg, #9775fa 0%, #b197fc 100%)"
+                onSaveImage={handleSaveImage}
+              />
+
+              {/* 保存原始数据按钮 */}
+              <div className="card" style={{ marginTop: '1rem' }}>
+                <div className="text-center">
+                  <h3 className="text-lg font-medium text-blue-900" style={{ marginBottom: '1rem' }}>保存人物设定</h3>
+                  <SaveJsonButton magicalGirlDetails={magicalGirlDetails} />
+                </div>
+              </div>
+            </>
           )}
 
           <footer className="footer text-white">
