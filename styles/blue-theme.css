@@ -14,7 +14,7 @@ body {
 }
 
 body {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
     min-height: 100vh;
 }
 
@@ -30,10 +30,10 @@ a {
 }
 
 
-/* 魔法少女主题样式 */
+/* 蓝色主题样式 - 只在 .blue-theme 容器内生效 */
 
-.magic-background {
-    background: linear-gradient(45deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+.blue-theme .magic-background {
+    background: linear-gradient(45deg, #4f46e5 0%, #7c3aed 50%, #3b82f6 100%);
     min-height: 100vh;
     position: relative;
     overflow: hidden;
@@ -79,11 +79,11 @@ a {
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.title {
+.blue-theme .title {
     text-align: center;
     font-size: 2rem;
     font-weight: bold;
-    background: linear-gradient(45deg, #ff6b6b, #ee5a6f, #d63384);
+    background: linear-gradient(45deg, #3b82f6, #1d4ed8, #1e40af);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -112,16 +112,16 @@ a {
     background: rgba(255, 255, 255, 0.8);
 }
 
-.input-field:focus {
+.blue-theme .input-field:focus {
     outline: none;
-    border-color: #ff6b6b;
-    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.generate-button {
+.blue-theme .generate-button {
     width: 100%;
     padding: 15px;
-    background: linear-gradient(45deg, #ff6b6b, #ee5a6f);
+    background: linear-gradient(45deg, #3b82f6, #1d4ed8);
     color: white;
     border: none;
     border-radius: 12px;
@@ -132,9 +132,9 @@ a {
     margin-bottom: 20px;
 }
 
-.generate-button:hover {
+.blue-theme .generate-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
 }
 
 .generate-button:disabled {
@@ -143,8 +143,8 @@ a {
     transform: none;
 }
 
-.result-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.blue-theme .result-card {
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
     color: white;
     border-radius: 15px;
     padding: 25px;
@@ -237,7 +237,7 @@ a {
     .card {
         padding: 20px;
     }
-    .title {
+    .blue-theme .title {
         font-size: 1.5rem;
     }
 }
@@ -250,8 +250,8 @@ a {
     font-style: italic;
 }
 
-.error-message {
-    background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+.blue-theme .error-message {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
     color: white;
     padding: 15px;
     border-radius: 10px;
@@ -280,26 +280,14 @@ a {
     font-size: 14px;
 }
 
-.footer-link {
-    color: #ff6b6b;
+.blue-theme .footer-link {
+    color: #3b82f6;
     font-weight: 600;
     text-decoration: none;
     transition: all 0.3s ease;
 }
 
-.footer-link:hover {
-    color: #ee5a6f;
+.blue-theme .footer-link:hover {
+    color: #1d4ed8;
     text-decoration: underline;
-}
-
-/* 问题切换动画 */
-@keyframes slideInFromRight {
-    from {
-        opacity: 0;
-        transform: translateX(100px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
 }

@@ -1,28 +1,29 @@
-import React, { useState, useRef } from 'react'
-import Head from 'next/head'
-import { snapdom } from '@zumer/snapdom'
-import { type AIGeneratedMagicalGirl, MainColor } from '../lib/magical-girl'
+import React, { useState, useRef } from 'react';
+import Head from 'next/head';
+import { snapdom } from '@zumer/snapdom';
+import { type AIGeneratedMagicalGirl } from '../lib/magical-girl';
+import { MainColor } from '../lib/main-color';
 
 interface MagicalGirl {
-  realName: string
-  name: string
-  flowerDescription: string
+  realName: string;
+  name: string;
+  flowerDescription: string;
   appearance: {
-    height: string
-    weight: string
-    hairColor: string
-    hairStyle: string
-    eyeColor: string
-    skinTone: string
-    wearing: string
-    specialFeature: string
-    mainColor: string // 写法有点诡异，但是能用就行.jpg
-    firstPageColor: string
-    secondPageColor: string
-  }
-  spell: string
-  level: string
-  levelEmoji: string
+    height: string;
+    weight: string;
+    hairColor: string;
+    hairStyle: string;
+    eyeColor: string;
+    skinTone: string;
+    wearing: string;
+    specialFeature: string;
+    mainColor: string; // 写法有点诡异，但是能用就行.jpg
+    firstPageColor: string;
+    secondPageColor: string;
+  };
+  spell: string;
+  level: string;
+  levelEmoji: string;
 }
 
 // 保留原有的 levels 数组和相关函数
@@ -33,10 +34,10 @@ const levels = [
   { name: '蕾', emoji: '🌸' },
   { name: '花', emoji: '🌺' },
   { name: '宝石权杖', emoji: '💎' }
-]
+];
 
 // 定义8套渐变配色方案，与 MainColor 枚举顺序对应
-const gradientColors: Record<MainColor, { first: string; second: string }> = {
+const gradientColors: Record<string, { first: string; second: string }> = {
   [MainColor.Red]: { first: '#ff6b6b', second: '#ee5a6f' },
   [MainColor.Orange]: { first: '#ff922b', second: '#ffa94d' },
   [MainColor.Cyan]: { first: '#22b8cf', second: '#66d9e8' },
@@ -45,32 +46,32 @@ const gradientColors: Record<MainColor, { first: string; second: string }> = {
   [MainColor.Pink]: { first: '#ff9a9e', second: '#fecfef' },
   [MainColor.Yellow]: { first: '#f59f00', second: '#fcc419' },
   [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
-}
+};
 
 function seedRandom(str: string): number {
-  let hash = 0
+  let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
   }
-  return Math.abs(hash)
+  return Math.abs(hash);
 }
 
 function getWeightedRandomFromSeed<T>(array: T[], weights: number[], seed: number, offset: number = 0): T {
   // 使用种子生成 0-1 之间的伪随机数
-  const pseudoRandom = ((seed + offset) * 9301 + 49297) % 233280 / 233280.0
+  const pseudoRandom = ((seed + offset) * 9301 + 49297) % 233280 / 233280.0;
 
   // 累计权重
-  let cumulativeWeight = 0
-  const cumulativeWeights = weights.map(weight => cumulativeWeight += weight)
-  const totalWeight = cumulativeWeights[cumulativeWeights.length - 1]
+  let cumulativeWeight = 0;
+  const cumulativeWeights = weights.map(weight => cumulativeWeight += weight);
+  const totalWeight = cumulativeWeights[cumulativeWeights.length - 1];
 
   // 找到对应的索引
-  const randomValue = pseudoRandom * totalWeight
-  const index = cumulativeWeights.findIndex(weight => randomValue <= weight)
+  const randomValue = pseudoRandom * totalWeight;
+  const index = cumulativeWeights.findIndex(weight => randomValue <= weight);
 
-  return array[index >= 0 ? index : 0]
+  return array[index >= 0 ? index : 0];
 }
 
 function checkNameLength(name: string): boolean {
@@ -85,21 +86,21 @@ async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ name: inputName }),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || '生成失败')
+    const error = await response.json();
+    throw new Error(error.error || '生成失败');
   }
 
-  const aiGenerated: AIGeneratedMagicalGirl = await response.json()
+  const aiGenerated: AIGeneratedMagicalGirl = await response.json();
 
   // 等级概率配置: [种, 芽, 叶, 蕾, 花, 宝石权杖]
-  const levelProbabilities = [0.1, 0.2, 0.3, 0.3, 0.07, 0.03]
+  const levelProbabilities = [0.1, 0.2, 0.3, 0.3, 0.07, 0.03];
 
   // 使用加权随机选择生成 level
-  const seed = seedRandom(aiGenerated.flowerName + inputName)
-  const level = getWeightedRandomFromSeed(levels, levelProbabilities, seed, 6)
+  const seed = seedRandom(aiGenerated.flowerName + inputName);
+  const level = getWeightedRandomFromSeed(levels, levelProbabilities, seed, 6);
 
   return {
     realName: inputName,
@@ -109,73 +110,73 @@ async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
     spell: aiGenerated.spell,
     level: level.name,
     levelEmoji: level.emoji
-  }
+  };
 }
 
 export default function Home() {
-  const [inputName, setInputName] = useState('')
-  const [magicalGirl, setMagicalGirl] = useState<MagicalGirl | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [showImageModal, setShowImageModal] = useState(false)
-  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null)
-  const resultRef = useRef<HTMLDivElement>(null)
+  const [inputName, setInputName] = useState('');
+  const [magicalGirl, setMagicalGirl] = useState<MagicalGirl | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const handleGenerate = async () => {
-    if (!inputName.trim()) return
+    if (!inputName.trim()) return;
 
     if (!checkNameLength(inputName)) {
       alert('名字太长啦，你怎么回事！');
-      return
+      return;
     }
 
-    setIsGenerating(true)
+    setIsGenerating(true);
 
     try {
-      const result = await generateMagicalGirl(inputName.trim())
-      setMagicalGirl(result)
+      const result = await generateMagicalGirl(inputName.trim());
+      setMagicalGirl(result);
     } catch {
       // 显示错误提示
-      alert(`✨ 魔法失效了！请再生成一次试试吧~`)
+      alert(`✨ 魔法失效了！请再生成一次试试吧~`);
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
   const handleSaveImage = async () => {
-    if (!resultRef.current) return
+    if (!resultRef.current) return;
 
     try {
       // 临时隐藏保存按钮和说明文字
-      const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement
-      const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement
+      const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement;
+      const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement;
 
-      if (saveButton) saveButton.style.display = 'none'
-      if (logoPlaceholder) logoPlaceholder.style.display = 'flex'
+      if (saveButton) saveButton.style.display = 'none';
+      if (logoPlaceholder) logoPlaceholder.style.display = 'flex';
 
       const result = await snapdom(resultRef.current, {
         scale: 1,
-      })
+      });
 
       // 恢复按钮显示
-      if (saveButton) saveButton.style.display = 'block'
-      if (logoPlaceholder) logoPlaceholder.style.display = 'none'
+      if (saveButton) saveButton.style.display = 'block';
+      if (logoPlaceholder) logoPlaceholder.style.display = 'none';
 
       // 获取 result.toPng() 生成的 HTMLImageElement 的图片 URL
       // toPng() 返回 Promise<HTMLImageElement>，可通过 .src 获取图片的 base64 url
       const imgElement = await result.toPng();
       const imageUrl = imgElement.src;
-      setSavedImageUrl(imageUrl)
-      setShowImageModal(true)
+      setSavedImageUrl(imageUrl);
+      setShowImageModal(true);
     } catch {
-      alert('生成图片失败，请重试')
+      alert('生成图片失败，请重试');
       // 确保在失败时也恢复按钮显示
-      const saveButton = resultRef.current?.querySelector('.save-button') as HTMLElement
-      const logoPlaceholder = resultRef.current?.querySelector('.logo-placeholder') as HTMLElement
+      const saveButton = resultRef.current?.querySelector('.save-button') as HTMLElement;
+      const logoPlaceholder = resultRef.current?.querySelector('.logo-placeholder') as HTMLElement;
 
-      if (saveButton) saveButton.style.display = 'block'
-      if (logoPlaceholder) logoPlaceholder.style.display = 'none'
+      if (saveButton) saveButton.style.display = 'block';
+      if (logoPlaceholder) logoPlaceholder.style.display = 'none';
     }
-  }
+  };
 
   return (
     <>
@@ -220,7 +221,7 @@ export default function Home() {
                 className="result-card"
                 style={{
                   background: (() => {
-                    const colors = gradientColors[magicalGirl.appearance.mainColor as MainColor] || gradientColors[MainColor.Pink];
+                    const colors = gradientColors[magicalGirl.appearance.mainColor] || gradientColors[MainColor.Pink];
                     return `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
                   })()
                 }}
@@ -338,5 +339,5 @@ export default function Home() {
         )}
       </div>
     </>
-  )
+  );
 } 

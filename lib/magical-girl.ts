@@ -1,19 +1,9 @@
 import { z } from "zod";
 import { config } from "./config";
 import { generateWithAI, GenerationConfig } from "./ai";
+import { MainColor } from "./main-color";
 
-export const MainColor = {
-  Red: '红色',
-  Orange: '橙色',
-  Cyan: '青色',
-  Blue: '蓝色',
-  Purple: '紫色',
-  Pink: '粉色',
-  Yellow: '黄色',
-  Green: '绿色'
-} as const;
-
-export type MainColor = typeof MainColor[keyof typeof MainColor];
+export type MainColor = (typeof MainColor)[keyof typeof MainColor];
 
 // 定义魔法少女生成的 schema（排除 level 相关字段）
 const MagicalGirlGenerationSchema = z.object({
