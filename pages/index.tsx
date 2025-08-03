@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { snapdom } from '@zumer/snapdom';
 import { type AIGeneratedMagicalGirl } from '../lib/magical-girl';
 import { MainColor } from '../lib/main-color';
+import Link from 'next/link';
 
 interface MagicalGirl {
   realName: string;
@@ -192,7 +193,7 @@ export default function Home() {
             </div>
             <p className="subtitle text-center">你是什么魔法少女呢！</p>
             <p className="subtitle text-center">
-              或者要不要来试试 <a href="/details" className="footer-link">奇妙妖精大调查</a>？
+              或者要不要来试试 <Link href="/details" className="footer-link">奇妙妖精大调查</Link>？
             </p>
             <div className="input-group">
               <label htmlFor="name" className="input-label">
