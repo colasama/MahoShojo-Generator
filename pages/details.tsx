@@ -198,10 +198,10 @@ const DetailsPage: React.FC = () => {
             {showIntroduction ? (
               // 介绍部分
               <div className="text-center">
-                <div className="mb-6 leading-relaxed"
+                <div className="mb-6 leading-relaxed text-gray-800"
                   style={{ lineHeight: '1.5', marginTop: '3rem', marginBottom: '4rem' }}
                 >
-                  你在魔法少女道路上的潜力和表现将会是如何？<br />
+                  你在魔法少女道路上的潜力和表现将会如何？<br />
                 </div>
                 <button
                   onClick={handleStartQuestionnaire}

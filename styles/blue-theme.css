@@ -281,13 +281,13 @@ a {
 }
 
 .blue-theme .footer-link {
-    color: #3b82f6;
+    color: #abcbff;
     font-weight: 600;
     text-decoration: none;
     transition: all 0.3s ease;
 }
 
 .blue-theme .footer-link:hover {
-    color: #1d4ed8;
+    color: #8298d6;
     text-decoration: underline;
 }

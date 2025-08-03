@@ -191,7 +191,9 @@ export default function Home() {
               <img src="/logo.svg" width={250} height={160} alt="Logo" />
             </div>
             <p className="subtitle text-center">你是什么魔法少女呢！</p>
-
+            <p className="subtitle text-center">
+              或者要不要来试试 <a href="/details" className="footer-link">奇妙妖精大调查</a>？
+            </p>
             <div className="input-group">
               <label htmlFor="name" className="input-label">
                 请输入你的名字：
