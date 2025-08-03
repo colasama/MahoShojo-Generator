@@ -40,10 +40,10 @@ interface MagicalGirlCardProps {
   onSaveImage?: (imageUrl: string) => void;
 }
 
-const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({ 
-  magicalGirl, 
+const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
+  magicalGirl,
   gradientStyle,
-  onSaveImage 
+  onSaveImage
 }) => {
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -66,7 +66,7 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
 
       const imgElement = await result.toPng();
       const imageUrl = imgElement.src;
-      
+
       if (onSaveImage) {
         onSaveImage(imageUrl);
       }
@@ -88,9 +88,9 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
     >
       <div className="result-content">
         <div className="flex justify-center items-center" style={{ marginBottom: '1rem', background: 'transparent' }}>
-          <img src="/mahou-title.svg" width={300} height={70} alt="Logo" style={{ display: 'block', background: 'transparent' }} />
+          <img src="/questionnaire-title.svg" width={300} height={70} alt="Logo" style={{ display: 'block', background: 'transparent' }} />
         </div>
-        
+
         {/* 基本信息 */}
         <div className="result-item">
           <div className="result-label">💝 魔法少女代号</div>
