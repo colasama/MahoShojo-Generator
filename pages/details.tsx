@@ -88,7 +88,7 @@ const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails }> = ({ 
         <textarea
           value={JSON.stringify(magicalGirlDetails, null, 2)}
           readOnly
-          className="w-full h-64 p-3 border rounded-lg text-xs font-mono bg-gray-50"
+          className="w-full h-64 p-3 border rounded-lg text-xs font-mono bg-gray-50 text-gray-900"
           onClick={(e) => (e.target as HTMLTextAreaElement).select()}
         />
         <p className="text-xs text-gray-500 mt-2 text-center">点击文本框可全选内容</p>
