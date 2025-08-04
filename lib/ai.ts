@@ -13,6 +13,7 @@ export interface GenerationConfig<T, I = string> {
   promptBuilder: (input: I) => string;
   schema: z.ZodSchema<T>;
   taskName: string;
+  maxTokens: number;
 }
 
 // 通用 AI 生成函数
@@ -49,6 +50,7 @@ export async function generateWithAI<T, I = string>(
         prompt: generationConfig.promptBuilder(input),
         schema: generationConfig.schema,
         temperature: generationConfig.temperature,
+        maxTokens: generationConfig.maxTokens,
       });
 
       console.log(`第一个提供商第 ${attempt + 1} 次尝试成功`);

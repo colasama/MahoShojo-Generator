@@ -81,7 +81,8 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
     return `请基于以下问卷回答开始分析和预测：${questionAnswerPairs}`
   },
   schema: MagicalGirlDetailsSchema,
-  taskName: "生成魔法少女详细信息"
+  taskName: "生成魔法少女详细信息",
+  maxTokens: 3000,
 }
 
 export default async function handler(

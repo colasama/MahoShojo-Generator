@@ -42,7 +42,8 @@ const magicalGirlGenerationConfig: GenerationConfig<AIGeneratedMagicalGirl, stri
   temperature: config.MAGICAL_GIRL_GENERATION.temperature,
   promptBuilder: (realName: string) => `请为名叫"${realName}"的人设计一个魔法少女角色。真实姓名：${realName}`,
   schema: MagicalGirlGenerationSchema,
-  taskName: "生成魔法少女"
+  taskName: "生成魔法少女",
+  maxTokens: 2000,
 };
 
 // 生成魔法少女的函数（使用通用函数）
