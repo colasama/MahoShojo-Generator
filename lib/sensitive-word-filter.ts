@@ -1,0 +1,286 @@
+// 防止屏蔽，所以用base64编码并直接扔文件里
+const sensitiveWordsConfig = {
+    mask: "*",
+    mask_word: "",
+    words: [
+        "5Lmg6L+R5bmz",
+        "6IOh6ZSm5rab",
+        "5rGf5rO95rCR",
+        "5rip5a625a6d",
+        "5p2O5YWL5by6",
+        "5p2O6ZW/5pil",
+        "5q+b5rO95Lic",
+        "6YKT5bCP5bmz",
+        "5ZGo5oGp5p2l",
+        "6ams5YWL5oCd",
+        "56S+5Lya5Li75LmJ",
+        "5YWx5Lqn5YWa",
+        "5YWx5Lqn5Li75LmJ",
+        "5aSn6ZmG5a6Y5pa5",
+        "5YyX5Lqs5pS/5p2D",
+        "5Lit5Y2O5bid5Zu9",
+        "5Lit5Zu95pS/5bqc",
+        "5YWx54uX",
+        "5YWt5Zub5LqL5Lu2",
+        "5aSp5a6J6Zeo",
+        "5YWt5Zub",
+        "5pS/5rK75bGA5bi45aeU",
+        "5Lik5Lya",
+        "5YWx6Z2S5Zui",
+        "5a2m5r2u",
+        "5YWr5Lmd",
+        "5LqM5Y2B5aSn",
+        "5rCR6L+b5YWa",
+        "5Y+w54us",
+        "5Y+w5rm+54us56uL",
+        "5Y+w5rm+5Zu9",
+        "5Zu95rCR5YWa",
+        "5Y+w5rm+5rCR5Zu9",
+        "5Lit5Y2O5rCR5Zu9",
+        "cG9ybmh1Yg==",
+        "UG9ybmh1Yg==",
+        "W1l5XW91W1BwXW9ybg==",
+        "cG9ybg==",
+        "UG9ybg==",
+        "W1h4XVtWdl1pZGVvcw==",
+        "W1JyXWVkW1R0XXViZQ==",
+        "W1h4XVtIaF1hbXN0ZXI=",
+        "W1NzXXBhbmtbV3ddaXJl",
+        "W1NzXXBhbmtbQmJdYW5n",
+        "W1R0XXViZTg=",
+        "W1l5XW91W0pqXWl6eg==",
+        "W0JiXXJhenplcnM=",
+        "W05uXWF1Z2h0eVsgXT9bQWFdbWVyaWNh",
+        "5L2c54ix",
+        "5YGa54ix",
+        "5oCn5Lqk",
+        "5oCn54ix",
+        "6Ieq5oWw",
+        "6Zi06IyO",
+        "5rer5aaH",
+        "6IKb5Lqk",
+        "5Lqk6YWN",
+        "5oCn5YWz57O7",
+        "5oCn5rS75Yqo",
+        "6Imy5oOF",
+        "6Imy5Zu+",
+        "5rap5Zu+",
+        "6KO45L2T",
+        "5bCP56m0",
+        "5rer6I2h",
+        "5oCn54ix",
+        "57+75aKZ",
+        "VlBO",
+        "56eR5a2m5LiK572R",
+        "5oyC5qKv5a2Q",
+        "R0ZX"
+    ],
+    encoding: "base64",
+    original_count: 71
+}
+
+/**
+ * 敏感词过滤结果接口
+ */
+interface FilterResult {
+    /** 是否包含敏感词 */
+    hasSensitiveWords: boolean;
+    /** 检测到的敏感词列表 */
+    detectedWords: string[];
+    /** 过滤后的文本（敏感词被替换） */
+    filteredText: string;
+    /** 原始文本 */
+    originalText: string;
+    /** 是否需要跳转到被捕页面 */
+    shouldRedirectToArrested: boolean;
+}
+
+/**
+ * 敏感词配置接口
+ */
+interface SensitiveWordsConfig {
+    mask: string;
+    mask_word: string;
+    words: string[];
+    encoding?: string;
+    original_count?: number;
+}
+
+/**
+ * 敏感词过滤器类
+ */
+export class SensitiveWordFilter {
+    private sensitiveWords: string[] = [];
+    private config: SensitiveWordsConfig | null = null;
+    private isInitialized: boolean = false;
+
+    constructor() {
+        this.config = sensitiveWordsConfig;
+        this.initialize();
+    }
+
+    /**
+     * 初始化敏感词列表
+     */
+    async initialize(): Promise<boolean> {
+        try {
+            if (!this.config || !this.config.words) {
+                throw new Error('配置文件格式错误');
+            }
+
+            // 如果是编码后的文件，需要解码
+            if (this.config.encoding === 'base64') {
+                this.sensitiveWords = this.config.words.map(word =>
+                    Buffer.from(word, 'base64').toString('utf8')
+                );
+            } else {
+                this.sensitiveWords = [...this.config.words];
+            }
+
+            this.isInitialized = true;
+            console.log(`✅ 敏感词过滤器初始化成功，加载了 ${this.sensitiveWords.length} 个敏感词`);
+            return true;
+        } catch (error) {
+            console.error('❌ 初始化敏感词过滤器失败:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 检查文本中是否包含敏感词
+     */
+    checkText(text: string): FilterResult {
+        if (!this.isInitialized) {
+            throw new Error('过滤器未初始化，请先调用 initialize() 方法');
+        }
+
+        const detectedWords: string[] = [];
+        let filteredText = text;
+
+        // 检查每个敏感词
+        for (const word of this.sensitiveWords) {
+            // 处理正则表达式格式的敏感词
+            const isRegex = word.includes('[') || word.includes('(') || word.includes('|');
+
+            if (isRegex) {
+                try {
+                    const regex = new RegExp(word, 'gi');
+                    const matches = text.match(regex);
+                    if (matches) {
+                        matches.forEach(match => {
+                            if (!detectedWords.includes(match)) {
+                                detectedWords.push(match);
+                            }
+                        });
+                        // 替换敏感词
+                        filteredText = filteredText.replace(regex, this.getMaskString(match => match));
+                    }
+                } catch (regexError) {
+                    // 如果正则表达式格式错误，按普通字符串处理
+                    if (text.toLowerCase().includes(word.toLowerCase())) {
+                        detectedWords.push(word);
+                        filteredText = this.replaceSensitiveWord(filteredText, word);
+                    }
+                }
+            } else {
+                // 普通字符串匹配（忽略大小写）
+                if (text.toLowerCase().includes(word.toLowerCase())) {
+                    detectedWords.push(word);
+                    filteredText = this.replaceSensitiveWord(filteredText, word);
+                }
+            }
+        }
+
+        const hasSensitiveWords = detectedWords.length > 0;
+
+        return {
+            hasSensitiveWords,
+            detectedWords,
+            filteredText,
+            originalText: text,
+            shouldRedirectToArrested: hasSensitiveWords
+        };
+    }
+
+    /**
+     * 替换敏感词
+     */
+    private replaceSensitiveWord(text: string, word: string): string {
+        if (!this.config) return text;
+
+        const regex = new RegExp(word, 'gi');
+
+        if (this.config.mask_word && this.config.mask_word.trim() !== '') {
+            // 如果设置了完整替换词，用它替换整个敏感词
+            return text.replace(regex, this.config.mask_word);
+        } else {
+            // 否则用mask字符替换敏感词的每个字符
+            return text.replace(regex, (match) => this.config!.mask.repeat(match.length));
+        }
+    }
+
+    /**
+     * 获取遮罩字符串
+     */
+    private getMaskString(wordGetter: (match: string) => string): (match: string) => string {
+        return (match: string) => {
+            if (this.config?.mask_word && this.config.mask_word.trim() !== '') {
+                return this.config.mask_word;
+            } else {
+                return (this.config?.mask || '*').repeat(match.length);
+            }
+        };
+    }
+
+    /**
+     * 批量检查文本数组
+     */
+    checkTextArray(texts: string[]): FilterResult[] {
+        return texts.map(text => this.checkText(text));
+    }
+
+    /**
+     * 检查文本并决定是否跳转
+     */
+    async checkAndRedirect(text: string, redirectCallback?: () => void): Promise<FilterResult> {
+        const result = this.checkText(text);
+
+        if (result.shouldRedirectToArrested) {
+            console.warn(`🚨 检测到敏感词: ${result.detectedWords.join(', ')}`);
+
+            if (redirectCallback) {
+                redirectCallback();
+            } else {
+                // 如果在浏览器环境中
+                if (typeof window !== 'undefined' && window.location) {
+                    window.location.href = '/arrested';
+                } else {
+                    console.log('🚨 应该跳转到 /arrested 页面');
+                }
+            }
+        }
+
+        return result;
+    }
+}
+
+/**
+ * 创建默认的敏感词过滤器实例
+ */
+export const createSensitiveWordFilter = (): SensitiveWordFilter => {
+    return new SensitiveWordFilter();
+};
+
+
+/**
+ * 快速检查并跳转函数
+ */
+export const quickCheck = async (
+    text: string
+): Promise<FilterResult> => {
+    const filter = createSensitiveWordFilter();
+    return filter.checkText(text);
+};
+
+
+export default SensitiveWordFilter;

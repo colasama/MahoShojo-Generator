@@ -5,6 +5,8 @@ import { type AIGeneratedMagicalGirl } from '../lib/magical-girl';
 import { MainColor } from '../lib/main-color';
 import Link from 'next/link';
 import { useCooldown } from '../lib/cooldown';
+import { quickCheck } from '@/lib/sensitive-word-filter';
+import { useRouter } from 'next/router';
 
 interface MagicalGirl {
   realName: string;
@@ -153,7 +155,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateMagicalGirlCooldown', 60000);
-
+  const router = useRouter();
 
   const handleGenerate = async () => {
     if (isCooldown) {
@@ -166,7 +168,12 @@ export default function Home() {
       setError('名字太长啦，你怎么回事！');
       return;
     }
-
+    // 检查敏感词
+    const result = await quickCheck(inputName.trim());
+    if (result.hasSensitiveWords) {
+      router.push('/arrested');
+      return;
+    }
     setIsGenerating(true);
     setError(null); // 清除之前的错误
 

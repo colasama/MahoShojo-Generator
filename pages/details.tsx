@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import { useCooldown } from '../lib/cooldown';
+import { quickCheck } from '@/lib/sensitive-word-filter';
 
 interface Questionnaire {
   questions: string[];
@@ -198,6 +199,13 @@ const DetailsPage: React.FC = () => {
     }
     setSubmitting(true);
     setError(null); // 清除之前的错误
+    // 检查
+    console.log('检查敏感词:', finalAnswers.join(''));
+    const result = await quickCheck(finalAnswers.join(''));
+    if (result.hasSensitiveWords) {
+      router.push('/arrested');
+      return;
+    }
 
     try {
       console.log('提交答案:', finalAnswers);
