@@ -2,7 +2,7 @@ import { generateObject, NoObjectGeneratedError } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
-import { config } from "./config";
+import { config, AIProvider } from "./config";
 
 // 延迟函数
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -16,17 +16,6 @@ export interface GenerationConfig<T, I = string> {
   taskName: string;
   maxTokens: number;
 }
-
-// 创建 AI 客户端
-type AIProvider = {
-  name: string;
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  type: 'openai' | 'google';
-  retryCount?: number;
-  skipProbability?: number;
-};
 
 const createAIClient = (provider: AIProvider) => {
   if (provider.type === 'google') {
@@ -85,9 +74,17 @@ export async function generateWithAI<T, I = string>(
           temperature: generationConfig.temperature,
           maxTokens: generationConfig.maxTokens,
           retryCount: 1,
+          mode: provider.mode || 'auto',
         };
 
-        const { object } = await generateObject(generateOptions);
+        const { object } = await generateObject({
+          ...generateOptions,
+          // 适配未提供 tool 模式的模型，修复产出的 JSON 文本
+          experimental_repairText: async (options) => {
+            options.text = options.text.replace('```json\n', '').replace('\n```', '');
+            return options.text;
+          },
+        });
 
         console.log(`提供商 ${provider.name} 第 ${attempt + 1} 次尝试成功`);
         return object as T;

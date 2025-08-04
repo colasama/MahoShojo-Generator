@@ -1,5 +1,5 @@
 // AI 提供商配置接口
-interface AIProvider {
+export interface AIProvider {
   name: string;
   apiKey: string;
   baseUrl: string;
@@ -7,6 +7,7 @@ interface AIProvider {
   type: 'openai' | 'google';
   retryCount?: number;
   skipProbability?: number;
+  mode?: 'json' | 'auto' | 'tool' | undefined;
 }
 
 // 解析 AI 提供商配置的函数
@@ -59,7 +60,8 @@ const parseApiPairs = () => {
     apiKey: provider.apiKey,
     baseUrl: provider.baseUrl,
     name: provider.name,
-    model: provider.model
+    model: provider.model,
+    mode: provider?.mode || 'auto'
   }));
 };
 

@@ -94,6 +94,19 @@ npm run start
 - [ ] 立绘 AIGC 生成功能
 - [ ] 角色卡片模板扩展
 
+## 🧡 致谢
+<div align="center">
+  <p>本项目在线版本的大模型能力由</p>
+  <p><b><a href="https://github.com/KouriChat/KouriChat"> 
+    <img width="180" src="https://static.kourichat.com/pic/KouriChat.webp"/></br>
+    基于 LLM 的情感陪伴程序</br>
+    <span style="font-size: 20px">KouriChat</span>
+  </a></b></p>
+  <p>强力支持</p>
+  <p><b>GitHub</b> | <a href="https://github.com/KouriChat/KouriChat">https://github.com/KouriChat/KouriChat</a></p>
+  <p><b>项目官网</b> | <a href="https://kourichat.com/">https://kourichat.com/</a></p>
+</div>
+
 ## 📁 项目结构
 
 ```
@@ -122,5 +135,5 @@ MahoShojo-Generator/
 
 ---
 
-<div style="text-align: center">🌸 为结构化生成献上祝福！ ✨</div>
+<div style="text-align: center">✨ 为结构化生成献上祝福 ✨</div>
 
