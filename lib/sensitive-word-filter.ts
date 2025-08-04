@@ -173,9 +173,10 @@ export class SensitiveWordFilter {
                             }
                         });
                         // 替换敏感词
-                        filteredText = filteredText.replace(regex, this.getMaskString(match => match));
+                        filteredText = filteredText.replace(regex, this.getMaskString());
                     }
                 } catch (regexError) {
+                    console.error('正则表达式格式错误:', regexError);
                     // 如果正则表达式格式错误，按普通字符串处理
                     if (text.toLowerCase().includes(word.toLowerCase())) {
                         detectedWords.push(word);
@@ -222,7 +223,7 @@ export class SensitiveWordFilter {
     /**
      * 获取遮罩字符串
      */
-    private getMaskString(wordGetter: (match: string) => string): (match: string) => string {
+    private getMaskString(): (match: string) => string {
         return (match: string) => {
             if (this.config?.mask_word && this.config.mask_word.trim() !== '') {
                 return this.config.mask_word;
