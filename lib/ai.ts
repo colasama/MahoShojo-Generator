@@ -1,5 +1,6 @@
 import { generateObject, NoObjectGeneratedError } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import { config } from "./config";
 
@@ -16,6 +17,32 @@ export interface GenerationConfig<T, I = string> {
   maxTokens: number;
 }
 
+// 创建 AI 客户端
+type AIProvider = {
+  name: string;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  type: 'openai' | 'google';
+  retryCount?: number;
+  skipProbability?: number;
+};
+
+const createAIClient = (provider: AIProvider) => {
+  if (provider.type === 'google') {
+    return createGoogleGenerativeAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseUrl,
+    });
+  } else {
+    return createOpenAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseUrl,
+      compatibility: "compatible",
+    });
+  }
+};
+
 // 通用 AI 生成函数
 export async function generateWithAI<T, I = string>(
   input: I,
@@ -30,96 +57,62 @@ export async function generateWithAI<T, I = string>(
 
   let lastError: unknown = null;
 
-  // 第一阶段：优先使用第一个配置，尝试1次
-  const firstProvider = providers[0];
-  console.log(`优先使用第一个提供商: ${firstProvider.name}，模型: ${firstProvider.model}`);
-
-  for (let attempt = 0; attempt < 1; attempt++) {
-    try {
-      console.log(`第一个提供商第 ${attempt + 1} 次尝试`);
-
-      const llm = createOpenAI({
-        apiKey: firstProvider.apiKey,
-        baseURL: firstProvider.baseUrl,
-        compatibility: "compatible",
-      });
-
-      const { object } = await generateObject({
-        model: llm(firstProvider.model),
-        system: generationConfig.systemPrompt,
-        prompt: generationConfig.promptBuilder(input),
-        schema: generationConfig.schema,
-        temperature: generationConfig.temperature,
-        maxTokens: generationConfig.maxTokens,
-      });
-
-      console.log(`第一个提供商第 ${attempt + 1} 次尝试成功`);
-      return object;
-    } catch (error) {
-      lastError = error;
-      console.error(`第一个提供商第 ${attempt + 1} 次尝试失败:`, error);
-
-      if (NoObjectGeneratedError.isInstance(error)) {
-        console.log("NoObjectGeneratedError 详情:");
-        console.log("Cause:", error.cause);
-        console.log("Text:", error.text);
-        console.log("Response:", error.response);
-        console.log("Usage:", error.usage);
-        console.log("Finish Reason:", error.finishReason);
-      }
-
-      // 如果不是最后一次尝试，等待0.2秒后再重试
-      if (attempt < 0) {
-        console.log(`等待 0.2 秒后重试...`);
-        await sleep(200);
-      }
-    }
-  }
-
-  // 第二阶段：如果第一个配置失败，按顺序使用后续配置，每个配置尝试一次
-  console.log(`第一个提供商失败，开始尝试后续提供商`);
-
-  for (let providerIndex = 1; providerIndex < providers.length; providerIndex++) {
+  // 遍历所有提供商
+  for (let providerIndex = 0; providerIndex < providers.length; providerIndex++) {
     const provider = providers[providerIndex];
 
-    // 增加 0.3 - 0.1 * providerIndex 的几率跳过这个提供商
-    if (Math.random() < 0.3 - 0.1 * providerIndex) {
-      console.log(`跳过提供商: ${provider.name}`);
+    // 检查是否跳过此提供商（第一个提供商不跳过）
+    if (providerIndex > 0 && Math.random() < (provider.skipProbability ?? 0)) {
+      console.log(`跳过提供商: ${provider.name} (跳过概率: ${provider.skipProbability})`);
       continue;
     }
 
-    try {
-      console.log(`尝试提供商: ${provider.name}，模型: ${provider.model}`);
+    const retryCount = provider.retryCount ?? 1;
+    console.log(`使用提供商: ${provider.name}，模型: ${provider.model}，重试次数: ${retryCount}`);
 
-      const llm = createOpenAI({
-        apiKey: provider.apiKey,
-        baseURL: provider.baseUrl,
-        compatibility: "compatible",
-      });
+    // 对当前提供商进行重试
+    for (let attempt = 0; attempt < retryCount; attempt++) {
+      try {
+        console.log(`提供商 ${provider.name} 第 ${attempt + 1}/${retryCount} 次尝试`);
 
-      const { object } = await generateObject({
-        model: llm(provider.model),
-        system: generationConfig.systemPrompt,
-        prompt: generationConfig.promptBuilder(input),
-        schema: generationConfig.schema,
-        temperature: generationConfig.temperature,
-      });
+        const llm = createAIClient(provider);
 
-      console.log(`提供商 ${provider.name} 尝试成功`);
-      return object;
-    } catch (error) {
-      lastError = error;
-      console.error(`提供商 ${provider.name} 尝试失败:`, error);
+        const generateOptions = {
+          model: llm(provider.model),
+          system: generationConfig.systemPrompt,
+          prompt: generationConfig.promptBuilder(input),
+          schema: generationConfig.schema,
+          temperature: generationConfig.temperature,
+          maxTokens: generationConfig.maxTokens,
+        };
 
-      if (NoObjectGeneratedError.isInstance(error)) {
-        console.log("NoObjectGeneratedError 详情:");
-        console.log("Cause:", error.cause);
-        console.log("Text:", error.text);
-        console.log("Response:", error.response);
-        console.log("Usage:", error.usage);
-        console.log("Finish Reason:", error.finishReason);
+        const { object } = await generateObject(generateOptions);
+
+        console.log(`提供商 ${provider.name} 第 ${attempt + 1} 次尝试成功`);
+        return object as T;
+      } catch (error) {
+        lastError = error;
+        console.error(`提供商 ${provider.name} 第 ${attempt + 1} 次尝试失败:`, error);
+
+        if (NoObjectGeneratedError.isInstance(error)) {
+          console.log("NoObjectGeneratedError 详情:");
+          console.log("Cause:", error.cause);
+          console.log("Text:", error.text);
+          console.log("Response:", error.response);
+          console.log("Usage:", error.usage);
+          console.log("Finish Reason:", error.finishReason);
+        }
+
+        // 如果不是最后一次尝试，等待后再重试
+        if (attempt < retryCount - 1) {
+          const waitTime = (attempt + 1) * 200; // 递增等待时间
+          console.log(`等待 ${waitTime} 毫秒后重试...`);
+          await sleep(waitTime);
+        }
       }
     }
+
+    console.log(`提供商 ${provider.name} 所有尝试都失败了`);
   }
 
   console.error("所有提供商都失败了:", lastError);

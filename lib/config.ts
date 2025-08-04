@@ -4,6 +4,9 @@ interface AIProvider {
   apiKey: string;
   baseUrl: string;
   model: string;
+  type: 'openai' | 'google';
+  retryCount?: number;
+  skipProbability?: number;
 }
 
 // 解析 AI 提供商配置的函数
@@ -12,7 +15,13 @@ const parseAIProviders = (): AIProvider[] => {
   if (process.env.AI_PROVIDERS_CONFIG) {
     try {
       const providers = JSON.parse(process.env.AI_PROVIDERS_CONFIG) as AIProvider[];
-      return providers.filter(p => p.apiKey && p.baseUrl && p.model);
+      return providers
+        .filter(p => p.apiKey && p.baseUrl && p.model && p.type)
+        .map(p => ({
+          ...p,
+          retryCount: p.retryCount ?? 1,
+          skipProbability: p.skipProbability ?? 0
+        }));
     } catch (error) {
       console.warn('解析 AI_PROVIDERS_CONFIG 失败，回退到简单配置:', error);
     }
@@ -28,7 +37,10 @@ const parseAIProviders = (): AIProvider[] => {
       name: 'default_provider',
       apiKey: singleKey,
       baseUrl: singleUrl,
-      model: singleModel
+      model: singleModel,
+      type: singleUrl.includes('googleapis.com') ? 'google' : 'openai',
+      retryCount: 1,
+      skipProbability: 0
     }];
   }
 
