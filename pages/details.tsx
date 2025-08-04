@@ -244,7 +244,7 @@ const DetailsPage: React.FC = () => {
 
         // 检查是否是 rate limit 错误
         if (errorMessage.includes('请求过于频繁')) {
-          setError('🚫 请求太频繁了！每2分钟只能生成一次魔法少女详情哦~请稍后再试吧！');
+          setError('🚫 请求太频繁了！每2分钟只能生成一次哦~请稍后再试吧！');
         } else if (errorMessage.includes('网络') || error instanceof TypeError) {
           setError('🌐 网络连接有问题！请检查网络后重试~');
         } else {
@@ -516,6 +516,12 @@ const DetailsPage: React.FC = () => {
             </p>
             <p className="text-white">
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
+            </p>
+            <p className="text-white">
+              本项目 AI 能力由&nbsp;
+              <a href="https://github.com/KouriChat/KouriChat" target="_blank" rel="noopener noreferrer" className="footer-link">KouriChat</a> &&nbsp;
+              <a href="https://api.kourichat.com/" target="_blank" rel="noopener noreferrer" className="footer-link">Kouri API</a>
+              &nbsp;强力支持
             </p>
             <p className="text-white">
               <a href="https://github.com/colasama/MahoShojo-Generator" target="_blank" rel="noopener noreferrer" className="footer-link">colasama/MahoShojo-Generator</a>
