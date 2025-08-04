@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import Head from 'next/head';
 import { snapdom } from '@zumer/snapdom';
-import { type AIGeneratedMagicalGirl } from '../lib/magical-girl';
+// TODO: 从这里引入怪怪的，但是先这样吧！
+import { type AIGeneratedMagicalGirl } from './api/generate-magical-girl';
 import { MainColor } from '../lib/main-color';
 import Link from 'next/link';
 import { useCooldown } from '../lib/cooldown';
