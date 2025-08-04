@@ -137,7 +137,7 @@ export default function Home() {
       setMagicalGirl(result);
     } catch {
       // 显示错误提示
-      alert(`✨ 魔法失效了！请再生成一次试试吧~`);
+      alert(`✨ 魔法失效了！可能是用的人太多狸！请再生成一次试试吧~`);
     } finally {
       setIsGenerating(false);
     }
