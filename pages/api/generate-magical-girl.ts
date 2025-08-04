@@ -1,10 +1,11 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-// TODO: 引用方式修改为 @/*
-import { withRateLimit } from '../../lib/rate-limiter';
 import { z } from "zod";
 import { generateWithAI, GenerationConfig } from "../../lib/ai";
-import { config } from "../../lib/config";
+import { config as appConfig } from "../../lib/config";
 import { MainColor } from "../../lib/main-color";
+
+export const config = {
+  runtime: 'edge',
+};
 
 export type MainColor = (typeof MainColor)[keyof typeof MainColor];
 
@@ -41,8 +42,8 @@ export type AIGeneratedMagicalGirl = z.infer<
 
 // 魔法少女生成配置
 const magicalGirlGenerationConfig: GenerationConfig<AIGeneratedMagicalGirl, string> = {
-  systemPrompt: config.MAGICAL_GIRL_GENERATION.systemPrompt,
-  temperature: config.MAGICAL_GIRL_GENERATION.temperature,
+  systemPrompt: appConfig.MAGICAL_GIRL_GENERATION.systemPrompt,
+  temperature: appConfig.MAGICAL_GIRL_GENERATION.temperature,
   promptBuilder: (realName: string) => `请为名叫"${realName}"的人设计一个魔法少女角色。真实姓名：${realName}`,
   schema: MagicalGirlGenerationSchema,
   taskName: "生成魔法少女",
@@ -57,27 +58,37 @@ export async function generateMagicalGirlWithAI(
 }
 
 async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+  req: Request
+): Promise<Response> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  const { name } = req.body;
+  const { name } = await req.json();
 
   if (!name || typeof name !== 'string') {
-    return res.status(400).json({ error: 'Name is required' });
+    return new Response(JSON.stringify({ error: 'Name is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
     const magicalGirl = await generateMagicalGirlWithAI(name.trim());
-    res.status(200).json(magicalGirl);
+    return new Response(JSON.stringify(magicalGirl), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error) {
     console.error('生成魔法少女失败:', error);
-    res.status(500).json({ error: '生成失败，请稍后重试' });
+    return new Response(JSON.stringify({ error: '生成失败，请稍后重试' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
 
-// 使用 rate limiter 包装处理函数
-export default withRateLimit('generate-magical-girl')(handler);
+export default handler;

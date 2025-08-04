@@ -44,7 +44,7 @@ interface MagicalGirlDetails {
   };
 }
 
-const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails }> = ({ magicalGirlDetails }) => {
+const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails; answers: string[] }> = ({ magicalGirlDetails, answers }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [showJsonText, setShowJsonText] = useState(false);
 
@@ -55,7 +55,12 @@ const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails }> = ({ 
   }, []);
 
   const downloadJson = () => {
-    const jsonData = JSON.stringify(magicalGirlDetails, null, 2);
+    // 将用户答案添加到保存的数据中
+    const dataToSave = {
+      ...magicalGirlDetails,
+      userAnswers: answers
+    };
+    const jsonData = JSON.stringify(dataToSave, null, 2);
     const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -88,7 +93,7 @@ const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails }> = ({ 
           </button>
         </div>
         <textarea
-          value={JSON.stringify(magicalGirlDetails, null, 2)}
+          value={JSON.stringify({ ...magicalGirlDetails, userAnswers: answers }, null, 2)}
           readOnly
           className="w-full h-64 p-3 border rounded-lg text-xs font-mono bg-gray-50 text-gray-900"
           onClick={(e) => (e.target as HTMLTextAreaElement).select()}
@@ -504,7 +509,7 @@ const DetailsPage: React.FC = () => {
               <div className="card" style={{ marginTop: '1rem' }}>
                 <div className="text-center">
                   <h3 className="text-lg font-medium text-blue-900" style={{ marginBottom: '1rem' }}>保存人物设定</h3>
-                  <SaveJsonButton magicalGirlDetails={magicalGirlDetails} />
+                  <SaveJsonButton magicalGirlDetails={magicalGirlDetails} answers={answers} />
                 </div>
               </div>
             </>

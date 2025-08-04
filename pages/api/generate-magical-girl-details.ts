@@ -1,8 +1,10 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
-import { withRateLimit } from '../../lib/rate-limiter';
 import { z } from 'zod';
 // import { MainColor } from '../../lib/main-color';
+
+export const config = {
+  runtime: 'edge',
+};
 
 // 定义基于问卷的魔法少女详细信息生成 schema
 const MagicalGirlDetailsSchema = z.object({
@@ -87,37 +89,53 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
 }
 
 async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+  req: Request
+): Promise<Response> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  const { answers } = req.body
+  const { answers } = await req.json();
 
   if (!answers || !Array.isArray(answers) || answers.length === 0) {
-    return res.status(400).json({ error: 'Answers array is required' })
+    return new Response(JSON.stringify({ error: 'Answers array is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   // 验证每个答案不超过30字
   for (const answer of answers) {
     if (typeof answer !== 'string' || answer.trim().length === 0) {
-      return res.status(400).json({ error: 'All answers must be non-empty strings' })
+      return new Response(JSON.stringify({ error: 'All answers must be non-empty strings' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
     if (answer.length > 30) {
-      return res.status(400).json({ error: 'Each answer must not exceed 30 characters' })
+      return new Response(JSON.stringify({ error: 'Each answer must not exceed 30 characters' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
   }
 
   try {
-    const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig)
-    res.status(200).json(magicalGirlDetails)
+    const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
+    return new Response(JSON.stringify(magicalGirlDetails), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (error) {
-    console.error('生成魔法少女详细信息失败:', error)
-    res.status(500).json({ error: '生成失败，请稍后重试' })
+    console.error('生成魔法少女详细信息失败:', error);
+    return new Response(JSON.stringify({ error: '生成失败，请稍后重试' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
 
-// 使用 rate limiter 包装处理函数
-export default withRateLimit('generate-magical-girl-details')(handler);
+export default handler;
