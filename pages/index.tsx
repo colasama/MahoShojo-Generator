@@ -381,7 +381,7 @@ export default function Home() {
             <p>
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
             </p>
-            <p className="text-white">
+            <p>
               本项目 AI 能力由&nbsp;
               <a href="https://github.com/KouriChat/KouriChat" target="_blank" rel="noopener noreferrer" className="footer-link">KouriChat</a> &&nbsp;
               <a href="https://api.kourichat.com/" target="_blank" rel="noopener noreferrer" className="footer-link">Kouri API</a>
