@@ -16,11 +16,16 @@ const setLocalStorageItem = (key: string, value: number) => {
 };
 
 export const useCooldown = (key: string, duration: number) => {
-    const [cooldownEndTime, setCooldownEndTime] = useState<number | null>(() => getLocalStorageItem(key));
+    // 在开发环境中禁用 cooldown
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    const [cooldownEndTime, setCooldownEndTime] = useState<number | null>(() => 
+        isDevelopment ? null : getLocalStorageItem(key)
+    );
     const [remainingTime, setRemainingTime] = useState<number>(0);
 
     useEffect(() => {
-        if (!cooldownEndTime) return;
+        if (isDevelopment || !cooldownEndTime) return;
 
         const calculateRemainingTime = () => {
             const now = Date.now();
@@ -39,15 +44,18 @@ export const useCooldown = (key: string, duration: number) => {
         const interval = setInterval(calculateRemainingTime, 1000);
 
         return () => clearInterval(interval);
-    }, [cooldownEndTime, key]);
+    }, [cooldownEndTime, key, isDevelopment]);
 
     const startCooldown = useCallback(() => {
+        // 在开发环境中不启动 cooldown
+        if (isDevelopment) return;
+        
         const endTime = Date.now() + duration;
         setLocalStorageItem(key, endTime);
         setCooldownEndTime(endTime);
-    }, [duration, key]);
+    }, [duration, key, isDevelopment]);
 
-    const isCooldown = remainingTime > 0;
+    const isCooldown = !isDevelopment && remainingTime > 0;
 
     return { isCooldown, startCooldown, remainingTime };
 };
