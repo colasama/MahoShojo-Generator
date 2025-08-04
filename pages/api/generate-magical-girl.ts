@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { generateMagicalGirlWithAI } from '../../lib/magical-girl';
+import { withRateLimit } from '../../lib/rate-limiter';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -23,3 +24,6 @@ export default async function handler(
     res.status(500).json({ error: '生成失败，请稍后重试' });
   }
 }
+
+// 使用 rate limiter 包装处理函数
+export default withRateLimit('generate-magical-girl')(handler);

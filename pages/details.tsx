@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import MagicalGirlCard from '../components/MagicalGirlCard';
+import { useCooldown } from '../lib/cooldown';
 
 interface Questionnaire {
   questions: string[];
@@ -119,11 +120,18 @@ const DetailsPage: React.FC = () => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
   const [showIntroduction, setShowIntroduction] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { isCooldown, startCooldown, remainingTime } = useCooldown('generateDetailsCooldown', 60000);
 
   useEffect(() => {
     // 加载问卷数据
     fetch('/questionnaire.json')
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('加载问卷文件失败');
+        }
+        return response.json();
+      })
       .then((data: Questionnaire) => {
         setQuestions(data.questions);
         setAnswers(new Array(data.questions.length).fill(''));
@@ -131,20 +139,23 @@ const DetailsPage: React.FC = () => {
       })
       .catch(error => {
         console.error('加载问卷失败:', error);
+        setError('📋 加载问卷失败，请刷新页面重试');
         setLoading(false);
       });
   }, []);
 
   const handleNext = () => {
     if (currentAnswer.trim().length === 0) {
-      alert('请输入答案');
+      setError('⚠️ 请输入答案后再继续');
       return;
     }
 
     if (currentAnswer.length > 30) {
-      alert('答案不得超过30字');
+      setError('⚠️ 答案不能超过30字');
       return;
     }
+
+    setError(null); // 清除错误信息
 
     proceedToNextQuestion(currentAnswer.trim());
   };
@@ -180,7 +191,13 @@ const DetailsPage: React.FC = () => {
   };
 
   const handleSubmit = async (finalAnswers: string[]) => {
+    if (isCooldown) {
+      setError(`请等待 ${remainingTime} 秒后再生成`);
+      return;
+    }
     setSubmitting(true);
+    setError(null); // 清除之前的错误
+
     try {
       console.log('提交答案:', finalAnswers);
       const response = await fetch('/api/generate-magical-girl-details', {
@@ -191,18 +208,45 @@ const DetailsPage: React.FC = () => {
         body: JSON.stringify({ answers: finalAnswers })
       });
 
-      if (response.ok) {
-        const result: MagicalGirlDetails = await response.json();
-        console.log('生成结果:', result);
-        setMagicalGirlDetails(result);
-      } else {
-        throw new Error('生成失败');
+      if (!response.ok) {
+        const errorData = await response.json();
+
+        // 处理不同的 HTTP 状态码
+        if (response.status === 429) {
+          const retryAfter = errorData.retryAfter || 60;
+          throw new Error(`请求过于频繁！请等待 ${retryAfter} 秒后再试。`);
+        } else if (response.status >= 500) {
+          throw new Error('服务器内部错误，请稍后重试');
+        } else {
+          throw new Error(errorData.message || errorData.error || '生成失败');
+        }
       }
+
+      const result: MagicalGirlDetails = await response.json();
+      console.log('生成结果:', result);
+      setMagicalGirlDetails(result);
+      setError(null); // 成功时清除错误
     } catch (error) {
       console.error('提交失败:', error);
-      alert('提交失败，请重试');
+
+      // 处理不同类型的错误
+      if (error instanceof Error) {
+        const errorMessage = error.message;
+
+        // 检查是否是 rate limit 错误
+        if (errorMessage.includes('请求过于频繁')) {
+          setError('🚫 请求太频繁了！每2分钟只能生成一次魔法少女详情哦~请稍后再试吧！');
+        } else if (errorMessage.includes('网络') || error instanceof TypeError) {
+          setError('🌐 网络连接有问题！请检查网络后重试~');
+        } else {
+          setError(`✨ 魔法失效了！${errorMessage}`);
+        }
+      } else {
+        setError('✨ 魔法失效了！生成详情时发生未知错误，请重试');
+      }
     } finally {
       setSubmitting(false);
+      startCooldown();
     }
   };
 
@@ -361,21 +405,32 @@ const DetailsPage: React.FC = () => {
                 {/* 下一题按钮 */}
                 <button
                   onClick={handleNext}
-                  disabled={submitting || currentAnswer.trim().length === 0 || isTransitioning}
+                  disabled={submitting || currentAnswer.trim().length === 0 || isTransitioning || isCooldown}
                   className="generate-button"
                 >
-                  {submitting ? (
-                    <span className="flex items-center justify-center">
-                      <svg className="animate-spin h-4 w-4 text-white" style={{ marginLeft: '-0.25rem', marginRight: '0.5rem' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      提交中...
-                    </span>
-                  ) : (
-                    isLastQuestion ? '提交' : '下一题'
-                  )}
+                  {isCooldown
+                    ? `请等待 ${remainingTime} 秒`
+                    : submitting
+                      ? (
+                        <span className="flex items-center justify-center">
+                          <svg className="animate-spin h-4 w-4 text-white" style={{ marginLeft: '-0.25rem', marginRight: '0.5rem' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          提交中...
+                        </span>
+                      )
+                      : isLastQuestion
+                        ? '提交'
+                        : '下一题'}
                 </button>
+
+                {/* 错误信息显示 */}
+                {error && (
+                  <div className="error-message">
+                    {error}
+                  </div>
+                )}
 
                 {/* 返回首页链接 */}
                 <div className="text-center" style={{ marginTop: '1rem' }}>

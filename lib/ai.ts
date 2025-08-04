@@ -84,6 +84,7 @@ export async function generateWithAI<T, I = string>(
           schema: generationConfig.schema,
           temperature: generationConfig.temperature,
           maxTokens: generationConfig.maxTokens,
+          retryCount: 1,
         };
 
         const { object } = await generateObject(generateOptions);

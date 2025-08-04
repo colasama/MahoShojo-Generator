@@ -4,6 +4,7 @@ import { snapdom } from '@zumer/snapdom';
 import { type AIGeneratedMagicalGirl } from '../lib/magical-girl';
 import { MainColor } from '../lib/main-color';
 import Link from 'next/link';
+import { useCooldown } from '../lib/cooldown';
 
 interface MagicalGirl {
   realName: string;
@@ -81,37 +82,66 @@ function checkNameLength(name: string): boolean {
 
 // 使用 API 路由生成魔法少女
 async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
-  const response = await fetch('/api/generate-magical-girl', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ name: inputName }),
-  });
+  try {
+    const response = await fetch('/api/generate-magical-girl', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name: inputName }),
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '生成失败');
+    if (!response.ok) {
+      const error = await response.json();
+
+      // 处理不同的 HTTP 状态码
+      if (response.status === 429) {
+        const retryAfter = error.retryAfter || 60;
+        throw new Error(`请求过于频繁！请等待 ${retryAfter} 秒后再试。`);
+      } else if (response.status >= 500) {
+        throw new Error('服务器内部错误，请稍后重试');
+      } else {
+        throw new Error(error.message || error.error || '生成失败');
+      }
+    }
+
+    const aiGenerated: AIGeneratedMagicalGirl = await response.json();
+
+    // 等级概率配置: [种, 芽, 叶, 蕾, 花, 宝石权杖]
+    const levelProbabilities = [0.1, 0.2, 0.3, 0.3, 0.07, 0.03];
+
+    // 使用加权随机选择生成 level
+    const seed = seedRandom(aiGenerated.flowerName + inputName);
+    const level = getWeightedRandomFromSeed(levels, levelProbabilities, seed, 6);
+
+    return {
+      realName: inputName,
+      name: aiGenerated.flowerName,
+      flowerDescription: aiGenerated.flowerDescription,
+      appearance: aiGenerated.appearance,
+      spell: aiGenerated.spell,
+      level: level.name,
+      levelEmoji: level.emoji
+    };
+  } catch (error) {
+    // 处理网络错误和其他异常
+    if (error instanceof Error) {
+      // 如果已经是我们抛出的错误，直接重新抛出
+      if (error.message.includes('请求过于频繁') ||
+        error.message.includes('服务器内部错误') ||
+        error.message.includes('生成失败')) {
+        throw error;
+      }
+    }
+
+    // 处理网络连接错误
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('网络连接失败，请检查网络后重试');
+    }
+
+    // 其他未知错误
+    throw new Error('生成魔法少女时发生未知错误，请重试');
   }
-
-  const aiGenerated: AIGeneratedMagicalGirl = await response.json();
-
-  // 等级概率配置: [种, 芽, 叶, 蕾, 花, 宝石权杖]
-  const levelProbabilities = [0.1, 0.2, 0.3, 0.3, 0.07, 0.03];
-
-  // 使用加权随机选择生成 level
-  const seed = seedRandom(aiGenerated.flowerName + inputName);
-  const level = getWeightedRandomFromSeed(levels, levelProbabilities, seed, 6);
-
-  return {
-    realName: inputName,
-    name: aiGenerated.flowerName,
-    flowerDescription: aiGenerated.flowerDescription,
-    appearance: aiGenerated.appearance,
-    spell: aiGenerated.spell,
-    level: level.name,
-    levelEmoji: level.emoji
-  };
 }
 
 export default function Home() {
@@ -120,26 +150,49 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  const { isCooldown, startCooldown, remainingTime } = useCooldown('generateMagicalGirlCooldown', 60000);
+
 
   const handleGenerate = async () => {
+    if (isCooldown) {
+      setError(`请等待 ${remainingTime} 秒后再生成`);
+      return;
+    }
     if (!inputName.trim()) return;
 
     if (!checkNameLength(inputName)) {
-      alert('名字太长啦，你怎么回事！');
+      setError('名字太长啦，你怎么回事！');
       return;
     }
 
     setIsGenerating(true);
+    setError(null); // 清除之前的错误
 
     try {
       const result = await generateMagicalGirl(inputName.trim());
       setMagicalGirl(result);
-    } catch {
-      // 显示错误提示
-      alert(`✨ 魔法失效了！可能是用的人太多狸！请再生成一次试试吧~`);
+      setError(null); // 成功时清除错误
+    } catch (error) {
+      // 处理不同类型的错误
+      if (error instanceof Error) {
+        const errorMessage = error.message;
+
+        // 检查是否是 rate limit 错误
+        if (errorMessage.includes('请求过于频繁')) {
+          setError('🚫 请求太频繁了！每2分钟只能生成一次魔法少女哦~请稍后再试吧！');
+        } else if (errorMessage.includes('网络')) {
+          setError('🌐 网络连接有问题！请检查网络后重试~');
+        } else {
+          setError(`✨ 魔法失效了！${errorMessage}`);
+        }
+      } else {
+        setError('✨ 魔法失效了！可能是用的人太多狸！请再生成一次试试吧~');
+      }
     } finally {
       setIsGenerating(false);
+      startCooldown();
     }
   };
 
@@ -212,11 +265,21 @@ export default function Home() {
 
             <button
               onClick={handleGenerate}
-              disabled={!inputName.trim() || isGenerating}
+              disabled={!inputName.trim() || isGenerating || isCooldown}
               className="generate-button"
             >
-              {isGenerating ? '少女创造中，请稍后捏 (≖ᴗ≖)✧✨' : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
+              {isCooldown
+                ? `请等待 ${remainingTime} 秒`
+                : isGenerating
+                  ? '少女创造中，请稍后捏 (≖ᴗ≖)✧✨'
+                  : 'へんしん(ﾉﾟ▽ﾟ)ﾉ! '}
             </button>
+
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
 
             {magicalGirl && (
               <div
