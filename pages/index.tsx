@@ -360,8 +360,8 @@ export default function Home() {
                   {/* Logo placeholder for saved images */}
                   <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
                     <img
-                      src="/logo-white.svg"
-                      width={120}
+                      src="/logo-white-qrcode.svg"
+                      width={320}
                       height={80}
                       alt="Logo"
                       style={{

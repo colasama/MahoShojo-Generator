@@ -169,7 +169,7 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
 
         <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
           <img
-            src="/logo-white.svg"
+            src="/logo-white-qrcode.svg"
             width={120}
             height={80}
             alt="Logo"
