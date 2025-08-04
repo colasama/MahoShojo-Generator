@@ -75,16 +75,13 @@ export async function generateWithAI<T, I = string>(
           maxTokens: generationConfig.maxTokens,
           retryCount: 1,
           mode: provider.mode || 'auto',
-        };
-
-        const { object } = await generateObject({
-          ...generateOptions,
-          // 适配未提供 tool 模式的模型，修复产出的 JSON 文本
-          experimental_repairText: async (options) => {
+          experimental_repairText: provider.mode === 'json' ? async (options: any) => {
             options.text = options.text.replace('```json\n', '').replace('\n```', '');
             return options.text;
-          },
-        });
+          } : undefined,
+        };
+
+        const { object } = await generateObject(generateOptions);
 
         console.log(`提供商 ${provider.name} 第 ${attempt + 1} 次尝试成功`);
         return object as T;
