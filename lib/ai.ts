@@ -75,6 +75,7 @@ export async function generateWithAI<T, I = string>(
           maxTokens: generationConfig.maxTokens,
           retryCount: 1,
           mode: provider.mode || 'auto',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           experimental_repairText: provider.mode === 'json' ? async (options: any) => {
             options.text = options.text.replace('```json\n', '').replace('\n```', '');
             return options.text;
