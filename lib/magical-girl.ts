@@ -43,7 +43,7 @@ const magicalGirlGenerationConfig: GenerationConfig<AIGeneratedMagicalGirl, stri
   promptBuilder: (realName: string) => `请为名叫"${realName}"的人设计一个魔法少女角色。真实姓名：${realName}`,
   schema: MagicalGirlGenerationSchema,
   taskName: "生成魔法少女",
-  maxTokens: 2000,
+  maxTokens: 6000,
 };
 
 // 生成魔法少女的函数（使用通用函数）

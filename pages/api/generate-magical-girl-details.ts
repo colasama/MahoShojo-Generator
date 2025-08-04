@@ -83,7 +83,7 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
   },
   schema: MagicalGirlDetailsSchema,
   taskName: "生成魔法少女详细信息",
-  maxTokens: 3000,
+  maxTokens: 8192,
 }
 
 async function handler(
