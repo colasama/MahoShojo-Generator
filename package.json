@@ -5,6 +5,8 @@
     "scripts": {
         "dev": "next dev --turbopack",
         "build": "next build",
+        "build:cf": "next-on-pages",
+        "preview": "npm run build:cf && wrangler pages dev",
         "start": "next start",
         "lint": "next lint"
     },
@@ -24,6 +26,7 @@
         "zod": "^3.25.67"
     },
     "devDependencies": {
+        "@cloudflare/next-on-pages": "^1.13.13",
         "@eslint/eslintrc": "^3",
         "@tailwindcss/postcss": "^4",
         "@types/node": "^20",
