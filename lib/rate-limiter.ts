@@ -98,7 +98,13 @@ const rateLimiter = new RateLimiter();
 /**
  * 获取客户端真实IP地址
  */
-export function getClientIP(req: any): string {
+type RequestWithIP = { 
+  headers: Record<string, string | string[] | undefined>; 
+  connection?: { remoteAddress?: string }; 
+  socket?: { remoteAddress?: string } 
+};
+
+export function getClientIP(req: RequestWithIP): string {
   const forwarded = req.headers['x-forwarded-for'];
   const realIP = req.headers['x-real-ip'];
   const remoteAddress = req.connection?.remoteAddress || req.socket?.remoteAddress;
@@ -118,8 +124,8 @@ export function getClientIP(req: any): string {
  * IP限制中间件
  */
 export function withRateLimit(endpoint: string) {
-  return function (handler: any) {
-    return async function (req: any, res: any) {
+  return function <T extends RequestWithIP, U>(handler: (req: T, res: U) => Promise<unknown>) {
+    return async function (req: T, res: U & { status: (code: number) => { json: (data: unknown) => unknown } }) {
       try {
         const ip = getClientIP(req);
         console.log(`[Rate Limiter] IP: ${ip}, Endpoint: ${endpoint}`);
