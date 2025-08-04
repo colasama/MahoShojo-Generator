@@ -248,6 +248,11 @@ export default function Home() {
             <p className="subtitle text-center">
               或者要不要来试试 <Link href="/details" className="footer-link">奇妙妖精大调查</Link>？
             </p>
+            <div style={{ marginTop: '1rem', marginBottom: '2rem', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>本测试设定来源于小说《下班，然后变成魔法少女》</p>
+              <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>以及广告位募集中</del></p>
+              <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>如有意向请联系魔法国度研究院院长 @祖母绿：1********</del></p>
+            </div>
             <div className="input-group">
               <label htmlFor="name" className="input-label">
                 请输入你的名字：
