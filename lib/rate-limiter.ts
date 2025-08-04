@@ -98,10 +98,11 @@ const rateLimiter = new RateLimiter();
 /**
  * 获取客户端真实IP地址
  */
-type RequestWithIP = { 
-  headers: Record<string, string | string[] | undefined>; 
-  connection?: { remoteAddress?: string }; 
-  socket?: { remoteAddress?: string } 
+type RequestWithIP = {
+  headers: Record<string, string | string[] | undefined>;
+  connection?: { remoteAddress?: string };
+  socket?: { remoteAddress?: string };
+  body?: unknown;
 };
 
 export function getClientIP(req: RequestWithIP): string {
@@ -136,6 +137,11 @@ export function withRateLimit(endpoint: string) {
           const resetTime = Math.ceil(timeUntilReset / 1000);
 
           console.log(`[Rate Limiter] 限制访问 - IP: ${ip}, Endpoint: ${endpoint}, 重置时间: ${resetTime}秒`);
+          
+          // 打印请求的 body（如果是 POST 请求）
+          if (req.body) {
+            console.log(`[Rate Limiter] 被限制的请求 body:`, JSON.stringify(req.body, null, 2));
+          }
 
           return res.status(429).json({
             error: '请求过于频繁',
