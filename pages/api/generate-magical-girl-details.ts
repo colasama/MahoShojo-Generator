@@ -11,7 +11,7 @@ export const config = {
 // 定义基于问卷的魔法少女详细信息生成 schema
 const MagicalGirlDetailsSchema = z.object({
   codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名。
-    请从我提供的花名中选取最合适的一个`),
+    请从我提供的花名中选取最合适的一个，也可以生成一个其他的更合适的花名，但是生成的时候需要减少鸢尾的出现概率`),
   appearance: z.object({
     outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，大约50字左右"),
     accessories: z.string().describe("变身后的饰品细节描述，大约50字左右"),
@@ -126,7 +126,10 @@ async function handler(
   try {
     const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
     console.log(process.env.D1_API_TOKEN, process.env.CLOUDFLARE_ACCOUNT_ID, process.env.D1_DATABASE_ID);
-    const result = await saveToD1(JSON.stringify(magicalGirlDetails));
+    const result = await saveToD1(JSON.stringify({
+      ...magicalGirlDetails,
+      answers: answers
+    }));
     if (!result) {
       console.error('保存到 D1 数据库失败');
     } else {
