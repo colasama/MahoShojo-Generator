@@ -5,6 +5,7 @@ import '@/styles/globals.css';
 import '@/styles/blue-theme.css';
 import '@/styles/gradient-buttons.css';
 import { GoogleAnalytics } from '@next/third-parties/google';
+import { GoogleAdSense } from "nextjs-google-adsense";
 
 // 如果需要统计，请取消注释并安装 @vercel/analytics
 // import { Analytics } from "@vercel/analytics/next";
@@ -25,6 +26,11 @@ export default function App({ Component, pageProps }: AppProps) {
       <div className={isDetailsPage ? 'blue-theme' : ''}>
         <Component {...pageProps} />
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || ''} />
+        {process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_PUBLISHER_ID && (
+          <GoogleAdSense
+            publisherId={process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_PUBLISHER_ID || ''}
+          />
+        )}
         {/* <Analytics /> */}
       </div>
     </>
