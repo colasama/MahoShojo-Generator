@@ -1,7 +1,13 @@
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { z } from 'zod';
 import { getRandomFlowers } from '../../lib/random-choose-hana-name';
+import { magicalGirlDetailsQueue } from '../../lib/queue-system';
+import { getClientIP } from '../../lib/rate-limiter';
+import { saveToD1 } from '../../lib/d1';
+import { getLogger } from '../../lib/logger';
 // import { MainColor } from '../../lib/main-color';
+
+const log = getLogger('api-gen-details');
 
 export const config = {
   runtime: 'edge',
@@ -10,7 +16,7 @@ export const config = {
 // 定义基于问卷的魔法少女详细信息生成 schema
 const MagicalGirlDetailsSchema = z.object({
   codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名。
-    请从我提供的花名中选取最合适的一个`),
+    请从我提供的花名中选取最合适的一个，也可以生成一个其他的更合适的花名，但是生成的时候需要减少鸢尾的出现概率`),
   appearance: z.object({
     outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，大约50字左右"),
     accessories: z.string().describe("变身后的饰品细节描述，大约50字左右"),
@@ -97,7 +103,7 @@ async function handler(
     });
   }
 
-  const { answers } = await req.json();
+  const { answers, persistenceKey } = await req.json();
 
   if (!answers || !Array.isArray(answers) || answers.length === 0) {
     return new Response(JSON.stringify({ error: 'Answers array is required' }), {
@@ -123,13 +129,35 @@ async function handler(
   }
 
   try {
-    const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
+    const ip = getClientIP(req as any);
+
+    // 添加到队列并等待处理
+    const magicalGirlDetails = await magicalGirlDetailsQueue.addToQueue(
+      'generate-magical-girl-details',
+      { answers },
+      ip,
+      async () => {
+        return await generateWithAI(answers, magicalGirlDetailsConfig);
+      },
+      persistenceKey
+    );
+
+    // 保存到D1数据库
+    const result = await saveToD1(JSON.stringify({
+      ...magicalGirlDetails,
+      answers: answers
+    }));
+    if (!result) {
+      log.error('保存到 D1 数据库失败');
+    } else {
+      log.info('保存到 D1 数据库成功');
+    }
     return new Response(JSON.stringify(magicalGirlDetails), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('生成魔法少女详细信息失败:', error);
+    log.error('生成魔法少女详细信息失败', { error, answersLength: answers?.length });
     const errorMessage = error instanceof Error ? error.message : '服务器内部错误';
     return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,

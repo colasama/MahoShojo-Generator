@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import { useCooldown } from '../lib/cooldown';
+import QueueStatus from '../components/QueueStatus';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 
 interface Questionnaire {
@@ -128,6 +129,7 @@ const DetailsPage: React.FC = () => {
   const [showIntroduction, setShowIntroduction] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showQueueStatus, setShowQueueStatus] = useState(false);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateDetailsCooldown', 60000);
 
   useEffect(() => {
@@ -204,10 +206,12 @@ const DetailsPage: React.FC = () => {
     }
     setSubmitting(true);
     setError(null); // 清除之前的错误
+    setShowQueueStatus(true); // 显示队列状态
     // 检查
     console.log('检查敏感词:', finalAnswers.join(''));
     const result = await quickCheck(finalAnswers.join(''));
     if (result.hasSensitiveWords) {
+      setShowQueueStatus(false);
       router.push('/arrested');
       return;
     }
@@ -260,6 +264,7 @@ const DetailsPage: React.FC = () => {
       }
     } finally {
       setSubmitting(false);
+      setShowQueueStatus(false); // 隐藏队列状态
       startCooldown();
     }
   };
@@ -403,7 +408,7 @@ const DetailsPage: React.FC = () => {
                 <div className="flex gap-2 justify-center" style={{ marginBottom: '1rem', marginTop: '2rem' }}>
                   <button
                     onClick={() => handleQuickOption('还没想好')}
-                    disabled={isTransitioning}
+                    disabled={submitting || isTransitioning || isCooldown}
                     className="generate-button h-10"
                     style={{ marginBottom: 0, padding: 0 }}
                   >
@@ -411,7 +416,7 @@ const DetailsPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleQuickOption('不想回答')}
-                    disabled={isTransitioning}
+                    disabled={submitting || isTransitioning || isCooldown}
                     className="generate-button h-10"
                     style={{ marginBottom: 0, padding: 0 }}
                   >
@@ -563,6 +568,16 @@ const DetailsPage: React.FC = () => {
             </div>
           </div>
         )}
+        
+        {/* 队列状态组件 */}
+        <QueueStatus 
+          endpoint="generate-magical-girl-details"
+          isVisible={showQueueStatus}
+          onComplete={() => {
+            setShowQueueStatus(false);
+            // 可以在这里添加完成后的逻辑
+          }}
+        />
       </div>
     </>
   );
