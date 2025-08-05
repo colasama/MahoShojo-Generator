@@ -4,7 +4,10 @@ import { getRandomFlowers } from '../../lib/random-choose-hana-name';
 import { magicalGirlDetailsQueue } from '../../lib/queue-system';
 import { getClientIP } from '../../lib/rate-limiter';
 import { saveToD1 } from '../../lib/d1';
+import { getLogger } from '../../lib/logger';
 // import { MainColor } from '../../lib/main-color';
+
+const log = getLogger('api-gen-details');
 
 export const config = {
   runtime: 'edge',
@@ -127,7 +130,7 @@ async function handler(
 
   try {
     const ip = getClientIP(req as any);
-    
+
     // 添加到队列并等待处理
     const magicalGirlDetails = await magicalGirlDetailsQueue.addToQueue(
       'generate-magical-girl-details',
@@ -138,23 +141,23 @@ async function handler(
       },
       persistenceKey
     );
-    
+
     // 保存到D1数据库
     const result = await saveToD1(JSON.stringify({
       ...magicalGirlDetails,
       answers: answers
     }));
     if (!result) {
-      console.error('保存到 D1 数据库失败');
+      log.error('保存到 D1 数据库失败');
     } else {
-      console.log('保存到 D1 数据库成功');
+      log.info('保存到 D1 数据库成功');
     }
     return new Response(JSON.stringify(magicalGirlDetails), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('生成魔法少女详细信息失败:', error);
+    log.error('生成魔法少女详细信息失败', { error, answersLength: answers?.length });
     return new Response(JSON.stringify({ error: '生成失败，请稍后重试' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

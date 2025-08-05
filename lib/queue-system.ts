@@ -1,3 +1,7 @@
+import { getLogger } from "./logger";
+
+const log = getLogger('queue-system');
+
 // 队列系统
 interface QueueItem {
   id: string;
@@ -67,10 +71,10 @@ class RequestQueue {
         }
       }
     } catch (e) {
-      console.log('[Queue System] 环境变量读取失败，使用默认配置:', e);
+      log.info('环境变量读取失败，使用默认配置', { error: e });
     }
 
-    console.log(`[Queue System] 初始化队列系统 - 每分钟最大API请求数: ${this.maxRequestsPerMinute}, 用户等待时间: ${this.userWaitTime}秒`);
+    log.info(`初始化队列系统 - 每分钟最大API请求数: ${this.maxRequestsPerMinute}, 用户等待时间: ${this.userWaitTime}秒`);
   }
 
   /**
@@ -97,7 +101,7 @@ class RequestQueue {
     // 如果已经达到最大请求数，等待到下一个分钟
     if (this.processedCount >= this.maxRequestsPerMinute) {
       const waitTime = this.processWindow - (now - this.lastProcessTime);
-      console.log(`[Queue System] 达到每分钟请求限制，等待 ${Math.ceil(waitTime / 1000)} 秒`);
+      log.info(`达到每分钟请求限制，等待 ${Math.ceil(waitTime / 1000)} 秒`);
       await this.sleep(waitTime);
       this.processedCount = 0;
       this.lastProcessTime = Date.now();
@@ -114,7 +118,7 @@ class RequestQueue {
     // 如果时间间隔不够，等待一段时间
     if (timeSinceLastRequest < 0) {
       const waitTime = Math.abs(timeSinceLastRequest);
-      console.log(`[Queue System] 均匀分布请求，等待 ${Math.ceil(waitTime / 1000)} 秒`);
+      log.info(`均匀分布请求，等待 ${Math.ceil(waitTime / 1000)} 秒`);
       await this.sleep(waitTime);
     }
 
@@ -173,7 +177,7 @@ class RequestQueue {
         const lastTime = this.userLastRequestTime.get(userKey) || 0;
         const waitTimeLeft = Math.ceil(this.userWaitTime - ((Date.now() - lastTime) / 1000));
 
-        console.log(`[Queue System] 用户 ${userKey} 请求过于频繁，需等待 ${waitTimeLeft} 秒`);
+        log.info(`用户 ${userKey} 请求过于频繁，需等待 ${waitTimeLeft} 秒`);
         reject(new Error(`请求过于频繁，请等待 ${waitTimeLeft} 秒后再试`));
         return;
       }
@@ -196,7 +200,7 @@ class RequestQueue {
 
       this.queue.push(queueItem);
 
-      console.log(`[Queue System] 添加请求到队列 - ID: ${queueItem.id}, IP: ${ip}, Endpoint: ${endpoint}, 队列长度: ${this.queue.length}, 持久化键: ${persistenceKey}`);
+      log.info(`添加请求到队列 - ID: ${queueItem.id}, IP: ${ip}, Endpoint: ${endpoint}, 队列长度: ${this.queue.length}, 持久化键: ${persistenceKey}`);
 
       // 如果当前没在处理，开始处理队列
       if (!this.processing) {
@@ -212,7 +216,7 @@ class RequestQueue {
     if (this.processing) return;
 
     this.processing = true;
-    console.log(`[Queue System] 开始处理队列，当前队列长度: ${this.queue.length}`);
+    log.info(`开始处理队列，当前队列长度: ${this.queue.length}`);
 
     while (this.queue.length > 0) {
       // 检查是否可以处理请求，并自动等待合适的时间
@@ -222,7 +226,7 @@ class RequestQueue {
       if (!item) break;
 
       try {
-        console.log(`[Queue System] 处理请求 - ID: ${item.id}, IP: ${item.ip}, Endpoint: ${item.endpoint}`);
+        log.info(`处理请求 - ID: ${item.id}, IP: ${item.ip}, Endpoint: ${item.endpoint}`);
 
         // 使用队列项自带的processor处理请求
         const result = await item.processor();
@@ -230,15 +234,15 @@ class RequestQueue {
         this.processedCount++;
         item.resolve(result);
 
-        console.log(`[Queue System] 请求处理成功 - ID: ${item.id}`);
+        log.info(`请求处理成功 - ID: ${item.id}`);
 
       } catch (error) {
-        console.error(`[Queue System] 请求处理失败 - ID: ${item.id}:`, error);
+        log.error(`请求处理失败 - ID: ${item.id}:`, { error });
 
         // 重试逻辑
         if (item.retryCount < 2) {
           item.retryCount++;
-          console.log(`[Queue System] 重试请求 - ID: ${item.id}, 重试次数: ${item.retryCount}`);
+          log.info(`重试请求 - ID: ${item.id}, 重试次数: ${item.retryCount}`);
           this.queue.unshift(item); // 重新添加到队列开头
         } else {
           item.reject(error);
@@ -247,7 +251,7 @@ class RequestQueue {
     }
 
     this.processing = false;
-    console.log(`[Queue System] 队列处理完成`);
+    log.info(`队列处理完成`);
   }
 
 
@@ -341,7 +345,7 @@ class RequestQueue {
     });
 
     if (originalLength !== this.queue.length) {
-      console.log(`[Queue System] 清理过期请求，移除 ${originalLength - this.queue.length} 个请求`);
+      log.info(`清理过期请求，移除 ${originalLength - this.queue.length} 个请求`);
     }
   }
 

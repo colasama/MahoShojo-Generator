@@ -4,6 +4,9 @@ import { config as appConfig } from "../../lib/config";
 import { MainColor } from "../../lib/main-color";
 import { magicalGirlQueue } from "../../lib/queue-system";
 import { getClientIP } from "../../lib/rate-limiter";
+import { getLogger } from "../../lib/logger";
+
+const log = getLogger('api-gen-girl');
 
 export const config = {
   runtime: 'edge',
@@ -80,7 +83,7 @@ async function handler(
 
   try {
     const ip = getClientIP(req as any);
-    
+
     // 添加到队列并等待处理
     const magicalGirl = await magicalGirlQueue.addToQueue(
       'generate-magical-girl',
@@ -91,13 +94,13 @@ async function handler(
       },
       persistenceKey
     );
-    
+
     return new Response(JSON.stringify(magicalGirl), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('生成魔法少女失败:', error);
+    log.error('生成魔法少女失败', { error, name });
     return new Response(JSON.stringify({ error: '生成失败，请稍后重试' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
