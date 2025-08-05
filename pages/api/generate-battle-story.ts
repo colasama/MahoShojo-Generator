@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { queryFromD1 } from '../../lib/d1'; // 导入 D1 查询函数
-import questionnaire from '../../../public/questionnaire.json';
+import { getLogger } from '../../lib/logger';
+
+const log = getLogger('api-gen-battle-story');
 
 export const config = {
   runtime: 'edge',
@@ -24,8 +26,31 @@ const BattleStorySchema = z.object({
 
 type BattleReport = z.infer<typeof BattleStorySchema>;
 
+// 预先加载问卷数据（在模块级别）
+let questionsCache: string[] | null = null;
+
+async function loadQuestions(): Promise<string[]> {
+  if (questionsCache) {
+    return questionsCache;
+  }
+
+  try {
+    // 使用 fetch 在函数内部加载 json 文件
+    const response = await fetch(`/questionnaire.json`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch questions: ${response.status}`);
+    }
+    const data = await response.json();
+    questionsCache = data.questions as string[];
+    return questionsCache;
+  } catch (error) {
+    log.error('加载问卷数据失败:', { error });
+    return [];
+  }
+}
+
 // 定义生成配置
-const battleStoryConfig: GenerationConfig<BattleReport, any[]> = {
+const createBattleStoryConfig = (questions: string[]): GenerationConfig<BattleReport, any[]> => ({
   systemPrompt: `你是一位资深的轻小说与网文作家，擅长分析和描绘魔法少女之间的冲突与战斗。你的任务是根据提供的魔法少女的角色设定，创作一场她们之间互相对战的精彩故事和一份专业的战斗结算报告。
 
 故事要求：
@@ -41,30 +66,27 @@ const battleStoryConfig: GenerationConfig<BattleReport, any[]> = {
 请严格按照提供的JSON schema格式返回故事和报告。`,
   temperature: 0.9,
   promptBuilder: (magicalGirls: any[]) => {
-    // 从导入的问卷中解构出问题列表
-    const { questions } = questionnaire;
-
     const profiles = magicalGirls.map((mg, index) => {
-        // isPreset 字段是前端添加的，不需要给 AI
-        const { userAnswers, isPreset, ...restOfProfile } = mg;
-        let profileString = `--- 角色 #${index + 1} ---\n`;
-        // 将用户答案和AI生成的其余设定分离开
-        const { userAnswers, ...restOfProfile } = mg;
+      // isPreset 字段是前端添加的，不需要给 AI
+      // 将用户答案和AI生成的其余设定分离开
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { userAnswers, isPreset: _, ...restOfProfile } = mg;
+      let profileString = `--- 角色 #${index + 1} ---\n`;
 
-        profileString += `// AI生成的角色核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
+      profileString += `// AI生成的角色核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
 
-        // 如果存在用户问卷回答，则将其与问题配对
-        if (userAnswers && Array.isArray(userAnswers)) {
-            profileString += `\n// 用户问卷回答 (用于理解角色深层性格与理念)\n`;
-            const qaBlock = userAnswers.map((answer, i) => {
-                // 使用索引从问卷中找到对应的问题
-                const question = questions[i] || `问题 ${i + 1}`; // 如果问题列表长度不够，则使用备用标题
-                return `Q: ${question}\nA: ${answer}`;
-            }).join('\n');
-            profileString += qaBlock;
-        }
+      // 如果存在用户问卷回答，则将其与问题配对
+      if (userAnswers && Array.isArray(userAnswers)) {
+        profileString += `\n// 用户问卷回答 (用于理解角色深层性格与理念)\n`;
+        const qaBlock = userAnswers.map((answer, i) => {
+          // 使用索引从问卷中找到对应的问题
+          const question = questions[i] || `问题 ${i + 1}`; // 如果问题列表长度不够，则使用备用标题
+          return `Q: ${question}\nA: ${answer}`;
+        }).join('\n');
+        profileString += qaBlock;
+      }
 
-        return profileString;
+      return profileString;
     }).join('\n\n');
 
     return `这是本次对战的魔法少女们的设定文件。每个角色包含【AI生成的角色核心设定】和【用户问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n请根据以上设定，创作她们之间的战斗故事和结算报告。`;
@@ -72,7 +94,7 @@ const battleStoryConfig: GenerationConfig<BattleReport, any[]> = {
   schema: BattleStorySchema,
   taskName: "生成魔法少女战斗故事",
   maxTokens: 8192,
-};
+});
 
 /**
  * 新增：更新数据库中的战斗统计信息
@@ -96,12 +118,22 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
       );
 
       // 更新胜/负场次和参战次数
-      const winsUpdate = isWinner ? 'wins + 1' : 'wins';
-      const lossesUpdate = !isWinner && winnerName !== '平局' ? 'losses + 1' : 'losses';
-      await queryFromD1(
-        `UPDATE characters SET wins = ${winsUpdate}, losses = ${lossesUpdate}, participations = participations + 1 WHERE name = ?;`,
-        [name]
-      );
+      if (isWinner) {
+        await queryFromD1(
+          'UPDATE characters SET wins = wins + 1, participations = participations + 1 WHERE name = ?;',
+          [name]
+        );
+      } else if (winnerName !== '平局') {
+        await queryFromD1(
+          'UPDATE characters SET losses = losses + 1, participations = participations + 1 WHERE name = ?;',
+          [name]
+        );
+      } else {
+        await queryFromD1(
+          'UPDATE characters SET participations = participations + 1 WHERE name = ?;',
+          [name]
+        );
+      }
     }
 
     // 2. 记录本次战斗
@@ -136,7 +168,11 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
+    // 预先加载问卷数据
+    const questions = await loadQuestions();
+
     // 生成战斗报告
+    const battleStoryConfig = createBattleStoryConfig(questions);
     const battleReport = await generateWithAI(magicalGirls, battleStoryConfig);
 
     // -- 新增逻辑 --

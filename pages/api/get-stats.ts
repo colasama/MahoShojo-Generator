@@ -1,6 +1,10 @@
 import { type NextApiRequest, type NextApiResponse } from 'next';
 import { queryFromD1 } from '../../lib/d1';
 
+export const config = {
+  runtime: 'edge',
+};
+
 // 定义API返回的数据结构
 export interface StatsData {
   totalBattles: number;
@@ -18,9 +22,8 @@ export interface CharacterRank {
 }
 
 async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
-    // @ts-ignore D1Result 类型可能不完全匹配，但结构是兼容的
-    const result: { results?: any[] } = await queryFromD1(sql, params);
-    return result.results || [];
+  const result = await queryFromD1(sql, params) as { result?: any[] };
+  return result.result || [];
 }
 
 export default async function handler(

@@ -30,7 +30,7 @@ const Leaderboard: React.FC<{ title: string; data: CharacterRank[]; presetInfo: 
 );
 
 export default function Home() {
-  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [, setImagesLoaded] = useState(false);
   // 状态：用于存储从API获取的统计数据
   const [stats, setStats] = useState<StatsData | null>(null);
   // 状态：用于存储预设角色的描述信息，方便在排行榜上显示

@@ -70,7 +70,6 @@ const QueueStatus: React.FC<QueueStatusProps> = ({ endpoint, isVisible, onComple
         } else {
           // 如果没有指定endpoint，使用所有队列中位置最靠前的
           const allQueues = Object.values(data).filter(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (item: any) => typeof item === 'object' && item.queueLength !== undefined
           ) as QueueStatusData[];
 

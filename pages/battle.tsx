@@ -28,9 +28,6 @@ const BattlePage: React.FC = () => {
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
     // --- 新增状态和副作用 ---
     const [presets, setPresets] = useState<PresetMagicalGirl[]>([]);
     const [isLoadingPresets, setIsLoadingPresets] = useState(true);
@@ -202,8 +199,8 @@ const BattlePage: React.FC = () => {
                 <div className="container">
                     <div className="card">
                         <div className="text-center mb-4">
-                           <h1 className="text-3xl font-bold text-gray-800">魔法少女竞技场</h1>
-                           <p className="subtitle" style={{marginBottom: '1rem'}}>上传她们的设定，见证宿命的对决！</p>
+                            <h1 className="text-3xl font-bold text-gray-800">魔法少女竞技场</h1>
+                            <p className="subtitle" style={{ marginBottom: '1rem' }}>上传她们的设定，见证宿命的对决！</p>
                         </div>
 
                         {/* 功能使用说明 */}
@@ -285,8 +282,8 @@ const BattlePage: React.FC = () => {
                             {isCooldown
                                 ? `请等待 ${remainingTime} 秒`
                                 : isGenerating
-                                ? '战斗推演中... (ง •̀_•́)ง'
-                                : '生成对战故事 (๑•̀ㅂ•́)و✧'}
+                                    ? '战斗推演中... (ง •̀_•́)ง'
+                                    : '生成对战故事 (๑•̀ㅂ•́)و✧'}
                         </button>
 
                         {error && <div className="error-message">{error}</div>}
@@ -301,7 +298,7 @@ const BattlePage: React.FC = () => {
 
                     <div className="text-center" style={{ marginTop: '2rem' }}>
                         <button onClick={() => router.push('/')} className="footer-link">
-                           返回首页
+                            返回首页
                         </button>
                     </div>
 
@@ -310,48 +307,48 @@ const BattlePage: React.FC = () => {
                             竞技场、问卷与系统设计 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
                         </p>
                         <p>
-                          <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
+                            <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
                         </p>
                         <p>
-                          本项目 AI 能力由&nbsp;
-                          <a href="https://github.com/KouriChat/KouriChat" target="_blank" rel="noopener noreferrer" className="footer-link">KouriChat</a> &&nbsp;
-                          <a href="https://api.kourichat.com/" target="_blank" rel="noopener noreferrer" className="footer-link">Kouri API</a>
-                          &nbsp;强力支持
+                            本项目 AI 能力由&nbsp;
+                            <a href="https://github.com/KouriChat/KouriChat" target="_blank" rel="noopener noreferrer" className="footer-link">KouriChat</a> &&nbsp;
+                            <a href="https://api.kourichat.com/" target="_blank" rel="noopener noreferrer" className="footer-link">Kouri API</a>
+                            &nbsp;强力支持
                         </p>
                         <p>
-                          <a href="https://github.com/colasama/MahoShojo-Generator" target="_blank" rel="noopener noreferrer" className="footer-link">colasama/MahoShojo-Generator</a>
+                            <a href="https://github.com/colasama/MahoShojo-Generator" target="_blank" rel="noopener noreferrer" className="footer-link">colasama/MahoShojo-Generator</a>
                         </p>
                     </footer>
                 </div>
 
-                 {/* 图片模态框 */}
+                {/* 图片模态框 */}
                 {showImageModal && savedImageUrl && (
-                  <div className="fixed inset-0 bg-black flex items-center justify-center z-50"
-                    style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
-                  >
-                    <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
-                      <div className="flex justify-between items-center m-0">
-                        <div></div>
-                        <button
-                          onClick={() => setShowImageModal(false)}
-                          className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
-                          style={{ marginRight: '0.5rem' }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                      <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
-                        💫 长按图片保存到相册
-                      </p>
-                      <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
-                        <img
-                          src={savedImageUrl}
-                          alt="魔法少女战斗报告"
-                          className="w-full h-auto rounded-lg mx-auto"
-                        />
-                      </div>
+                    <div className="fixed inset-0 bg-black flex items-center justify-center z-50"
+                        style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
+                    >
+                        <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
+                            <div className="flex justify-between items-center m-0">
+                                <div></div>
+                                <button
+                                    onClick={() => setShowImageModal(false)}
+                                    className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
+                                    style={{ marginRight: '0.5rem' }}
+                                >
+                                    ×
+                                </button>
+                            </div>
+                            <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
+                                💫 长按图片保存到相册
+                            </p>
+                            <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
+                                <img
+                                    src={savedImageUrl}
+                                    alt="魔法少女战斗报告"
+                                    className="w-full h-auto rounded-lg mx-auto"
+                                />
+                            </div>
+                        </div>
                     </div>
-                  </div>
                 )}
             </div>
         </>
