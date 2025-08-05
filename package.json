@@ -7,7 +7,7 @@
         "dev:pretty": "next dev --turbopack | pino-pretty",
         "build": "next build",
         "build:cf": "next-on-pages",
-        "preview": "npm run build:cf && wrangler pages dev",
+        "preview": "npm run build:cf && wrangler pages dev .vercel/output/static",
         "start": "next start",
         "lint": "next lint"
     },
@@ -38,6 +38,7 @@
         "eslint-config-next": "15.3.2",
         "tailwindcss": "^4",
         "tw-animate-css": "^1.3.0",
-        "typescript": "^5"
+        "typescript": "^5",
+        "wrangler": "^4.28.0"
     }
 }
