@@ -1,6 +1,7 @@
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { z } from 'zod';
 import { getRandomFlowers } from '../../lib/random-choose-hana-name';
+import { saveToD1 } from '../../lib/d1';
 // import { MainColor } from '../../lib/main-color';
 
 export const config = {
@@ -124,6 +125,13 @@ async function handler(
 
   try {
     const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
+    console.log(process.env.D1_API_TOKEN, process.env.CLOUDFLARE_ACCOUNT_ID, process.env.D1_DATABASE_ID);
+    const result = await saveToD1(JSON.stringify(magicalGirlDetails));
+    if (!result) {
+      console.error('保存到 D1 数据库失败');
+    } else {
+      console.log('保存到 D1 数据库成功');
+    }
     return new Response(JSON.stringify(magicalGirlDetails), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
