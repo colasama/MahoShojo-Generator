@@ -80,7 +80,6 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
       `问题${index + 1}的回答: "${answer}"`
     ).join('\n')
     const flowers = getRandomFlowers();
-    console.log(flowers);
     return `请基于以下问卷回答开始分析和预测：${questionAnswerPairs}，可选的花名和对应的花语：${flowers}`
   },
   schema: MagicalGirlDetailsSchema,
