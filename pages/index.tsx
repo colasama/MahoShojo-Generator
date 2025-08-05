@@ -60,6 +60,16 @@ export default function Home() {
                   </div>
                 </div>
               </Link>
+
+              {/* 魔法少女竞技场按钮 */}
+              <Link href="/battle" className="feature-button battle-arena">
+                <div className="gradient-overlay"></div>
+                <div className="feature-button-content">
+                  <div className="feature-title-container">
+                    <span className="text-2xl font-bold text-white drop-shadow-md">魔法少女竞技场</span>
+                  </div>
+                </div>
+              </Link>
             </div>
 
             <div style={{ marginTop: '3rem', textAlign: 'center' }}>

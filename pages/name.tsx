@@ -102,7 +102,7 @@ async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
         const retryAfter = error.retryAfter || 60;
         throw new Error(`请求过于频繁！请等待 ${retryAfter} 秒后再试。`);
       } else if (response.status >= 500) {
-        throw new Error('服务器内部错误，请稍后重试');
+        throw new Error('服务器内部错误，当前可能正忙，请稍后重试');
       } else {
         throw new Error(error.message || error.error || '生成失败');
       }
@@ -378,6 +378,9 @@ export default function Name() {
           </div>
 
           <footer className="footer">
+            <p>
+                竞技场、问卷与系统设计 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
+            </p>
             <p>
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
             </p>

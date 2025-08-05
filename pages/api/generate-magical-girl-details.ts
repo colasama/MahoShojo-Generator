@@ -130,7 +130,8 @@ async function handler(
     });
   } catch (error) {
     console.error('生成魔法少女详细信息失败:', error);
-    return new Response(JSON.stringify({ error: '生成失败，请稍后重试' }), {
+    const errorMessage = error instanceof Error ? error.message : '服务器内部错误';
+    return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

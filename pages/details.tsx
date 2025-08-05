@@ -230,7 +230,7 @@ const DetailsPage: React.FC = () => {
           const retryAfter = errorData.retryAfter || 60;
           throw new Error(`请求过于频繁！请等待 ${retryAfter} 秒后再试。`);
         } else if (response.status >= 500) {
-          throw new Error('服务器内部错误，请稍后重试');
+          throw new Error('服务器内部错误，当前可能正忙，请稍后重试');
         } else {
           throw new Error(errorData.message || errorData.error || '生成失败');
         }
@@ -517,7 +517,7 @@ const DetailsPage: React.FC = () => {
 
           <footer className="footer text-white">
             <p className="text-white">
-              问卷与系统设计 <a className="footer-link">@末伏之夜</a>
+              竞技场、问卷与系统设计 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
             </p>
             <p className="text-white">
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品

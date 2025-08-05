@@ -70,6 +70,15 @@
     #9775fa 100%);
 }
 
+.battle-arena .gradient-overlay {
+  background: linear-gradient(45deg,
+    #434343 0%,
+    #000000 25%,
+    #757F9A 50%,
+    #D7DDE8 75%,
+    #434343 100%);
+}
+
 .feature-button:hover .gradient-overlay {
   opacity: 1;
   animation: gradientFlowFast 3s ease-in-out infinite;
