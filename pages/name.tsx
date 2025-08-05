@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
 import { snapdom } from '@zumer/snapdom';
 // TODO: 从这里引入怪怪的，但是先这样吧！
@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { useRouter } from 'next/router';
+import QueueStatus from '../components/QueueStatus';
 
 interface MagicalGirl {
   realName: string;
@@ -84,14 +85,14 @@ function checkNameLength(name: string): boolean {
 }
 
 // 使用 API 路由生成魔法少女
-async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
+async function generateMagicalGirl(inputName: string, persistenceKey?: string): Promise<MagicalGirl> {
   try {
     const response = await fetch('/api/generate-magical-girl', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name: inputName }),
+      body: JSON.stringify({ name: inputName, persistenceKey }),
     });
 
     if (!response.ok) {
@@ -154,9 +155,23 @@ export default function Name() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showQueueStatus, setShowQueueStatus] = useState(false);
+  const [persistenceKey, setPersistenceKey] = useState<string>('');
   const resultRef = useRef<HTMLDivElement>(null);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateMagicalGirlCooldown', 60000);
   const router = useRouter();
+
+  // 初始化持久化键
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let key = localStorage.getItem('queuePersistenceKey');
+      if (!key) {
+        key = `queue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('queuePersistenceKey', key);
+      }
+      setPersistenceKey(key);
+    }
+  }, []);
 
   const handleGenerate = async () => {
     if (isCooldown) {
@@ -177,9 +192,10 @@ export default function Name() {
     }
     setIsGenerating(true);
     setError(null); // 清除之前的错误
+    setShowQueueStatus(true); // 显示队列状态
 
     try {
-      const result = await generateMagicalGirl(inputName.trim());
+      const result = await generateMagicalGirl(inputName.trim(), persistenceKey);
       setMagicalGirl(result);
       setError(null); // 成功时清除错误
     } catch (error) {
@@ -200,6 +216,7 @@ export default function Name() {
       }
     } finally {
       setIsGenerating(false);
+      setShowQueueStatus(false); // 隐藏队列状态
       startCooldown();
     }
   };
@@ -422,6 +439,17 @@ export default function Name() {
             </div>
           </div>
         )}
+        
+        {/* 队列状态组件 */}
+        <QueueStatus 
+          endpoint="generate-magical-girl"
+          isVisible={showQueueStatus}
+          persistenceKey={persistenceKey}
+          onComplete={() => {
+            setShowQueueStatus(false);
+            // 可以在这里添加完成后的逻辑
+          }}
+        />
       </div>
     </>
   );

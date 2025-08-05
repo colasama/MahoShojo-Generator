@@ -1,11 +1,13 @@
-/* 流动渐变按钮样式 */
+/* 流动渐变按钮样式 - 性能优化版本 */
 
+/* 使用transform代替background-position，性能更好 */
 @keyframes gradientFlow {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
 
+/* 优化的快速流动动画 */
 @keyframes gradientFlowFast {
   0% { background-position: 0% 0%; }
   25% { background-position: 100% 0%; }
@@ -14,6 +16,7 @@
   100% { background-position: 0% 0%; }
 }
 
+/* 闪烁效果 */
 @keyframes sparkle {
   0%, 100% { 
     opacity: 0.3; 
@@ -31,12 +34,18 @@
   border-radius: 20px;
   padding: 2rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
+  /* 添加回模糊效果，但使用性能更好的方式 */
+  backdrop-filter: blur(5px);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
+  /* 优化：使用transform和opacity的transition，性能更好 */
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s ease;
   text-decoration: none;
   color: inherit;
   overflow: hidden;
+  /* 开启硬件加速 */
+  will-change: transform, opacity;
 }
 
 .gradient-overlay {
@@ -47,38 +56,56 @@
   bottom: 0;
   opacity: 1;
   border-radius: 20px;
-  background-size: 300% 300%;
-  animation: gradientFlow 6s ease-in-out infinite;
+  /* 恢复动画效果，但使用较小的背景尺寸减少GPU负担 */
+  background-size: 200% 200%;
+  /* 使用transform触发GPU加速 */
+  transform: translateZ(0);
+  /* 开启硬件加速 */
+  will-change: background-position, transform;
   z-index: 1;
 }
 
+/* 只在非移动设备上启用动画 */
+@media (min-width: 768px) {
+  .gradient-overlay {
+    animation: gradientFlow 8s ease-in-out infinite;
+  }
+}
+
 .magical-generator .gradient-overlay {
+  /* 恢复原始渐变，但优化停止点 */
   background: linear-gradient(45deg, 
     #ff9a9e 0%, 
-    #fecfef 25%, 
+    #fecfef 30%, 
     #fecfef 50%, 
-    #ff6b6b 75%, 
+    #ff6b6b 70%, 
     #ee5a6f 100%);
 }
 
 .fairy-quest .gradient-overlay {
+  /* 恢复原始渐变，但优化停止点 */
   background: linear-gradient(45deg, 
     #667eea 0%, 
-    #764ba2 25%, 
+    #764ba2 30%, 
     #5c7cfa 50%, 
-    #748ffc 75%, 
+    #748ffc 70%, 
     #9775fa 100%);
 }
 
 .feature-button:hover .gradient-overlay {
+  /* 恢复原始动画，但使用GPU加速 */
+  animation: gradientFlowFast 4s ease-in-out infinite;
+  background-size: 300% 300%;
+  transform: translateZ(0);
   opacity: 1;
-  animation: gradientFlowFast 3s ease-in-out infinite;
-  background-size: 400% 400%;
 }
 
 .feature-button:hover {
-  transform: translateY(-8px) scale(1.02);
+  /* 恢复原始效果，但优化transform */
+  transform: translateY(-8px);
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+  /* 确保硬件加速 */
+  will-change: transform, box-shadow;
 }
 
 .feature-button-content {
@@ -123,7 +150,7 @@
   font-weight: 500;
 }
 
-/* 魔法粒子效果 */
+/* 魔法粒子效果 - 性能优化版 */
 .feature-button::before {
   content: '';
   position: absolute;
@@ -131,27 +158,55 @@
   left: 0;
   right: 0;
   bottom: 0;
+  /* 恢复原始效果，但优化背景图案 */
   background-image: 
     radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.3) 2px, transparent 2px),
     radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
     radial-gradient(circle at 40% 60%, rgba(255, 255, 255, 0.15) 1px, transparent 1px);
   background-size: 40px 40px, 25px 25px, 35px 35px;
-  animation: sparkle 4s ease-in-out infinite;
   opacity: 0;
   transition: opacity 0.3s ease;
   z-index: 3;
   pointer-events: none;
   border-radius: 20px;
+  /* 开启硬件加速 */
+  will-change: opacity;
+  transform: translateZ(0);
 }
 
 .feature-button:hover::before {
-  opacity: 1;
+  opacity: 0.8;
+  /* 恢复原始动画，但只在hover时运行 */
+  animation: sparkle 4s ease-in-out infinite;
+}
+
+/* Loading状态样式 */
+.feature-button.loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.feature-button.loading .gradient-overlay {
+  animation: none;
+  opacity: 0.7;
+}
+
+/* 性能优化：减少不必要的重绘 */
+.feature-button * {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* 响应式设计 */
 @media (max-width: 600px) {
   .feature-button {
     padding: 0.5rem;
+    /* 移动端减少transform效果 */
+    will-change: auto;
+  }
+  
+  .feature-button:hover {
+    transform: translateY(-2px);
   }
   
   .feature-button-content {
@@ -164,10 +219,50 @@
   
   .feature-title-svg {
     width: 200px;
-    height: 120px;
+    height: auto;
   }
   
   .feature-description {
     font-size: 0.85rem;
+  }
+  
+  /* 移动端优化 */
+  .feature-button::before {
+    /* 简化移动端效果 */
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+  
+  /* 移动端减少动画 */
+  .gradient-overlay {
+    animation: none !important;
+    background-size: 100% 100% !important;
+  }
+  
+  .feature-button:hover .gradient-overlay {
+    animation: none !important;
+    background-size: 100% 100% !important;
+    transform: none;
+  }
+}
+
+/* 减少动画的偏好设置支持 */
+@media (prefers-reduced-motion: reduce) {
+  .feature-button {
+    transition: none;
+  }
+  
+  .feature-button:hover {
+    transform: none;
+    animation: none;
+  }
+  
+  .feature-button::before {
+    animation: none;
+  }
+  
+  .gradient-overlay {
+    animation: none;
   }
 }

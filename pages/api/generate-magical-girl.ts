@@ -2,6 +2,8 @@ import { z } from "zod";
 import { generateWithAI, GenerationConfig } from "../../lib/ai";
 import { config as appConfig } from "../../lib/config";
 import { MainColor } from "../../lib/main-color";
+import { magicalGirlQueue } from "../../lib/queue-system";
+import { getClientIP } from "../../lib/rate-limiter";
 
 export const config = {
   runtime: 'edge',
@@ -67,7 +69,7 @@ async function handler(
     });
   }
 
-  const { name } = await req.json();
+  const { name, persistenceKey } = await req.json();
 
   if (!name || typeof name !== 'string') {
     return new Response(JSON.stringify({ error: 'Name is required' }), {
@@ -77,7 +79,19 @@ async function handler(
   }
 
   try {
-    const magicalGirl = await generateMagicalGirlWithAI(name.trim());
+    const ip = getClientIP(req as any);
+    
+    // 添加到队列并等待处理
+    const magicalGirl = await magicalGirlQueue.addToQueue(
+      'generate-magical-girl',
+      { name: name.trim() },
+      ip,
+      async () => {
+        return await generateMagicalGirlWithAI(name.trim());
+      },
+      persistenceKey
+    );
+    
     return new Response(JSON.stringify(magicalGirl), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
