@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
+// 导入问卷问题
+import questionnaire from '../../../public/questionnaire.json';
 
 export const config = {
   runtime: 'edge',
 };
 
+// 定义AI响应的Zod schema
 const BattleStorySchema = z.object({
   title: z.string().describe("一个轻小说或网文风格的，富有想象力且能概括故事核心的标题。"),
   story: z.object({
@@ -21,13 +24,13 @@ const BattleStorySchema = z.object({
 
 type BattleReport = z.infer<typeof BattleStorySchema>;
 
-// Define the generation configuration
+// 定义生成配置
 const battleStoryConfig: GenerationConfig<BattleReport, any[]> = {
   systemPrompt: `你是一位资深的轻小说与网文作家，擅长分析和描绘魔法少女之间的冲突与战斗。你的任务是根据提供的魔法少女的角色设定，创作一场她们之间互相对战的精彩故事和一份专业的战斗结算报告。
 
 故事要求：
 1. 逻辑连贯：故事必须有明确的起因、经过和结果。
-2. 角色驱动：战斗过程需要紧密结合每位魔法少女的设定，包括她们的外貌、能力、性格和武器（魔力构装）。她们的行动和决策应符合其性格。
+2. 角色驱动：战斗过程需要紧密结合每位魔法少女的设定，特别是要深入理解她们在问卷回答中体现出的性格和理念。她们的行动和决策应符合其性格。
 3. 场面生动：战斗描写需要充满想象力，画面感强。
 4. 结局合理：战斗的胜负或结果需要基于她们能力的克制关系、战术策略和性格因素，得出合乎逻辑的结论。
 
@@ -38,10 +41,31 @@ const battleStoryConfig: GenerationConfig<BattleReport, any[]> = {
 请严格按照提供的JSON schema格式返回故事和报告。`,
   temperature: 0.9,
   promptBuilder: (magicalGirls: any[]) => {
-    const profiles = magicalGirls.map((mg, index) =>
-        `--- 角色 #${index + 1} ---\n${JSON.stringify(mg, null, 2)}`
-    ).join('\n\n');
-    return `这是本次对战的魔法少女们的设定文件：\n\n${profiles}\n\n请根据以上设定，创作她们之间的战斗故事和结算报告。`;
+    // 从导入的问卷中解构出问题列表
+    const { questions } = questionnaire;
+
+    const profiles = magicalGirls.map((mg, index) => {
+        let profileString = `--- 角色 #${index + 1} ---\n`;
+        // 将用户答案和AI生成的其余设定分离开
+        const { userAnswers, ...restOfProfile } = mg;
+
+        profileString += `// AI生成的角色核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
+
+        // 如果存在用户问卷回答，则将其与问题配对
+        if (userAnswers && Array.isArray(userAnswers)) {
+            profileString += `\n// 用户问卷回答 (用于理解角色深层性格与理念)\n`;
+            const qaBlock = userAnswers.map((answer, i) => {
+                // 使用索引从问卷中找到对应的问题
+                const question = questions[i] || `问题 ${i + 1}`; // 如果问题列表长度不够，则使用备用标题
+                return `Q: ${question}\nA: ${answer}`;
+            }).join('\n');
+            profileString += qaBlock;
+        }
+
+        return profileString;
+    }).join('\n\n');
+
+    return `这是本次对战的魔法少女们的设定文件。每个角色包含【AI生成的角色核心设定】和【用户问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n请根据以上设定，创作她们之间的战斗故事和结算报告。`;
   },
   schema: BattleStorySchema,
   taskName: "生成魔法少女战斗故事",
@@ -76,7 +100,7 @@ async function handler(req: Request): Promise<Response> {
   } catch (error) {
     console.error('生成战斗故事失败:', error);
     const errorMessage = error instanceof Error ? error.message : '未知错误';
-    return new Response(JSON.stringify({ error: '生成失败，请稍后重试', message: errorMessage }), {
+    return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
