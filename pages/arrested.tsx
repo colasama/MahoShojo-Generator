@@ -61,7 +61,7 @@ export default function ArrestedPage() {
 
                         <div className="text-center mb-8" style={{ padding: '2rem' }}>
                             <div className="text-lg md:text-xl text-purple-200 font-semibold" style={{ padding: '2rem', marginBottom: '4rem' }}>
-                                <p>调查使正在前往您的所在地</p>
+                                <p>巡查使正在前往您的所在地</p>
                                 <p>请勿离开该界面</p>
                             </div>
                             <div className="text-purple-100 space-y-3" style={{ marginBottom: '8rem' }}>

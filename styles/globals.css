@@ -39,6 +39,13 @@ a {
     overflow: hidden;
 }
 
+.magic-background-white {
+    background: linear-gradient(45deg, #fff6f7 0%, #ffc8e0 50%, #ffffff 100%);
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+}
+
 .magic-background::before {
     content: '';
     position: absolute;
