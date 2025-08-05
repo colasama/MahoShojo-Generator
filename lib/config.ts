@@ -67,7 +67,7 @@ const parseApiPairs = () => {
 };
 
 // 获取第一个提供商的模型
-const getDefaultModel = (): string => {
+const getDefaultModel = (): string | string[] => {
   const providers = getAPIProviders();
   if (providers.length > 0) {
     return providers[0].model;

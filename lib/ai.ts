@@ -49,19 +49,19 @@ function shuffleArray<T>(array: T[]): T[] {
  */
 function weightedRandomSelect<T extends { weight?: number }>(items: T[]): T[] {
   if (items.length === 0) return [];
-  
+
   // 如果没有权重，返回随机打乱的数组
   if (!items.some(item => item.weight)) {
     return shuffleArray(items);
   }
-  
+
   const sorted = [...items].sort((a, b) => {
     const weightA = a.weight || 1;
     const weightB = b.weight || 1;
     // 添加随机因子，权重高的更容易被选中，但不是绝对的
     return (weightB + Math.random() * 0.5) - (weightA + Math.random() * 0.5);
   });
-  
+
   return sorted;
 }
 
@@ -83,7 +83,7 @@ function selectRandomModel(models: string | string[]): string {
  */
 function expandProviders(providers: AIProvider[]): AIProvider[] {
   const expandedProviders: AIProvider[] = [];
-  
+
   providers.forEach(provider => {
     if (typeof provider.model === 'string') {
       // 单个模型，直接添加
@@ -100,7 +100,7 @@ function expandProviders(providers: AIProvider[]): AIProvider[] {
       });
     }
   });
-  
+
   return expandedProviders;
 }
 
@@ -146,7 +146,7 @@ export async function generateWithAI<T, I = string>(
       providersToTry = weightedRandomSelect(expandedProviders);
       console.log(`[负载均衡] 使用加权随机策略，提供商顺序: ${providersToTry.map(p => `${p.name}(${typeof p.model === 'string' ? p.model : 'multi'})`).join(' -> ')}`);
       break;
-    
+
     case LoadBalanceStrategy.ROUND_ROBIN:
       // 轮询选择提供商
       const startIndex = roundRobinCounter % expandedProviders.length;
@@ -157,7 +157,7 @@ export async function generateWithAI<T, I = string>(
       roundRobinCounter++;
       console.log(`[负载均衡] 使用轮询策略，从第 ${startIndex + 1} 个提供商开始: ${providersToTry.map(p => `${p.name}(${typeof p.model === 'string' ? p.model : 'multi'})`).join(' -> ')}`);
       break;
-    
+
     case LoadBalanceStrategy.SEQUENTIAL:
     default:
       // 顺序执行（原有逻辑）
@@ -197,7 +197,6 @@ export async function generateWithAI<T, I = string>(
           maxTokens: generationConfig.maxTokens,
           retryCount: 1,
           mode: provider.mode || 'auto',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           experimental_repairText: provider.mode === 'json' ? async (options: any) => {
             options.text = options.text.replace('```json\n', '').replace('\n```', '');
             return options.text;

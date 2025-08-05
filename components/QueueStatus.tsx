@@ -21,16 +21,16 @@ interface QueueStatusProps {
 const QueueStatus: React.FC<QueueStatusProps> = ({ endpoint, isVisible, onComplete, persistenceKey }) => {
   const [queueStatus, setQueueStatus] = useState<QueueStatusData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [currentPersistenceKey, setCurrentPersistenceKey] = useState<string>(() => {
+  const [currentPersistenceKey,] = useState<string>(() => {
     // 优先使用传入的持久化键
     if (persistenceKey) return persistenceKey;
-    
+
     // 尝试从localStorage恢复
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('queuePersistenceKey');
       if (saved) return saved;
     }
-    
+
     // 生成新的持久化键
     const newKey = `queue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     if (typeof window !== 'undefined') {
@@ -48,38 +48,39 @@ const QueueStatus: React.FC<QueueStatusProps> = ({ endpoint, isVisible, onComple
 
     const fetchQueueStatus = async () => {
       try {
-        let url = endpoint 
+        let url = endpoint
           ? `/api/queue-status?endpoint=${endpoint}`
           : '/api/queue-status';
-        
+
         // 添加持久化键参数
         if (currentPersistenceKey) {
           url += `${url.includes('?') ? '&' : '?'}persistenceKey=${currentPersistenceKey}`;
         }
-        
+
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('获取队列状态失败');
         }
-        
+
         const data = await response.json();
-        
+
         // 如果是特定endpoint，直接使用数据
         if (endpoint) {
           setQueueStatus(data);
         } else {
           // 如果没有指定endpoint，使用所有队列中位置最靠前的
           const allQueues = Object.values(data).filter(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (item: any) => typeof item === 'object' && item.queueLength !== undefined
           ) as QueueStatusData[];
-          
+
           if (allQueues.length > 0) {
             // 找到用户位置最靠前的队列
             const userQueue = allQueues.find(q => q.currentPosition > 0) || allQueues[0];
             setQueueStatus(userQueue);
           }
         }
-        
+
         setError(null);
       } catch (err) {
         console.error('获取队列状态失败:', err);
@@ -89,10 +90,10 @@ const QueueStatus: React.FC<QueueStatusProps> = ({ endpoint, isVisible, onComple
 
     // 立即获取一次
     fetchQueueStatus();
-    
+
     // 每2秒刷新一次队列状态
     const interval = setInterval(fetchQueueStatus, 2000);
-    
+
     return () => clearInterval(interval);
   }, [isVisible, endpoint]);
 
@@ -103,7 +104,7 @@ const QueueStatus: React.FC<QueueStatusProps> = ({ endpoint, isVisible, onComple
       const timer = setTimeout(() => {
         onComplete?.();
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [queueStatus, onComplete]);
@@ -142,20 +143,20 @@ const QueueStatus: React.FC<QueueStatusProps> = ({ endpoint, isVisible, onComple
           <h3>🎀 魔法少女排队中...</h3>
           <p className="queue-subtitle">由于用户过多，请耐心等待哦～</p>
         </div>
-        
+
         <div className="queue-info">
           <div className="queue-stat">
             <span className="stat-label">当前队列长度</span>
             <span className="stat-value">{queueLength}</span>
           </div>
-          
+
           <div className="queue-stat">
             <span className="stat-label">您的位置</span>
             <span className="stat-value">
               {currentPosition === 0 ? '正在处理' : `第 ${currentPosition} 位`}
             </span>
           </div>
-          
+
           <div className="queue-stat">
             <span className="stat-label">预计等待时间</span>
             <span className="stat-value">
@@ -166,9 +167,9 @@ const QueueStatus: React.FC<QueueStatusProps> = ({ endpoint, isVisible, onComple
 
         <div className="queue-progress">
           <div className="progress-bar">
-            <div 
+            <div
               className="progress-fill"
-              style={{ 
+              style={{
                 width: currentPosition === 0 ? '100%' : `${Math.max(0, 100 - (currentPosition / Math.max(queueLength, 1)) * 100)}%`
               }}
             ></div>

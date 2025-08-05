@@ -10,10 +10,10 @@ export default function Home() {
     const preloadImages = async () => {
       const imageUrls = [
         '/logo.svg',
-        '/logo-white.svg', 
+        '/logo-white.svg',
         '/questionnaire-logo.svg'
       ];
-      
+
       const imagePromises = imageUrls.map(url => {
         return new Promise((resolve, reject) => {
           const img = new window.Image();
@@ -27,7 +27,7 @@ export default function Home() {
         await Promise.all(imagePromises);
         setImagesLoaded(true);
       } catch (error) {
-        console.log('图片预加载完成，但部分图片可能失败');
+        console.log('图片预加载完成，但部分图片可能失败', error);
         setImagesLoaded(true);
       }
     };
@@ -49,10 +49,10 @@ export default function Home() {
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '2rem' }}>
               {imagesLoaded ? (
-                <img 
-                  src="/logo.svg" 
-                  width={280} 
-                  height={180} 
+                <img
+                  src="/logo.svg"
+                  width={280}
+                  height={180}
                   alt="魔法少女生成器"
                   style={{ maxWidth: '100%', height: 'auto' }}
                 />
