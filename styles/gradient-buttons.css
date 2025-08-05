@@ -151,11 +151,11 @@
 /* 响应式设计 */
 @media (max-width: 600px) {
   .feature-button {
-    padding: 1.5rem;
+    padding: 0.5rem;
   }
   
   .feature-button-content {
-    padding: 1rem;
+    padding: 0;
   }
   
   .feature-title-container {
@@ -164,7 +164,7 @@
   
   .feature-title-svg {
     width: 200px;
-    height: 48px;
+    height: 120px;
   }
   
   .feature-description {
