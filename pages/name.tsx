@@ -361,8 +361,8 @@ export default function Name() {
                   <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
                     <img
                       src="/logo-white-qrcode.svg"
-                      width={320}
-                      height={80}
+                      width={240}
+                      height={240}
                       alt="Logo"
                       style={{
                         display: 'block',
