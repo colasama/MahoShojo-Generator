@@ -1,7 +1,6 @@
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import '../styles/gradient-buttons.css';
 
 export default function Home() {
   return (

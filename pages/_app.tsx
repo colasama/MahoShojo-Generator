@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import '@/styles/globals.css';
 import '@/styles/blue-theme.css';
+import '@/styles/gradient-buttons.css';
 import { GoogleAnalytics } from '@next/third-parties/google';
 
 // 如果需要统计，请取消注释并安装 @vercel/analytics
