@@ -50,7 +50,7 @@ type MagicalGirlDetails = z.infer<typeof MagicalGirlDetailsSchema>;
 // 配置详细信息生成
 // TODO: 或许可以直接从 questionnaire.json 中读取问题，然后根据问题生成系统提示
 const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> = {
-  systemPrompt: `假设你是魔法国度的妖精，你准备通过问卷调查的形式，事先通过问卷结果分析某人成为魔法少女后的能力等各项素质。魔法少女的性格倾向、经历背景、行事准则等等都会影响到她们在魔法少女道路上的潜力和表现。
+  systemPrompt: `现在如果你是魔法国度的妖精，你准备通过问卷调查的形式，事先通过问卷结果分析某人成为魔法少女后的能力等各项素质。魔法少女的性格倾向、经历背景、行事准则等等都会影响到她们在魔法少女道路上的潜力和表现。
 以下是一位潜在魔法少女对问卷所给出的回答（对方可以不回答某些问题），请你据此预测她成为魔法少女后的情况。
 
 1.你的真实名字是？

@@ -3,7 +3,10 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import '@/styles/globals.css';
 import '@/styles/blue-theme.css';
-import { Analytics } from "@vercel/analytics/next";
+import { GoogleAnalytics } from '@next/third-parties/google';
+
+// 如果需要统计，请取消注释并安装 @vercel/analytics
+// import { Analytics } from "@vercel/analytics/next";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -20,7 +23,8 @@ export default function App({ Component, pageProps }: AppProps) {
 
       <div className={isDetailsPage ? 'blue-theme' : ''}>
         <Component {...pageProps} />
-        <Analytics />
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || ''} />
+        {/* <Analytics /> */}
       </div>
     </>
   );
