@@ -125,7 +125,6 @@ async function handler(
 
   try {
     const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
-    console.log(process.env.D1_API_TOKEN, process.env.CLOUDFLARE_ACCOUNT_ID, process.env.D1_DATABASE_ID);
     const result = await saveToD1(JSON.stringify({
       ...magicalGirlDetails,
       answers: answers
