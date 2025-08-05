@@ -32,8 +32,6 @@ export async function saveToD1(data: unknown): Promise<void> {
       const errorText = await response.text();
       throw new Error(`D1 API 错误: ${response.status} ${response.statusText} - ${errorText}`);
     }
-
-    const result = await response.json();
     // console.log("成功保存到 D1 数据库:", result);
   } catch (error) {
     console.error("保存到 D1 数据库失败:", error);
