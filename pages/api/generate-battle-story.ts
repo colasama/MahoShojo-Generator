@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
-// 导入问卷问题
+import { queryFromD1 } from '../../lib/d1'; // 导入 D1 查询函数
 import questionnaire from '../../../public/questionnaire.json';
 
 export const config = {
@@ -45,6 +45,8 @@ const battleStoryConfig: GenerationConfig<BattleReport, any[]> = {
     const { questions } = questionnaire;
 
     const profiles = magicalGirls.map((mg, index) => {
+        // isPreset 字段是前端添加的，不需要给 AI
+        const { userAnswers, isPreset, ...restOfProfile } = mg;
         let profileString = `--- 角色 #${index + 1} ---\n`;
         // 将用户答案和AI生成的其余设定分离开
         const { userAnswers, ...restOfProfile } = mg;
@@ -72,6 +74,49 @@ const battleStoryConfig: GenerationConfig<BattleReport, any[]> = {
   maxTokens: 8192,
 };
 
+/**
+ * 新增：更新数据库中的战斗统计信息
+ * @param winnerName 胜利者名字
+ * @param participants 所有参战者信息
+ */
+async function updateBattleStats(winnerName: string, participants: any[]) {
+  try {
+    const participantNames = participants.map(p => p.codename || p.name);
+
+    // 1. 更新每个参战者的统计数据
+    for (const participant of participants) {
+      const name = participant.codename || participant.name;
+      const isPreset = !!participant.isPreset;
+      const isWinner = name === winnerName;
+
+      // 插入或忽略已存在的角色
+      await queryFromD1(
+        "INSERT INTO characters (name, is_preset) VALUES (?, ?) ON CONFLICT(name) DO NOTHING;",
+        [name, isPreset ? 1 : 0]
+      );
+
+      // 更新胜/负场次和参战次数
+      const winsUpdate = isWinner ? 'wins + 1' : 'wins';
+      const lossesUpdate = !isWinner && winnerName !== '平局' ? 'losses + 1' : 'losses';
+      await queryFromD1(
+        `UPDATE characters SET wins = ${winsUpdate}, losses = ${lossesUpdate}, participations = participations + 1 WHERE name = ?;`,
+        [name]
+      );
+    }
+
+    // 2. 记录本次战斗
+    await queryFromD1(
+      "INSERT INTO battles (winner_name, participants_json, created_at) VALUES (?, ?, ?);",
+      [winnerName, JSON.stringify(participantNames), new Date().toISOString()]
+    );
+
+    console.log('成功更新战斗统计数据到 D1');
+  } catch (error) {
+    // D1 更新失败不应阻塞主流程，只记录错误
+    console.error('更新 D1 数据库失败:', error);
+  }
+}
+
 
 async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
@@ -91,7 +136,20 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
+    // 生成战斗报告
     const battleReport = await generateWithAI(magicalGirls, battleStoryConfig);
+
+    // -- 新增逻辑 --
+    // 在返回结果前，异步更新数据库，不阻塞响应
+    // 注意：在 Vercel Edge/Cloudflare Workers 中，需要用特殊方式确保异步任务在响应后继续执行
+    const updatePromise = updateBattleStats(battleReport.report.winner, magicalGirls);
+
+    // Cloudflare Workers/Pages 环境下，可以将 promise 传递给 waitUntil
+    const executionContext = (req as any).context;
+    if (executionContext && typeof executionContext.waitUntil === 'function') {
+      executionContext.waitUntil(updatePromise);
+    }
+    // -- 新增逻辑结束 --
 
     return new Response(JSON.stringify(battleReport), {
       status: 200,

@@ -1,10 +1,11 @@
-import React, { useState, useRef, ChangeEvent } from 'react';
+import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import BattleReportCard, { BattleReport } from '../components/BattleReportCard';
 import Link from 'next/link';
+import { PresetMagicalGirl } from './api/get-presets'; // 导入类型
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
@@ -27,23 +28,73 @@ const BattlePage: React.FC = () => {
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 处理文件选择变化的函数
+    const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // --- 新增状态和副作用 ---
+    const [presets, setPresets] = useState<PresetMagicalGirl[]>([]);
+    const [isLoadingPresets, setIsLoadingPresets] = useState(true);
+
+    useEffect(() => {
+        // 组件加载时获取预设角色列表
+        const fetchPresets = async () => {
+            try {
+                const response = await fetch('/api/get-presets');
+                if (!response.ok) throw new Error('获取预设失败');
+                const data = await response.json();
+                setPresets(data);
+            } catch (err) {
+                console.error(err);
+                setError('无法加载预设魔法少女列表。');
+            } finally {
+                setIsLoadingPresets(false);
+            }
+        };
+        fetchPresets();
+    }, []);
+
+    // --- 新增处理函数 ---
+    const handleSelectPreset = async (preset: PresetMagicalGirl) => {
+        if (magicalGirls.length >= 6) {
+            setError('最多只能选择 6 位魔法少女参战。');
+            return;
+        }
+
+        // 避免重复添加
+        if (filenames.includes(preset.filename)) {
+            setError(`${preset.name} 已经在战斗列表中了。`);
+            return;
+        }
+
+        try {
+            const response = await fetch(`/presets/${preset.filename}`);
+            if (!response.ok) throw new Error(`无法加载 ${preset.name} 的设定文件。`);
+            const presetData = await response.json();
+
+            // 添加 isPreset 标志，用于数据库记录
+            presetData.isPreset = true;
+
+            setMagicalGirls(prev => [...prev, presetData]);
+            setFilenames(prev => [...prev, preset.filename]);
+            setError(null);
+        } catch (err) {
+            if (err instanceof Error) {
+                setError(err.message);
+            }
+        }
+    };
+
     const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
-        if (!files || files.length === 0) {
+        if (!files || files.length === 0) return;
+
+        const totalSlots = 6 - magicalGirls.length;
+        if (files.length > totalSlots) {
+            setError(`最多还能上传 ${totalSlots} 个文件。`);
             return;
         }
 
-        if (files.length < 2 || files.length > 6) {
-            setError('⚠️ 请上传 2 到 6 个设定文件');
-            return;
-        }
-
-        setError(null);
-        setMagicalGirls([]);
-        setFilenames([]);
-        setBattleReport(null);
-
+        // ... (原有的文件读取逻辑保持不变, 但现在是追加而不是重置)
         const loadedGirls: any[] = [];
         const loadedFilenames: string[] = [];
 
@@ -69,6 +120,16 @@ const BattlePage: React.FC = () => {
             } else {
                 setError('❌ 文件读取失败，请确保上传了正确的 JSON 文件。');
             }
+        }
+    };
+
+    const handleClearRoster = () => {
+        setMagicalGirls([]);
+        setFilenames([]);
+        setBattleReport(null);
+        setError(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''; // 重置文件输入框
         }
     };
 
@@ -157,9 +218,32 @@ const BattlePage: React.FC = () => {
                             </ol>
                         </div>
 
+                        {/* --- 预设角色选择区域 --- */}
+                        <div className="mb-6">
+                            <h3 className="input-label">选择预设魔法少女：</h3>
+                            {isLoadingPresets ? (
+                                <p className="text-sm text-gray-500">正在加载预设角色...</p>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {presets.map(preset => (
+                                        <button
+                                            key={preset.filename}
+                                            onClick={() => handleSelectPreset(preset)}
+                                            title={preset.description}
+                                            disabled={magicalGirls.length >= 6}
+                                            className="px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded-full hover:bg-purple-200 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {preset.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* --- 上传区域 --- */}
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">
-                                上传 2~6 个魔法少女 .json 设定文件:
+                                或上传自己的 .json 设定文件:
                             </label>
                             <input
                                 ref={fileInputRef}
@@ -172,11 +256,23 @@ const BattlePage: React.FC = () => {
                             />
                         </div>
 
+                        {/* --- 已选角色列表 --- */}
                         {filenames.length > 0 && (
                             <div className="mb-4 p-3 bg-gray-100 rounded-lg">
-                                <p className="font-semibold text-sm text-gray-700">已加载角色:</p>
-                                <ul className="list-disc list-inside text-sm text-gray-600">
-                                    {filenames.map(name => <li key={name}>{name}</li>)}
+                                <div className="flex justify-between items-center">
+                                    <p className="font-semibold text-sm text-gray-700">
+                                        已选角色 ({filenames.length}/6):
+                                    </p>
+                                    <button onClick={handleClearRoster} className="text-xs text-red-500 hover:underline">
+                                        清空列表
+                                    </button>
+                                </div>
+                                <ul className="list-disc list-inside text-sm text-gray-600 mt-2">
+                                    {magicalGirls.map(girl => (
+                                        <li key={girl.codename || girl.name}>
+                                            {girl.codename || girl.name} {girl.isPreset && ' (预设)'}
+                                        </li>
+                                    ))}
                                 </ul>
                             </div>
                         )}
