@@ -408,7 +408,7 @@ const DetailsPage: React.FC = () => {
                 <div className="flex gap-2 justify-center" style={{ marginBottom: '1rem', marginTop: '2rem' }}>
                   <button
                     onClick={() => handleQuickOption('还没想好')}
-                    disabled={isTransitioning}
+                    disabled={submitting || isTransitioning || isCooldown}
                     className="generate-button h-10"
                     style={{ marginBottom: 0, padding: 0 }}
                   >
@@ -416,7 +416,7 @@ const DetailsPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleQuickOption('不想回答')}
-                    disabled={isTransitioning}
+                    disabled={submitting || isTransitioning || isCooldown}
                     className="generate-button h-10"
                     style={{ marginBottom: 0, padding: 0 }}
                   >
