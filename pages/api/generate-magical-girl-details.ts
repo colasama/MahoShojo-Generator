@@ -1,6 +1,8 @@
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { z } from 'zod';
 import { getRandomFlowers } from '../../lib/random-choose-hana-name';
+import { magicalGirlDetailsQueue } from '../../lib/queue-system';
+import { getClientIP } from '../../lib/rate-limiter';
 import { saveToD1 } from '../../lib/d1';
 // import { MainColor } from '../../lib/main-color';
 
@@ -98,7 +100,7 @@ async function handler(
     });
   }
 
-  const { answers } = await req.json();
+  const { answers, persistenceKey } = await req.json();
 
   if (!answers || !Array.isArray(answers) || answers.length === 0) {
     return new Response(JSON.stringify({ error: 'Answers array is required' }), {
@@ -124,7 +126,20 @@ async function handler(
   }
 
   try {
-    const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
+    const ip = getClientIP(req as any);
+    
+    // 添加到队列并等待处理
+    const magicalGirlDetails = await magicalGirlDetailsQueue.addToQueue(
+      'generate-magical-girl-details',
+      { answers },
+      ip,
+      async () => {
+        return await generateWithAI(answers, magicalGirlDetailsConfig);
+      },
+      persistenceKey
+    );
+    
+    // 保存到D1数据库
     const result = await saveToD1(JSON.stringify({
       ...magicalGirlDetails,
       answers: answers

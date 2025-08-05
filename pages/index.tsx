@@ -1,22 +1,66 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 
 export default function Home() {
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  useEffect(() => {
+    // 预加载关键图片
+    const preloadImages = async () => {
+      const imageUrls = [
+        '/logo.svg',
+        '/logo-white.svg', 
+        '/questionnaire-logo.svg'
+      ];
+      
+      const imagePromises = imageUrls.map(url => {
+        return new Promise((resolve, reject) => {
+          const img = new window.Image();
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+      });
+
+      try {
+        await Promise.all(imagePromises);
+        setImagesLoaded(true);
+      } catch (error) {
+        console.log('图片预加载完成，但部分图片可能失败');
+        setImagesLoaded(true);
+      }
+    };
+
+    preloadImages();
+  }, []);
+
   return (
     <>
       <Head>
         <title>✨ 魔法少女生成器 ✨</title>
         <meta name="description" content="AI驱动的魔法少女角色生成器，创建独一无二的魔法少女角色" />
         <link rel="preload" href="/logo.svg" as="image" type="image/svg+xml" />
-        <link rel="preload" href="/mahou-title.svg" as="image" type="image/svg+xml" />
-        <link rel="preload" href="/questionnaire-title.svg" as="image" type="image/svg+xml" />
+        <link rel="preload" href="/logo-white.svg" as="image" type="image/svg+xml" />
+        <link rel="preload" href="/questionnaire-logo.svg" as="image" type="image/svg+xml" />
       </Head>
       <div className="magic-background-white">
         <div className="container">
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '2rem' }}>
-              <img src="/logo.svg" width={280} height={180} alt="魔法少女生成器" />
+              {imagesLoaded ? (
+                <img 
+                  src="/logo.svg" 
+                  width={280} 
+                  height={180} 
+                  alt="魔法少女生成器"
+                  style={{ maxWidth: '100%', height: 'auto' }}
+                />
+              ) : (
+                <div style={{ width: 280, height: 180, backgroundColor: '#f0f0f0', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ color: '#999' }}>加载中...</span>
+                </div>
+              )}
             </div>
 
             <p className="subtitle text-center">
@@ -27,36 +71,47 @@ export default function Home() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* 魔法少女生成器按钮 */}
-              <Link href="/name" className="feature-button magical-generator">
+              <Link href="/name" className={`feature-button magical-generator ${!imagesLoaded ? 'loading' : ''}`}>
                 <div className="gradient-overlay"></div>
                 <div className="feature-button-content">
                   <div className="feature-title-container">
-                    <img
-                      src="/logo-white.svg"
-                      width={250}
-                      height={60}
-                      alt="奇妙妖精大调查"
-                      className="feature-title-svg"
-                    />
+                    {imagesLoaded ? (
+                      <img
+                        src="/logo-white.svg"
+                        width={250}
+                        height={60}
+                        alt="魔法少女生成器"
+                        className="feature-title-svg"
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                      />
+                    ) : (
+                      <div style={{ width: 250, height: 60, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>魔法少女生成器</span>
+                      </div>
+                    )}
                   </div>
-                  {/* <p className="feature-description">
-                    输入你的名字，让AI为你创造独一无二的魔法少女身份
-                  </p> */}
                 </div>
               </Link>
 
               {/* 奇妙妖精大调查按钮 */}
-              <Link href="/details" className="feature-button fairy-quest">
+              <Link href="/details" className={`feature-button fairy-quest ${!imagesLoaded ? 'loading' : ''}`}>
                 <div className="gradient-overlay"></div>
                 <div className="feature-button-content">
                   <div className="feature-title-container">
-                    <img
-                      src="/questionnaire-logo.svg"
-                      width={250}
-                      height={40}
-                      alt="奇妙妖精大调查"
-                      className="feature-title-svg"
-                    />
+                    {imagesLoaded ? (
+                      <img
+                        src="/questionnaire-logo.svg"
+                        width={250}
+                        height={40}
+                        alt="奇妙妖精大调查"
+                        className="feature-title-svg"
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                      />
+                    ) : (
+                      <div style={{ width: 250, height: 40, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>奇妙妖精大调查</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Link>

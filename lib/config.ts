@@ -3,11 +3,12 @@ export interface AIProvider {
   name: string;
   apiKey: string;
   baseUrl: string;
-  model: string;
+  model: string | string[]; // 支持单个模型或多个模型数组
   type: 'openai' | 'google';
   retryCount?: number;
   skipProbability?: number;
   mode?: 'json' | 'auto' | 'tool' | undefined;
+  weight?: number; // 负载均衡权重，数值越大被选中概率越高
 }
 
 // 解析 AI 提供商配置的函数
@@ -74,11 +75,17 @@ const getDefaultModel = (): string => {
   return 'gemini-2.5-flash';
 };
 
+// 获取负载均衡策略
+const getLoadBalanceStrategy = (): string => {
+  return process.env.AI_LOAD_BALANCE_STRATEGY || 'random';
+};
+
 export const config = {
   // Vercel AI 配置
   API_PAIRS: parseApiPairs(),
   MODEL: getDefaultModel(),
   PROVIDERS: getAPIProviders(),
+  LOAD_BALANCE_STRATEGY: getLoadBalanceStrategy(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {
