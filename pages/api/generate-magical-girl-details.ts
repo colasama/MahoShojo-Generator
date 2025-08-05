@@ -1,5 +1,6 @@
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { z } from 'zod';
+import { getRandomFlowers } from '../../lib/random-choose-hana-name';
 // import { MainColor } from '../../lib/main-color';
 
 export const config = {
@@ -8,10 +9,8 @@ export const config = {
 
 // 定义基于问卷的魔法少女详细信息生成 schema
 const MagicalGirlDetailsSchema = z.object({
-  codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名，
-    推荐使用一些不那么常见的会开花的植物，比如树、果、草的花，只要是能开花的植物都行，增加冷门的小众的植物名概率。
-    减少鸢尾和曼陀罗的出现概率，可以在预测列表的 top-5 中选取，大部分时候输出常用中文名，有时候可以使用英文音译为中文或者拉丁文音译为中文增加酷炫度
-    下面是一些参考名字，但是不要拘泥于这些名字，请随机生成并自由发挥：矢车菊 / 翠雀 / 苹果 / 艾草 / 白玫 / 朝颜 / 玛格丽特 / 翠雀 / 木百合 / 曙草`),
+  codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名。
+    请从我提供的花名中选取最合适的一个`),
   appearance: z.object({
     outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，大约50字左右"),
     accessories: z.string().describe("变身后的饰品细节描述，大约50字左右"),
@@ -80,8 +79,9 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
     const questionAnswerPairs = answers.map((answer, index) =>
       `问题${index + 1}的回答: "${answer}"`
     ).join('\n')
-
-    return `请基于以下问卷回答开始分析和预测：${questionAnswerPairs}`
+    const flowers = getRandomFlowers();
+    console.log(flowers);
+    return `请基于以下问卷回答开始分析和预测：${questionAnswerPairs}，可选的花名和对应的花语：${flowers}`
   },
   schema: MagicalGirlDetailsSchema,
   taskName: "生成魔法少女详细信息",
