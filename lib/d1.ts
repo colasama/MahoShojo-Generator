@@ -4,11 +4,11 @@ const D1_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 
 // 保存到 D1 数据库的函数
-export async function saveToD1(data: unknown): Promise<void> {
+export async function saveToD1(data: unknown): Promise<boolean> {
   try {
     if (!D1_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !D1_DATABASE_ID) {
       console.warn("缺少 Cloudflare 配置信息，跳过 D1 保存");
-      return;
+      return false;
     }
 
     const timestamp = new Date().toISOString();
@@ -32,10 +32,11 @@ export async function saveToD1(data: unknown): Promise<void> {
       const errorText = await response.text();
       throw new Error(`D1 API 错误: ${response.status} ${response.statusText} - ${errorText}`);
     }
-    console.log("D1 success: ", dataString);
+    return true;
   } catch (error) {
     console.error("保存到 D1 数据库失败:", error);
     // 不抛出错误，避免影响主要生成流程
+    return false;
   }
 }
 
