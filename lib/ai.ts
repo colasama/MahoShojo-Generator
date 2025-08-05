@@ -3,7 +3,6 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import { config, AIProvider } from "./config";
-import { saveToD1 } from "./d1";
 
 // 延迟函数
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -84,9 +83,6 @@ export async function generateWithAI<T, I = string>(
         };
 
         const { object } = await generateObject(generateOptions);
-
-        // 设置保存内容到 D1，不阻塞主线程
-        saveToD1(object);
 
         console.log(`提供商 ${provider.name} 第 ${attempt + 1} 次尝试成功`);
         return object as T;
