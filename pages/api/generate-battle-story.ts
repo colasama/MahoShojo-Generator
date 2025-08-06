@@ -1,3 +1,5 @@
+// pages/api/generate-battle-story.ts
+
 import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { queryFromD1 } from '../../lib/d1'; // 导入 D1 查询函数
@@ -9,22 +11,25 @@ export const config = {
   runtime: 'edge',
 };
 
-// 定义AI响应的Zod schema
-const BattleStorySchema = z.object({
-  title: z.string().describe("一个轻小说或网文风格的，富有想象力且能概括故事核心的标题。"),
-  story: z.object({
-    cause: z.string().describe("故事的开头部分。作为引子，通过设问、对话、心理描写等写作技巧吸引读者注意，引出战斗的起因，说明这些魔法少女为何会发生冲突，字数约100-150字。"),
-    progression: z.string().describe("故事的详细经过。承接开头，生动地描绘她们如何运用各自的能力进行战斗，战斗场面和策略，字数约300-600字。"),
-    result: z.string().describe("故事的结局。为这段战斗故事做收尾，描述战斗是如何结束的，以及最终的结局，字数约100-150字。"),
+// 定义AI响应的Zod schema - 已从战斗故事更新为新闻报道
+const NewsReportSchema = z.object({
+  headline: z.string().describe("一个引人注目、充满噱头的新闻标题，可以使用震惊体等技巧来吸引读者。"),
+  reporterInfo: z.object({
+    name: z.string().describe("一位虚构的新闻记者的名字，如果是魔法少女则应当按照格式“魔法少女[花名]”。"),
+    publication: z.string().describe("一个虚构的、听起来像是魔法少女世界观下的新闻媒体或自媒体的名称（例如：《国度日报》、《祖母绿周刊》、《卢恩诺雷每日速报》）。")
   }),
-  report: z.object({
+  article: z.object({
+    body: z.string().describe("新闻正文。以新闻报道的口吻，生动地叙述魔法少女之间冲突的事件经过。可以适当夸张，但要基于角色设定，字数约300-600字。"),
+    analysis: z.string().describe("记者的分析与猜测。这部分内容可以带有记者的主观色彩，看热闹不嫌事大，进行一些有逻辑但可能不完全真实的猜测和引申，制造“爆点”，字数约100-150字。")
+  }),
+  officialReport: z.object({
     summary: z.string().describe("战斗的简要总结报告，客观地概括整个事件。"),
-    winner: z.string().describe("胜利者的魔法少女代号。如果是平局，则返回'平局'。"),
-    outcome: z.string().describe("战斗带来的最终影响，包括对参战者和环境的后续影响，告诉读者“后来怎么样了”。"),
+    winner: z.string().describe("记者观察到的胜利者的魔法少女代号。如果是平局，则返回'平局'。"),
+    impact: z.string().describe("对本次事件的总结点评，描述战斗带来的最终影响，包括对参战者和环境的后续影响。"),
   })
 });
 
-type BattleReport = z.infer<typeof BattleStorySchema>;
+type NewsReport = z.infer<typeof NewsReportSchema>;
 
 // 预先加载问卷数据（在模块级别）
 let questionsCache: string[] | null = null;
@@ -49,21 +54,16 @@ async function loadQuestions(): Promise<string[]> {
   }
 }
 
-// 定义生成配置
-const createBattleStoryConfig = (questions: string[]): GenerationConfig<BattleReport, any[]> => ({
-  systemPrompt: `你是一位资深的轻小说与网文作家，擅长分析和描绘魔法少女之间的冲突与战斗。你的任务是根据提供的魔法少女的角色设定，创作一场她们之间互相对战的精彩故事和一份专业的战斗结算报告。
+// 定义生成配置 - 已更新为新闻报道
+const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsReport, any[]> => ({
+  systemPrompt: `你是一位魔法少女世界观下的资深新闻记者，供职于一家追求“爆点”和“噱头”的自媒体。有目击报告称几位魔法少女之间存在冲突，并且发生了战斗。你的任务是根据提供的几位魔法少女的情报信息，撰写一篇关于她们之间冲突的、能够吸引大量读者眼球的新闻稿。
 
-故事要求：
-1. 逻辑连贯：故事必须有明确的起因、经过和结果。
-2. 角色驱动：战斗过程需要紧密结合每位魔法少女的设定，特别是要深入理解她们在问卷回答中体现出的性格和理念。她们的行动和决策应符合其性格。
-3. 场面生动：战斗描写需要充满想象力，画面感强。
-4. 结局合理：战斗的胜负或结果需要基于她们能力的克制关系、战术策略和性格因素，得出合乎逻辑的结论。
-
-报告要求：
-1. 客观简洁：战斗报告需要用客观、中立的语言进行总结。
-2. 要素齐全：报告需明确指出胜者（或平局）以及战斗的最终影响。
-
-请严格按照提供的JSON schema格式返回故事和报告。`,
+写作要求：
+1. 新闻风格：使用新闻报道的口吻，但可以夸张、渲染这起事件，制造戏剧性冲突。你是那种看热闹不嫌事大的记者。
+2. 标题党：新闻标题必须引人注目，可以使用“震惊体”、“标题党”等技巧。
+3. 逻辑与虚构：报道的核心事件需基于角色设定（特别是问卷回答所体现的性格和理念），她们在事件中的行动和决策应符合其性格，但你可以在事实基础上进行大胆的猜测、编造细节甚至挑拨离间，只要整体逻辑自洽且足够精彩。
+4. 角色深度：深入分析角色问卷回答，挖掘她们性格中的冲突点，并以此作为新闻的核心矛盾，甚至可以据此编造一些虚构的“幕后消息”。
+5. 结构清晰：严格按照提供的JSON schema格式返回新闻稿，包含标题、记者信息、正文、分析和官方报告。`,
   temperature: 0.9,
   promptBuilder: (magicalGirls: any[]) => {
     const profiles = magicalGirls.map((mg, index) => {
@@ -89,10 +89,10 @@ const createBattleStoryConfig = (questions: string[]): GenerationConfig<BattleRe
       return profileString;
     }).join('\n\n');
 
-    return `这是本次对战的魔法少女们的设定文件。每个角色包含【AI生成的角色核心设定】和【用户问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n请根据以上设定，创作她们之间的战斗故事和结算报告。`;
+    return `这是本次对战的魔法少女们的情报信息。每个角色包含【角色核心设定】和【问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n请根据以上设定，创作她们之间的冲突新闻稿。`;
   },
-  schema: BattleStorySchema,
-  taskName: "生成魔法少女战斗故事",
+  schema: NewsReportSchema,
+  taskName: "生成魔法少女新闻报道",
   maxTokens: 8192,
 });
 
@@ -171,28 +171,25 @@ async function handler(req: Request): Promise<Response> {
     // 预先加载问卷数据
     const questions = await loadQuestions();
 
-    // 生成战斗报告
-    const battleStoryConfig = createBattleStoryConfig(questions);
-    const battleReport = await generateWithAI(magicalGirls, battleStoryConfig);
+    // 生成新闻报道
+    const newsReportConfig = createNewsReportConfig(questions);
+    const newsReport = await generateWithAI(magicalGirls, newsReportConfig);
 
-    // -- 新增逻辑 --
     // 在返回结果前，异步更新数据库，不阻塞响应
-    // 注意：在 Vercel Edge/Cloudflare Workers 中，需要用特殊方式确保异步任务在响应后继续执行
-    const updatePromise = updateBattleStats(battleReport.report.winner, magicalGirls);
+    const updatePromise = updateBattleStats(newsReport.officialReport.winner, magicalGirls);
 
     // Cloudflare Workers/Pages 环境下，可以将 promise 传递给 waitUntil
     const executionContext = (req as any).context;
     if (executionContext && typeof executionContext.waitUntil === 'function') {
       executionContext.waitUntil(updatePromise);
     }
-    // -- 新增逻辑结束 --
 
-    return new Response(JSON.stringify(battleReport), {
+    return new Response(JSON.stringify(newsReport), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('生成战斗故事失败:', error);
+    console.error('生成新闻报道失败:', error);
     const errorMessage = error instanceof Error ? error.message : '未知错误';
     return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,

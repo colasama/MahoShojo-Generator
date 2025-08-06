@@ -1,9 +1,11 @@
+// pages/battle.tsx
+
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
-import BattleReportCard, { BattleReport } from '../components/BattleReportCard';
+import BattleReportCard, { NewsReport } from '../components/BattleReportCard'; // 已更新导入的类型
 import Link from 'next/link';
 import { PresetMagicalGirl } from './api/get-presets'; // 导入类型
 
@@ -17,8 +19,8 @@ const BattlePage: React.FC = () => {
     const [isGenerating, setIsGenerating] = useState(false);
     // 错误信息
     const [error, setError] = useState<string | null>(null);
-    // 生成的战斗报告结果
-    const [battleReport, setBattleReport] = useState<BattleReport | null>(null);
+    // 更新状态以匹配新的数据结构
+    const [newsReport, setNewsReport] = useState<NewsReport | null>(null);
     // 保存的图片URL
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     // 是否显示图片模态框
@@ -123,7 +125,7 @@ const BattlePage: React.FC = () => {
     const handleClearRoster = () => {
         setMagicalGirls([]);
         setFilenames([]);
-        setBattleReport(null);
+        setNewsReport(null);
         setError(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = ''; // 重置文件输入框
@@ -137,13 +139,13 @@ const BattlePage: React.FC = () => {
             return;
         }
         if (magicalGirls.length < 2 || magicalGirls.length > 6) {
-            setError('⚠️ 请先上传 2 到 6 个魔法少女设定文件');
+            setError('⚠️ 请先提交 2 到 6 位魔法少女的情报');
             return;
         }
 
         setIsGenerating(true);
         setError(null);
-        setBattleReport(null);
+        setNewsReport(null);
 
         try {
             // 安全措施：检查上传内容中的敏感词
@@ -169,8 +171,8 @@ const BattlePage: React.FC = () => {
                 throw new Error(errorData.message || errorData.error || '生成失败');
             }
 
-            const result: BattleReport = await response.json();
-            setBattleReport(result);
+            const result: NewsReport = await response.json();
+            setNewsReport(result);
             startCooldown();
         } catch (err) {
             if (err instanceof Error) {
@@ -197,21 +199,20 @@ const BattlePage: React.FC = () => {
             </Head>
             <div className="magic-background-white">
                 <div className="container">
-                    <div className="card">
+                    <div className="card" style={{border: "2px solid #ccc", background: "#f9f9f9"}}>
                         <div className="text-center mb-4">
                             <h1 className="text-3xl font-bold text-gray-800">魔法少女竞技场</h1>
-                            <p className="subtitle" style={{ marginBottom: '1rem' }}>上传她们的设定，见证宿命的对决！</p>
+                            <p className="subtitle" style={{ marginBottom: '1rem' }}>提交目击情报，生成独家新闻报道！</p>
                         </div>
 
                         {/* 功能使用说明 */}
-                        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                            <h3 className="font-bold mb-2">💡 如何使用？</h3>
+                        <div className="mb-6 p-4 bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-800">
+                            <h3 className="font-bold mb-2">📰 投稿须知</h3>
                             <ol className="list-decimal list-inside space-y-1">
-                                <li>前往<Link href="/details" className="footer-link">【奇妙妖精大调查】</Link>页面。</li>
-                                <li>完成问卷并生成你的魔法少女。</li>
-                                <li>在结果页面底部，点击【下载设定文件】按钮，保存 `.json` 文件。</li>
-                                <li>重复以上步骤，获取 2-6 位魔法少女的设定文件。</li>
-                                <li>在此页面上传你保存的 `.json` 文件，即可生成她们的对战故事！</li>
+                                <li>前往<Link href="/details" className="footer-link">【奇妙妖精大调查】</Link>页面，生成魔法少女并下载其【设定文件】。</li>
+                                <li>收集 2-6 位魔法少女的设定文件（.json 格式）。</li>
+                                <li>在此处选择预设角色或上传你收集到的设定文件作为“情报”。</li>
+                                <li>我们的王牌记者将根据你的情报，撰写一篇精彩绝伦的新闻报道！</li>
                             </ol>
                         </div>
 
@@ -240,7 +241,7 @@ const BattlePage: React.FC = () => {
                         {/* --- 上传区域 --- */}
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">
-                                或上传自己的 .json 设定文件:
+                                或上传自己的 .json 设定情报文件:
                             </label>
                             <input
                                 ref={fileInputRef}
@@ -255,7 +256,7 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 已选角色列表 --- */}
                         {filenames.length > 0 && (
-                            <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+                            <div className="mb-4 p-3 bg-gray-200 rounded-lg">
                                 <div className="flex justify-between items-center">
                                     <p className="font-semibold text-sm text-gray-700">
                                         已选角色 ({filenames.length}/6):
@@ -280,18 +281,18 @@ const BattlePage: React.FC = () => {
                             className="generate-button"
                         >
                             {isCooldown
-                                ? `请等待 ${remainingTime} 秒`
+                                ? `记者赶稿中...请等待 ${remainingTime} 秒`
                                 : isGenerating
-                                    ? '战斗推演中... (ง •̀_•́)ง'
-                                    : '生成对战故事 (๑•̀ㅂ•́)و✧'}
+                                    ? '撰写报道中... (ง •̀_•́)ง'
+                                    : '生成独家新闻 (๑•̀ㅂ•́)و✧'}
                         </button>
 
                         {error && <div className="error-message">{error}</div>}
                     </div>
 
-                    {battleReport && (
+                    {newsReport && (
                         <BattleReportCard
-                            report={battleReport}
+                            report={newsReport}
                             onSaveImage={handleSaveImage}
                         />
                     )}
