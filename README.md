@@ -105,6 +105,14 @@ npm run start
 - [ ] 角色卡片模板扩展
 - [ ] 将系统通用化，模块化
 
+
+## 潜在问题
+
+1. pages/api/get-presets.ts的API在当前环境下可能无法读取文件系统，导致预设角色列表 PRESET_LIST 为空。或许可以考虑修改为直接在代码中定义预设角色列表，提供"name"、"description"、"filename"的字段。这种方式可以确保在任何环境下都能稳定地提供预设数据，同时避免了在运行时进行文件IO操作。
+
+2. pages/api/get-stats.ts的API可能重构为使用标准的 Request 和 Response 对象比较好。
+
+
 ## 🧡 致谢
 <div align="center">
   <p>本项目在线版本的大模型能力由</p>
