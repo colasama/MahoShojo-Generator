@@ -15,6 +15,7 @@ export interface NewsReport {
     analysis: string;
   };
   officialReport: {
+    summary: string;
     winner: string;
     impact: string;
   };
@@ -28,11 +29,12 @@ interface BattleReportCardProps {
 const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
+  // 处理保存为图片的功能
   const handleSaveImage = async () => {
     if (!cardRef.current) return;
 
     try {
-      // 修改为隐藏整个按钮容器
+      // 截图前隐藏按钮和显示Logo
       const buttonsContainer = cardRef.current.querySelector('.buttons-container') as HTMLElement;
       const logoPlaceholder = cardRef.current.querySelector('.logo-placeholder') as HTMLElement;
 
@@ -41,7 +43,7 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
 
       const result = await snapdom(cardRef.current, { scale: 1 });
 
-      // 恢复按钮容器的显示
+      // 截图后恢复按钮和隐藏Logo
       if (buttonsContainer) buttonsContainer.style.display = 'flex';
       if (logoPlaceholder) logoPlaceholder.style.display = 'none';
 
@@ -63,8 +65,8 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
     }
   };
 
+  // 处理保存为Markdown文件
   const handleSaveMarkdown = () => {
-    // 1. 将报告内容格式化为 Markdown 字符串
     const markdownContent = `
 # ${report.headline}
 **来源：${report.reporterInfo.publication} | 记者：${report.reporterInfo.name}**
@@ -82,16 +84,16 @@ ${report.article.body}
 ---
 
 ## 官方通报
+- **战斗总结**: ${report.officialReport.summary}
 - **胜利者**: ${report.officialReport.winner}
 - **最终影响**: ${report.officialReport.impact}
     `.trim();
 
-    // 2. 创建 Blob 对象并触发下载
+    // 创建Blob对象并触发下载
     const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    // 创建一个安全的文件名
     const sanitizedTitle = report.headline.replace(/[^a-z0-9\u4e00-\u9fa5]/gi, '_');
     link.download = `魔法少女速报_${sanitizedTitle}.md`;
     document.body.appendChild(link);
@@ -128,7 +130,7 @@ ${report.article.body}
           <div className="result-label">📊 战斗结算报告</div>
           <div className="result-value">
             <h3 className="font-semibold mt-2">战斗简报：</h3>
-            <p className="text-sm opacity-90">{report.report.summary}</p>
+            <p className="text-sm opacity-90">{report.officialReport.summary}</p>
             <h3 className="font-semibold mt-2">胜利者：</h3>
             <p className="text-sm opacity-90">{report.officialReport.winner}</p>
             <h3 className="font-semibold mt-3">最终影响：</h3>
@@ -148,6 +150,7 @@ ${report.article.body}
           </button>
         </div>
 
+        {/* Logo占位符，用于截图 */}
         <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
           <img
             src="/logo-white-qrcode.svg"

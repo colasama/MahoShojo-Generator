@@ -5,15 +5,15 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
-import BattleReportCard, { NewsReport } from '../components/BattleReportCard'; // 已更新导入的类型
+import BattleReportCard, { NewsReport } from '../components/BattleReportCard';
 import Link from 'next/link';
-import { PresetMagicalGirl } from './api/get-presets'; // 导入类型
+import { PresetMagicalGirl } from './api/get-presets';
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
     // 存储解析后的魔法少女JSON数据
     const [magicalGirls, setMagicalGirls] = useState<any[]>([]);
-    // 存储上传的文件名用于显示
+    // 存储上传或选择的文件名/代号用于显示
     const [filenames, setFilenames] = useState<string[]>([]);
     // 是否正在生成中
     const [isGenerating, setIsGenerating] = useState(false);
@@ -30,12 +30,11 @@ const BattlePage: React.FC = () => {
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // --- 新增状态和副作用 ---
     const [presets, setPresets] = useState<PresetMagicalGirl[]>([]);
     const [isLoadingPresets, setIsLoadingPresets] = useState(true);
 
+    // 组件加载时获取预设角色列表
     useEffect(() => {
-        // 组件加载时获取预设角色列表
         const fetchPresets = async () => {
             try {
                 const response = await fetch('/api/get-presets');
@@ -52,14 +51,12 @@ const BattlePage: React.FC = () => {
         fetchPresets();
     }, []);
 
-    // --- 新增处理函数 ---
+    // 处理选择预设角色的逻辑
     const handleSelectPreset = async (preset: PresetMagicalGirl) => {
         if (magicalGirls.length >= 6) {
             setError('最多只能选择 6 位魔法少女参战。');
             return;
         }
-
-        // 避免重复添加
         if (filenames.includes(preset.filename)) {
             setError(`${preset.name} 已经在战斗列表中了。`);
             return;
@@ -77,12 +74,11 @@ const BattlePage: React.FC = () => {
             setFilenames(prev => [...prev, preset.filename]);
             setError(null);
         } catch (err) {
-            if (err instanceof Error) {
-                setError(err.message);
-            }
+            if (err instanceof Error) setError(err.message);
         }
     };
 
+    // 处理用户上传文件
     const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (!files || files.length === 0) return;
@@ -93,7 +89,6 @@ const BattlePage: React.FC = () => {
             return;
         }
 
-        // ... (原有的文件读取逻辑保持不变, 但现在是追加而不是重置)
         const loadedGirls: any[] = [];
         const loadedFilenames: string[] = [];
 
@@ -104,24 +99,29 @@ const BattlePage: React.FC = () => {
                 }
                 const text = await file.text();
                 const json = JSON.parse(text);
-                // 对JSON文件内容进行基本校验
                 if (!json.codename && !json.name) {
                     throw new Error(`文件 "${file.name}" 似乎不是一个有效的魔法少女设定。`);
                 }
                 loadedGirls.push(json);
                 loadedFilenames.push(file.name);
             }
-            setMagicalGirls(loadedGirls);
-            setFilenames(loadedFilenames);
+            // 修正：追加而不是覆盖
+            setMagicalGirls(prev => [...prev, ...loadedGirls]);
+            setFilenames(prev => [...prev, ...loadedFilenames]);
+            setError(null);
         } catch (err) {
             if (err instanceof Error) {
                 setError(`❌ 文件读取失败: ${err.message}`);
             } else {
                 setError('❌ 文件读取失败，请确保上传了正确的 JSON 文件。');
             }
+        } finally {
+            // 清空input的值
+            if (event.target) event.target.value = '';
         }
     };
 
+    // 清空已选角色列表
     const handleClearRoster = () => {
         setMagicalGirls([]);
         setFilenames([]);

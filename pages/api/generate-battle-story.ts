@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { queryFromD1 } from '../../lib/d1'; // 导入 D1 查询函数
 import { getLogger } from '../../lib/logger';
+// 直接导入问卷JSON文件，而不是在运行时fetch
+import questionnaire from '../../public/questionnaire.json';
 
 const log = getLogger('api-gen-battle-story');
 
@@ -30,29 +32,6 @@ const NewsReportSchema = z.object({
 });
 
 type NewsReport = z.infer<typeof NewsReportSchema>;
-
-// 预先加载问卷数据（在模块级别）
-let questionsCache: string[] | null = null;
-
-async function loadQuestions(): Promise<string[]> {
-  if (questionsCache) {
-    return questionsCache;
-  }
-
-  try {
-    // 使用 fetch 在函数内部加载 json 文件
-    const response = await fetch(`/questionnaire.json`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch questions: ${response.status}`);
-    }
-    const data = await response.json();
-    questionsCache = data.questions as string[];
-    return questionsCache;
-  } catch (error) {
-    log.error('加载问卷数据失败:', { error });
-    return [];
-  }
-}
 
 // 定义生成配置 - 已更新为新闻报道
 const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsReport, any[]> => ({
@@ -97,7 +76,7 @@ const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsRepor
 });
 
 /**
- * 新增：更新数据库中的战斗统计信息
+ * 更新数据库中的战斗统计信息
  * @param winnerName 胜利者名字
  * @param participants 所有参战者信息
  */
@@ -111,13 +90,13 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
       const isPreset = !!participant.isPreset;
       const isWinner = name === winnerName;
 
-      // 插入或忽略已存在的角色
+      // 插入或忽略已存在的角色，确保角色信息被记录
       await queryFromD1(
         "INSERT INTO characters (name, is_preset) VALUES (?, ?) ON CONFLICT(name) DO NOTHING;",
         [name, isPreset ? 1 : 0]
       );
 
-      // 更新胜/负场次和参战次数
+      // 根据胜负情况更新 wins, losses 和 participations 字段
       if (isWinner) {
         await queryFromD1(
           'UPDATE characters SET wins = wins + 1, participations = participations + 1 WHERE name = ?;',
@@ -128,7 +107,7 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
           'UPDATE characters SET losses = losses + 1, participations = participations + 1 WHERE name = ?;',
           [name]
         );
-      } else {
+      } else { // 平局情况
         await queryFromD1(
           'UPDATE characters SET participations = participations + 1 WHERE name = ?;',
           [name]
@@ -136,16 +115,16 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
       }
     }
 
-    // 2. 记录本次战斗
+    // 2. 将本次战斗记录插入 battles 表
     await queryFromD1(
       "INSERT INTO battles (winner_name, participants_json, created_at) VALUES (?, ?, ?);",
       [winnerName, JSON.stringify(participantNames), new Date().toISOString()]
     );
 
-    console.log('成功更新战斗统计数据到 D1');
+    log.info('成功更新战斗统计数据到 D1');
   } catch (error) {
-    // D1 更新失败不应阻塞主流程，只记录错误
-    console.error('更新 D1 数据库失败:', error);
+    // D1 更新失败不应阻塞主流程，只记录错误日志
+    log.error('更新 D1 数据库失败:', { error });
   }
 }
 
@@ -168,17 +147,17 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // 预先加载问卷数据
-    const questions = await loadQuestions();
+    // 从导入的JSON中获取问卷问题
+    const questions = questionnaire.questions;
 
     // 生成新闻报道
     const newsReportConfig = createNewsReportConfig(questions);
     const newsReport = await generateWithAI(magicalGirls, newsReportConfig);
 
-    // 在返回结果前，异步更新数据库，不阻塞响应
+    // 在返回结果前，异步更新数据库，不阻塞对用户的响应
     const updatePromise = updateBattleStats(newsReport.officialReport.winner, magicalGirls);
 
-    // Cloudflare Workers/Pages 环境下，可以将 promise 传递给 waitUntil
+    // 在 Cloudflare Workers/Pages 环境下, 可以将 promise 传递给 waitUntil 以确保其在请求结束后仍能执行完成
     const executionContext = (req as any).context;
     if (executionContext && typeof executionContext.waitUntil === 'function') {
       executionContext.waitUntil(updatePromise);
@@ -189,7 +168,7 @@ async function handler(req: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('生成新闻报道失败:', error);
+    log.error('生成新闻报道失败:', { error });
     const errorMessage = error instanceof Error ? error.message : '未知错误';
     return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,
