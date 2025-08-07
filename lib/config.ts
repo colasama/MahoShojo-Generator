@@ -82,6 +82,16 @@ const getLoadBalanceStrategy = (): string => {
   return process.env.AI_LOAD_BALANCE_STRATEGY || 'random';
 };
 
+// 新增：获取统计数据显示开关
+const getShowStatData = (): boolean => {
+  const showStat = process.env.SHOW_STAT_DATA || 'false';
+  // 如果环境变量设置为 'false' 或 '0'，则返回 false，其他情况返回 true
+  if (showStat === 'false' || showStat === '0') {
+    return false;
+  }
+  return true; // 默认显示统计数据
+};
+
 // 新增：获取排行榜模式
 // 如果是在 Cloudflare Pages 上部署，可以直接在项目的 设置 > 环境变量 中添加 LEADERBOARD_MODE 并设置其值。
 const getLeaderboardMode = (): 'all' | 'preset' | 'user' => {
@@ -99,6 +109,9 @@ export const config = {
   MODEL: getDefaultModel(),
   PROVIDERS: getAPIProviders(),
   LOAD_BALANCE_STRATEGY: getLoadBalanceStrategy(),
+
+  // 新增：统计数据显示开关配置
+  SHOW_STAT_DATA: getShowStatData(),
 
   // 新增：排行榜模式配置
   LEADERBOARD_MODE: getLeaderboardMode(),

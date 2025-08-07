@@ -25,28 +25,28 @@ export interface CharacterRank {
 }
 
 async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
-    try {
-        // 注释：Cloudflare D1 API 的返回格式可能嵌套在 'results' 属性下
-        const response = await queryFromD1(sql, params) as { results?: any[] };
-        // 有时它也在 'result' -> 'results'
-        if (response.results) {
-            return response.results;
-        }
-        // 兼容旧的或不同的返回格式
-        const legacyResponse = response as any;
-        if (legacyResponse.result && Array.isArray(legacyResponse.result)) {
-            return legacyResponse.result;
-        }
-        return [];
-    } catch (error) {
-        console.error('数据库查询失败:', error);
-        // 如果是表不存在的错误，返回空数组而不是抛出错误
-        if (error instanceof Error && error.message.includes('no such table')) {
-            console.warn('数据库表不存在，返回空数据');
-            return [];
-        }
-        throw error;
+  try {
+    // 注释：Cloudflare D1 API 的返回格式可能嵌套在 'results' 属性下
+    const response = await queryFromD1(sql, params) as { results?: any[] };
+    // 有时它也在 'result' -> 'results'
+    if (response.results) {
+      return response.results;
     }
+    // 兼容旧的或不同的返回格式
+    const legacyResponse = response as any;
+    if (legacyResponse.result && Array.isArray(legacyResponse.result)) {
+      return legacyResponse.result;
+    }
+    return [];
+  } catch (error) {
+    console.error('数据库查询失败:', error);
+    // 如果是表不存在的错误，返回空数组而不是抛出错误
+    if (error instanceof Error && error.message.includes('no such table')) {
+      console.warn('数据库表不存在，返回空数据');
+      return [];
+    }
+    throw error;
+  }
 }
 
 
@@ -88,8 +88,8 @@ export default async function handler(
     // 胜率榜 (至少参与3场)
     // 注释：这里需要将筛选条件与原有的 'participations >= 3' 结合
     const winRateFilter = filterClause
-        ? `${filterClause} AND participations >= 3`
-        : 'WHERE participations >= 3';
+      ? `${filterClause} AND participations >= 3`
+      : 'WHERE participations >= 3';
 
     const winRateRank = await executeQuery(
       `SELECT name, is_preset, wins, participations FROM characters ${winRateFilter} ORDER BY (CAST(wins AS REAL) / participations) DESC, wins DESC LIMIT ?;`,
@@ -141,9 +141,9 @@ export default async function handler(
     };
 
     // 检查是否所有排行榜都为空（可能表示数据库未初始化）
-    const hasAnyData = totalBattles > 0 || totalParticipants > 0 || 
-                      winRateRank.length > 0 || participationRank.length > 0 || 
-                      winsRank.length > 0 || lossesRank.length > 0;
+    const hasAnyData = totalBattles > 0 || totalParticipants > 0 ||
+      winRateRank.length > 0 || participationRank.length > 0 ||
+      winsRank.length > 0 || lossesRank.length > 0;
 
     if (!hasAnyData) {
       // 添加初始化提示

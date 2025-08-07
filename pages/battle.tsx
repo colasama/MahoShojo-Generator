@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { PresetMagicalGirl } from './api/get-presets';
 import { StatsData } from './api/get-stats';
 import Leaderboard from '../components/Leaderboard';
+import { config as appConfig } from '../lib/config';
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
@@ -46,11 +47,18 @@ const BattlePage: React.FC = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // 并行获取预设角色和统计数据
-                const [presetsRes, statsRes] = await Promise.all([
-                    fetch('/api/get-presets'),
-                    fetch('/api/get-stats')
-                ]);
+                // 根据配置决定是否需要获取统计数据
+                const shouldFetchStats = appConfig.SHOW_STAT_DATA;
+                
+                // 构建请求数组
+                const requests = [fetch('/api/get-presets')];
+                if (shouldFetchStats) {
+                    requests.push(fetch('/api/get-stats'));
+                }
+                
+                // 并行获取数据
+                const responses = await Promise.all(requests);
+                const [presetsRes, statsRes] = responses;
 
                 if (presetsRes.ok) {
                     const presetsData = await presetsRes.json();
@@ -66,13 +74,16 @@ const BattlePage: React.FC = () => {
                     console.error("获取预设失败");
                 }
 
-                if (statsRes.ok) {
-                    const statsData = await statsRes.json();
-                    console.log('Stats data loaded:', statsData); // Debug log
-                    setStats(statsData);
-                } else {
-                    const errorText = await statsRes.text();
-                    console.error("获取统计数据失败:", statsRes.status, errorText);
+                // 只有在启用统计数据功能时才处理统计数据响应
+                if (shouldFetchStats && statsRes) {
+                    if (statsRes.ok) {
+                        const statsData = await statsRes.json();
+                        console.log('Stats data loaded:', statsData); // Debug log
+                        setStats(statsData);
+                    } else {
+                        const errorText = await statsRes.text();
+                        console.error("获取统计数据失败:", statsRes.status, errorText);
+                    }
                 }
             } catch (err) {
                 console.error('加载数据失败:', err);
@@ -333,36 +344,40 @@ const BattlePage: React.FC = () => {
                     )}
 
                     {/* --- 竞技场统计数据 --- */}
-                    {isLoadingStats ? (
-                        <div className="card mt-6 text-center text-gray-500">正在加载数据中心...</div>
-                    ) : stats ? (
-                        <div className="card mt-6">
-                            <h3 className="text-xl font-bold text-gray-800 text-center mb-4">
-                                竞技场数据中心
-                            </h3>
-                            <div className="grid grid-cols-2 gap-4 text-center mb-6">
-                                <div className="p-4 bg-gray-100 rounded-lg">
-                                    <p className="text-2xl font-bold text-pink-500">{stats.totalBattles || 0}</p>
-                                    <p className="text-sm text-gray-600">战斗总场数</p>
+                    {appConfig.SHOW_STAT_DATA && (
+                        <>
+                            {isLoadingStats ? (
+                                <div className="card mt-6 text-center text-gray-500">正在加载数据中心...</div>
+                            ) : stats ? (
+                                <div className="card mt-6">
+                                    <h3 className="text-xl font-bold text-gray-800 text-center mb-4">
+                                        竞技场数据中心
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-4 text-center mb-6">
+                                        <div className="p-4 bg-gray-100 rounded-lg">
+                                            <p className="text-2xl font-bold text-pink-500">{stats.totalBattles || 0}</p>
+                                            <p className="text-sm text-gray-600">战斗总场数</p>
+                                        </div>
+                                        <div className="p-4 bg-gray-100 rounded-lg">
+                                            <p className="text-2xl font-bold text-blue-500">{stats.totalParticipants || 0}</p>
+                                            <p className="text-sm text-gray-600">总参战人次</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <Leaderboard title="🏆 胜率排行榜" data={stats.winRateRank || []} presetInfo={presetInfo} />
+                                        <Leaderboard title="⚔️ 参战数排行榜" data={stats.participationRank || []} presetInfo={presetInfo} />
+                                        <Leaderboard title="🥇 胜利榜" data={stats.winsRank || []} presetInfo={presetInfo} />
+                                        <Leaderboard title="💔 战败榜" data={stats.lossesRank || []} presetInfo={presetInfo} />
+                                    </div>
                                 </div>
-                                <div className="p-4 bg-gray-100 rounded-lg">
-                                    <p className="text-2xl font-bold text-blue-500">{stats.totalParticipants || 0}</p>
-                                    <p className="text-sm text-gray-600">总参战人次</p>
+                            ) : (
+                                <div className="card mt-6 text-center text-gray-500">
+                                    <p>数据库还未初始化或暂无战斗数据</p>
+                                    <p className="text-sm mt-2">开始使用竞技场功能后，这里将显示统计数据</p>
+                                    <p className="text-xs mt-2 text-red-500">请在 Cloudflare D1 控制台执行建表 SQL 语句</p>
                                 </div>
-                            </div>
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <Leaderboard title="🏆 胜率排行榜" data={stats.winRateRank || []} presetInfo={presetInfo} />
-                                <Leaderboard title="⚔️ 参战数排行榜" data={stats.participationRank || []} presetInfo={presetInfo} />
-                                <Leaderboard title="🥇 胜利榜" data={stats.winsRank || []} presetInfo={presetInfo} />
-                                <Leaderboard title="💔 战败榜" data={stats.lossesRank || []} presetInfo={presetInfo} />
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="card mt-6 text-center text-gray-500">
-                            <p>数据库还未初始化或暂无战斗数据</p>
-                            <p className="text-sm mt-2">开始使用竞技场功能后，这里将显示统计数据</p>
-                            <p className="text-xs mt-2 text-red-500">请在 Cloudflare D1 控制台执行建表 SQL 语句</p>
-                        </div>
+                            )}
+                        </>
                     )}
 
                     <div className="text-center" style={{ marginTop: '2rem' }}>
