@@ -2,6 +2,7 @@
 
 import { type NextRequest } from 'next/server';
 import { queryFromD1 } from '../../lib/d1';
+import { config as appConfig } from '../../lib/config'; // 导入应用配置
 
 export const config = {
   runtime: 'edge',
@@ -52,7 +53,19 @@ export default async function handler(
   }
 
   try {
-    // -- 1. 获取总览数据 --
+    // --- 新增：根据配置生成 SQL 筛选条件 ---
+    // 从配置中读取排行榜模式
+    const leaderboardMode = appConfig.LEADERBOARD_MODE;
+    let filterClause = '';
+    // is_preset 在数据库中是布尔值 (0 or 1)
+    if (leaderboardMode === 'preset') {
+      filterClause = 'WHERE is_preset = 1';
+    } else if (leaderboardMode === 'user') {
+      filterClause = 'WHERE is_preset = 0';
+    }
+    // 如果是 'all'，则 filterClause 为空字符串，查询所有角色
+
+    // -- 1. 获取总览数据 (总览数据不受筛选影响) --
     const totalBattlesResult = await executeQuery("SELECT COUNT(*) as count FROM battles;");
     const totalParticipantsResult = await executeQuery("SELECT SUM(participations) as count FROM characters;");
 
@@ -63,26 +76,31 @@ export default async function handler(
     const limit = 5;
 
     // 胜率榜 (至少参与3场)
+    // 注释：这里需要将筛选条件与原有的 'participations >= 3' 结合
+    const winRateFilter = filterClause
+        ? `${filterClause} AND participations >= 3`
+        : 'WHERE participations >= 3';
+
     const winRateRank = await executeQuery(
-      "SELECT name, is_preset, wins, participations FROM characters WHERE participations >= 3 ORDER BY (CAST(wins AS REAL) / participations) DESC, wins DESC LIMIT ?;",
+      `SELECT name, is_preset, wins, participations FROM characters ${winRateFilter} ORDER BY (CAST(wins AS REAL) / participations) DESC, wins DESC LIMIT ?;`,
       [limit]
     );
 
     // 参战榜
     const participationRank = await executeQuery(
-      "SELECT name, is_preset, participations FROM characters ORDER BY participations DESC LIMIT ?;",
+      `SELECT name, is_preset, participations FROM characters ${filterClause} ORDER BY participations DESC LIMIT ?;`,
       [limit]
     );
 
     // 胜场榜
     const winsRank = await executeQuery(
-      "SELECT name, is_preset, wins FROM characters ORDER BY wins DESC LIMIT ?;",
+      `SELECT name, is_preset, wins FROM characters ${filterClause} ORDER BY wins DESC LIMIT ?;`,
       [limit]
     );
 
     // 败场榜 (或称“劳模榜”)
     const lossesRank = await executeQuery(
-      "SELECT name, is_preset, losses FROM characters ORDER BY losses DESC LIMIT ?;",
+      `SELECT name, is_preset, losses FROM characters ${filterClause} ORDER BY losses DESC LIMIT ?;`,
       [limit]
     );
 

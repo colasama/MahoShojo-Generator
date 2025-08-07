@@ -1,3 +1,5 @@
+// lib/config.ts
+
 // AI 提供商配置接口
 export interface AIProvider {
   name: string;
@@ -80,12 +82,26 @@ const getLoadBalanceStrategy = (): string => {
   return process.env.AI_LOAD_BALANCE_STRATEGY || 'random';
 };
 
+// 新增：获取排行榜模式
+// 如果是在 Cloudflare Pages 上部署，可以直接在项目的 设置 > 环境变量 中添加 LEADERBOARD_MODE 并设置其值。
+const getLeaderboardMode = (): 'all' | 'preset' | 'user' => {
+  const mode = process.env.LEADERBOARD_MODE;
+  if (mode === 'preset' || mode === 'user') {
+    return mode;
+  }
+  return 'all'; // 默认为 'all'
+};
+
+
 export const config = {
   // Vercel AI 配置
   API_PAIRS: parseApiPairs(),
   MODEL: getDefaultModel(),
   PROVIDERS: getAPIProviders(),
   LOAD_BALANCE_STRATEGY: getLoadBalanceStrategy(),
+
+  // 新增：排行榜模式配置
+  LEADERBOARD_MODE: getLeaderboardMode(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {
@@ -101,4 +117,4 @@ export const config = {
 
 请严格按照提供的 JSON schema 格式返回结果。`
   }
-} 
+}
