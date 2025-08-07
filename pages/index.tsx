@@ -173,7 +173,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* --- 新增：竞技场统计数据 --- */}
+          {/* --- 竞技场统计数据 --- */}
           {isLoading ? (
             <div className="card mt-6 text-center text-gray-500">正在加载数据中心...</div>
           ) : stats && (

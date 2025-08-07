@@ -1,4 +1,6 @@
-import { type NextApiRequest, type NextApiResponse } from 'next';
+// pages/api/get-stats.ts
+
+import { type NextRequest } from 'next/server';
 import { queryFromD1 } from '../../lib/d1';
 
 export const config = {
@@ -22,16 +24,31 @@ export interface CharacterRank {
 }
 
 async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
-  const result = await queryFromD1(sql, params) as { result?: any[] };
-  return result.result || [];
+    // 注释：Cloudflare D1 API 的返回格式可能嵌套在 'results' 属性下
+    const response = await queryFromD1(sql, params) as { results?: any[] };
+    // 有时它也在 'result' -> 'results'
+    if (response.results) {
+      return response.results;
+    }
+    // 兼容旧的或不同的返回格式
+    const legacyResponse = response as any;
+    if (legacyResponse.result && Array.isArray(legacyResponse.result)) {
+        return legacyResponse.result;
+    }
+    return [];
 }
 
+
+// 注释：已将 handler 从 (req: NextApiRequest, res: NextApiResponse) 修改为 (req: NextRequest)
+// 这是为了兼容 Cloudflare Edge Runtime，它使用标准的 Web API Request 和 Response 对象。
 export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<StatsData | { error: string }>
+  req: NextRequest
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
@@ -76,7 +93,7 @@ export default async function handler(
       winRateRank: winRateRank.map(r => ({
         name: r.name,
         is_preset: !!r.is_preset,
-        value: `${((r.wins / r.participations) * 100).toFixed(1)}% (${r.wins}胜)`,
+        value: r.participations > 0 ? `${((r.wins / r.participations) * 100).toFixed(1)}% (${r.wins}胜)` : '0.0% (0胜)',
       })),
       participationRank: participationRank.map(r => ({
         name: r.name,
@@ -95,9 +112,16 @@ export default async function handler(
       })),
     };
 
-    res.status(200).json(responseData);
+    return new Response(JSON.stringify(responseData), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
   } catch (error) {
     console.error('获取统计数据失败:', error);
-    res.status(500).json({ error: '无法加载统计数据' });
+    return new Response(JSON.stringify({ error: '无法加载统计数据' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
