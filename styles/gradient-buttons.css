@@ -92,6 +92,15 @@
     #9775fa 100%);
 }
 
+.battle-arena .gradient-overlay {
+  background: linear-gradient(45deg,
+    #434343 0%,
+    #000000 25%,
+    #757F9A 50%,
+    #D7DDE8 75%,
+    #434343 100%);
+}
+
 .feature-button:hover .gradient-overlay {
   /* 恢复原始动画，但使用GPU加速 */
   animation: gradientFlowFast 4s ease-in-out infinite;
@@ -120,7 +129,6 @@
 }
 
 .feature-title-container {
-  margin-bottom: 1rem;
   font-size: 1.5rem;
   font-weight: bold;
   background: linear-gradient(45deg, #333, #666);

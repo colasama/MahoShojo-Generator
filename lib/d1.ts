@@ -73,3 +73,28 @@ export async function queryFromD1(sql: string, params: unknown[] = []): Promise<
     throw error;
   }
 }
+
+/*
+需要在 Cloudflare D1 的控制台执行以下 SQL 语句来创建竞技场所需数据表：
+-- 角色统计表
+-- 用于记录每个参战角色的胜、负、参战次数等信息
+CREATE TABLE IF NOT EXISTS characters (
+  name TEXT PRIMARY KEY NOT NULL,         -- 魔法少女的名字/代号，作为唯一标识
+  is_preset BOOLEAN NOT NULL DEFAULT 0, -- 是否是预设角色 (1 for true, 0 for false)
+  wins INTEGER NOT NULL DEFAULT 0,        -- 胜利次数
+  losses INTEGER NOT NULL DEFAULT 0,      -- 失败次数
+  participations INTEGER NOT NULL DEFAULT 0 -- 总参战次数
+);
+
+-- 战斗记录表
+-- 用于记录每一场战斗的概要信息
+CREATE TABLE IF NOT EXISTS battles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,      -- 唯一ID
+  winner_name TEXT NOT NULL,               -- 胜利者名字 (如果是平局，可以存 "平局")
+  participants_json TEXT NOT NULL,         -- 参战者列表 (JSON数组格式)
+  created_at TEXT NOT NULL                 -- 战斗发生时间
+);
+
+请不要忘记在 Cloudflare D1 的控制台执行上述 SQL 语句来创建竞技场所需的 characters 和 battles 数据表。
+如果缺少了这些表，get-stats 和 generate-battle-story API 将会失败。
+*/

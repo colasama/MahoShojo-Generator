@@ -55,3 +55,9 @@ export const randomChooseHanaName = () => {
     const hanaNames = [''];
     return hanaNames[Math.floor(Math.random() * hanaNames.length)];
 };
+
+// 随机获取一个花名
+export const randomChooseOneHanaName = () => {
+    const flowers = getRandomFlowersArray(1);
+    return flowers[0].name;
+}

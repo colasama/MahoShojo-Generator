@@ -1,3 +1,5 @@
+// lib/sensitive-word-filter.ts
+
 // 防止屏蔽，所以用base64编码并直接扔文件里
 const sensitiveWordsConfig = {
     mask: "*",
@@ -107,6 +109,28 @@ interface SensitiveWordsConfig {
 }
 
 /**
+ * 兼容 Edge Runtime 的 Base64 解码函数
+ * @param str Base64 编码的字符串
+ * @returns 解码后的 UTF-8 字符串
+ */
+const base64Decode = (str: string): string => {
+    try {
+        // atob 是 Web API 标准，用于解码 Base64
+        // 但是 atob 不支持 UTF-8，需要进行额外转换
+        const binaryString = atob(str);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        // TextDecoder 是处理编码的标准方式
+        return new TextDecoder('utf-8').decode(bytes);
+    } catch (e) {
+        console.error("Base64解码失败:", e);
+        return "";
+    }
+}
+
+/**
  * 敏感词过滤器类
  */
 export class SensitiveWordFilter {
@@ -130,9 +154,9 @@ export class SensitiveWordFilter {
 
             // 如果是编码后的文件，需要解码
             if (this.config.encoding === 'base64') {
-                this.sensitiveWords = this.config.words.map(word =>
-                    Buffer.from(word, 'base64').toString('utf8')
-                );
+                // 注释：Edge Runtime 环境没有 NodeJS 的 Buffer 对象。
+                // 使用 Web 标准的 atob() 和 TextDecoder 进行解码，以确保兼容性。
+                this.sensitiveWords = this.config.words.map(word => base64Decode(word));
             } else {
                 this.sensitiveWords = [...this.config.words];
             }
@@ -216,7 +240,7 @@ export class SensitiveWordFilter {
             return text.replace(regex, this.config.mask_word);
         } else {
             // 否则用mask字符替换敏感词的每个字符
-            return text.replace(regex, (match) => this.config!.mask.repeat(match.length));
+            return text.replace(regex, (match) => (this.config!.mask || '*').repeat(match.length));
         }
     }
 

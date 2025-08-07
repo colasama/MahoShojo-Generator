@@ -1,4 +1,4 @@
-import { magicalGirlQueue, magicalGirlDetailsQueue } from '../../lib/queue-system';
+import { magicalGirlQueue, magicalGirlDetailsQueue, battleHistoryQueue, cleanupQueues } from '../../lib/queue-system';
 import { getClientIP } from '../../lib/rate-limiter';
 import { getLogger } from '../../lib/logger';
 
@@ -19,6 +19,9 @@ async function handler(
   }
 
   try {
+    // 定期清理过期队列项
+    cleanupQueues();
+    
     const ip = getClientIP(req as any);
     const url = new URL(req.url);
     const endpoint = url.searchParams.get('endpoint');
@@ -30,14 +33,18 @@ async function handler(
       queueStatus = magicalGirlQueue.getQueueStatus(ip, persistenceKey || undefined);
     } else if (endpoint === 'generate-magical-girl-details') {
       queueStatus = magicalGirlDetailsQueue.getQueueStatus(ip, persistenceKey || undefined);
+    } else if (endpoint === 'generate-battle-story') {
+      queueStatus = battleHistoryQueue.getQueueStatus(ip, persistenceKey || undefined);
     } else {
       // 返回所有队列的状态
       const mgStatus = magicalGirlQueue.getQueueStatus(ip, persistenceKey || undefined);
       const mgDetailsStatus = magicalGirlDetailsQueue.getQueueStatus(ip, persistenceKey || undefined);
+      const battleStatus = battleHistoryQueue.getQueueStatus(ip, persistenceKey || undefined);
 
       return new Response(JSON.stringify({
         'generate-magical-girl': mgStatus,
         'generate-magical-girl-details': mgDetailsStatus,
+        'generate-battle-story': battleStatus,
         ip: ip,
         persistenceKey: persistenceKey
       }), {
