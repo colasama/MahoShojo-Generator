@@ -178,7 +178,7 @@ const BattlePage: React.FC = () => {
             if (err instanceof Error) {
                 setError(`✨ 魔法失效了！${err.message}`);
             } else {
-                setError('✨ 魔法失效了！生成故事时发生未知错误，请重试。');
+                setError('✨ 魔法失效了！推演战斗时发生未知错误，请重试。');
             }
         } finally {
             setIsGenerating(false);
@@ -195,24 +195,24 @@ const BattlePage: React.FC = () => {
         <>
             <Head>
                 <title>魔法少女竞技场 - MahoShojo Generator</title>
-                <meta name="description" content="上传魔法少女设定，生成她们之间的战斗故事！" />
+                <meta name="description" content="上传魔法少女设定，推演她们之间的战斗！" />
             </Head>
             <div className="magic-background-white">
                 <div className="container">
                     <div className="card" style={{border: "2px solid #ccc", background: "#f9f9f9"}}>
                         <div className="text-center mb-4">
                             <h1 className="text-3xl font-bold text-gray-800">魔法少女竞技场</h1>
-                            <p className="subtitle" style={{ marginBottom: '1rem' }}>提交目击情报，生成独家新闻报道！</p>
+                            <p className="subtitle" style={{ marginBottom: '1rem' }}>能亲眼见到强者之战，这下就算死也会值回票价呀！</p>
                         </div>
 
                         {/* 功能使用说明 */}
                         <div className="mb-6 p-4 bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-800">
-                            <h3 className="font-bold mb-2">📰 投稿须知</h3>
+                            <h3 className="font-bold mb-2">📰 使用须知</h3>
                             <ol className="list-decimal list-inside space-y-1">
                                 <li>前往<Link href="/details" className="footer-link">【奇妙妖精大调查】</Link>页面，生成魔法少女并下载其【设定文件】。</li>
                                 <li>收集 2-6 位魔法少女的设定文件（.json 格式）。</li>
                                 <li>在此处选择预设角色或上传你收集到的设定文件作为“情报”。</li>
-                                <li>我们的王牌记者将根据你的情报，撰写一篇精彩绝伦的新闻报道！</li>
+                                <li>接下来，敬请期待魔法少女们在「命运的舞台」之上的战斗吧！</li>
                             </ol>
                         </div>
 
