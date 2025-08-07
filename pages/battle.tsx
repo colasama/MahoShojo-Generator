@@ -1,24 +1,26 @@
+// pages/battle.tsx
+
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
-import BattleReportCard, { BattleReport } from '../components/BattleReportCard';
+import BattleReportCard, { NewsReport } from '../components/BattleReportCard';
 import Link from 'next/link';
-import { PresetMagicalGirl } from './api/get-presets'; // 导入类型
+import { PresetMagicalGirl } from './api/get-presets';
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
     // 存储解析后的魔法少女JSON数据
     const [magicalGirls, setMagicalGirls] = useState<any[]>([]);
-    // 存储上传的文件名用于显示
+    // 存储上传或选择的文件名/代号用于显示
     const [filenames, setFilenames] = useState<string[]>([]);
     // 是否正在生成中
     const [isGenerating, setIsGenerating] = useState(false);
     // 错误信息
     const [error, setError] = useState<string | null>(null);
-    // 生成的战斗报告结果
-    const [battleReport, setBattleReport] = useState<BattleReport | null>(null);
+    // 更新状态以匹配新的数据结构
+    const [newsReport, setNewsReport] = useState<NewsReport | null>(null);
     // 保存的图片URL
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     // 是否显示图片模态框
@@ -28,12 +30,11 @@ const BattlePage: React.FC = () => {
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // --- 新增状态和副作用 ---
     const [presets, setPresets] = useState<PresetMagicalGirl[]>([]);
     const [isLoadingPresets, setIsLoadingPresets] = useState(true);
 
+    // 组件加载时获取预设角色列表
     useEffect(() => {
-        // 组件加载时获取预设角色列表
         const fetchPresets = async () => {
             try {
                 const response = await fetch('/api/get-presets');
@@ -50,14 +51,12 @@ const BattlePage: React.FC = () => {
         fetchPresets();
     }, []);
 
-    // --- 新增处理函数 ---
+    // 处理选择预设角色的逻辑
     const handleSelectPreset = async (preset: PresetMagicalGirl) => {
         if (magicalGirls.length >= 6) {
             setError('最多只能选择 6 位魔法少女参战。');
             return;
         }
-
-        // 避免重复添加
         if (filenames.includes(preset.filename)) {
             setError(`${preset.name} 已经在战斗列表中了。`);
             return;
@@ -75,12 +74,11 @@ const BattlePage: React.FC = () => {
             setFilenames(prev => [...prev, preset.filename]);
             setError(null);
         } catch (err) {
-            if (err instanceof Error) {
-                setError(err.message);
-            }
+            if (err instanceof Error) setError(err.message);
         }
     };
 
+    // 处理用户上传文件
     const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (!files || files.length === 0) return;
@@ -91,7 +89,6 @@ const BattlePage: React.FC = () => {
             return;
         }
 
-        // ... (原有的文件读取逻辑保持不变, 但现在是追加而不是重置)
         const loadedGirls: any[] = [];
         const loadedFilenames: string[] = [];
 
@@ -102,28 +99,33 @@ const BattlePage: React.FC = () => {
                 }
                 const text = await file.text();
                 const json = JSON.parse(text);
-                // 对JSON文件内容进行基本校验
                 if (!json.codename && !json.name) {
                     throw new Error(`文件 "${file.name}" 似乎不是一个有效的魔法少女设定。`);
                 }
                 loadedGirls.push(json);
                 loadedFilenames.push(file.name);
             }
-            setMagicalGirls(loadedGirls);
-            setFilenames(loadedFilenames);
+            // 修正：追加而不是覆盖
+            setMagicalGirls(prev => [...prev, ...loadedGirls]);
+            setFilenames(prev => [...prev, ...loadedFilenames]);
+            setError(null);
         } catch (err) {
             if (err instanceof Error) {
                 setError(`❌ 文件读取失败: ${err.message}`);
             } else {
                 setError('❌ 文件读取失败，请确保上传了正确的 JSON 文件。');
             }
+        } finally {
+            // 清空input的值
+            if (event.target) event.target.value = '';
         }
     };
 
+    // 清空已选角色列表
     const handleClearRoster = () => {
         setMagicalGirls([]);
         setFilenames([]);
-        setBattleReport(null);
+        setNewsReport(null);
         setError(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = ''; // 重置文件输入框
@@ -137,13 +139,13 @@ const BattlePage: React.FC = () => {
             return;
         }
         if (magicalGirls.length < 2 || magicalGirls.length > 6) {
-            setError('⚠️ 请先上传 2 到 6 个魔法少女设定文件');
+            setError('⚠️ 请先提交 2 到 6 位魔法少女的情报');
             return;
         }
 
         setIsGenerating(true);
         setError(null);
-        setBattleReport(null);
+        setNewsReport(null);
 
         try {
             // 安全措施：检查上传内容中的敏感词
@@ -169,14 +171,14 @@ const BattlePage: React.FC = () => {
                 throw new Error(errorData.message || errorData.error || '生成失败');
             }
 
-            const result: BattleReport = await response.json();
-            setBattleReport(result);
+            const result: NewsReport = await response.json();
+            setNewsReport(result);
             startCooldown();
         } catch (err) {
             if (err instanceof Error) {
                 setError(`✨ 魔法失效了！${err.message}`);
             } else {
-                setError('✨ 魔法失效了！生成故事时发生未知错误，请重试。');
+                setError('✨ 魔法失效了！推演战斗时发生未知错误，请重试。');
             }
         } finally {
             setIsGenerating(false);
@@ -193,25 +195,24 @@ const BattlePage: React.FC = () => {
         <>
             <Head>
                 <title>魔法少女竞技场 - MahoShojo Generator</title>
-                <meta name="description" content="上传魔法少女设定，生成她们之间的战斗故事！" />
+                <meta name="description" content="上传魔法少女设定，推演她们之间的战斗！" />
             </Head>
             <div className="magic-background-white">
                 <div className="container">
-                    <div className="card">
+                    <div className="card" style={{border: "2px solid #ccc", background: "#f9f9f9"}}>
                         <div className="text-center mb-4">
                             <h1 className="text-3xl font-bold text-gray-800">魔法少女竞技场</h1>
-                            <p className="subtitle" style={{ marginBottom: '1rem' }}>上传她们的设定，见证宿命的对决！</p>
+                            <p className="subtitle" style={{ marginBottom: '1rem' }}>能亲眼见到强者之战，这下就算死也会值回票价呀！</p>
                         </div>
 
                         {/* 功能使用说明 */}
-                        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                            <h3 className="font-bold mb-2">💡 如何使用？</h3>
+                        <div className="mb-6 p-4 bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-800">
+                            <h3 className="font-bold mb-2">📰 使用须知</h3>
                             <ol className="list-decimal list-inside space-y-1">
-                                <li>前往<Link href="/details" className="footer-link">【奇妙妖精大调查】</Link>页面。</li>
-                                <li>完成问卷并生成你的魔法少女。</li>
-                                <li>在结果页面底部，点击【下载设定文件】按钮，保存 `.json` 文件。</li>
-                                <li>重复以上步骤，获取 2-6 位魔法少女的设定文件。</li>
-                                <li>在此页面上传你保存的 `.json` 文件，即可生成她们的对战故事！</li>
+                                <li>前往<Link href="/details" className="footer-link">【奇妙妖精大调查】</Link>页面，生成魔法少女并下载其【设定文件】。</li>
+                                <li>收集 2-6 位魔法少女的设定文件（.json 格式）。</li>
+                                <li>在此处选择预设角色或上传你收集到的设定文件作为“情报”。</li>
+                                <li>接下来，敬请期待魔法少女们在「命运的舞台」之上的战斗吧！</li>
                             </ol>
                         </div>
 
@@ -240,7 +241,7 @@ const BattlePage: React.FC = () => {
                         {/* --- 上传区域 --- */}
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">
-                                或上传自己的 .json 设定文件:
+                                或上传自己的 .json 设定情报文件:
                             </label>
                             <input
                                 ref={fileInputRef}
@@ -255,7 +256,7 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 已选角色列表 --- */}
                         {filenames.length > 0 && (
-                            <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+                            <div className="mb-4 p-3 bg-gray-200 rounded-lg">
                                 <div className="flex justify-between items-center">
                                     <p className="font-semibold text-sm text-gray-700">
                                         已选角色 ({filenames.length}/6):
@@ -280,18 +281,18 @@ const BattlePage: React.FC = () => {
                             className="generate-button"
                         >
                             {isCooldown
-                                ? `请等待 ${remainingTime} 秒`
+                                ? `记者赶稿中...请等待 ${remainingTime} 秒`
                                 : isGenerating
-                                    ? '战斗推演中... (ง •̀_•́)ง'
-                                    : '生成对战故事 (๑•̀ㅂ•́)و✧'}
+                                    ? '撰写报道中... (ง •̀_•́)ง'
+                                    : '生成独家新闻 (๑•̀ㅂ•́)و✧'}
                         </button>
 
                         {error && <div className="error-message">{error}</div>}
                     </div>
 
-                    {battleReport && (
+                    {newsReport && (
                         <BattleReportCard
-                            report={battleReport}
+                            report={newsReport}
                             onSaveImage={handleSaveImage}
                         />
                     )}

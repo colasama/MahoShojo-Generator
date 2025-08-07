@@ -94,4 +94,7 @@ CREATE TABLE IF NOT EXISTS battles (
   participants_json TEXT NOT NULL,         -- 参战者列表 (JSON数组格式)
   created_at TEXT NOT NULL                 -- 战斗发生时间
 );
+
+请不要忘记在 Cloudflare D1 的控制台执行上述 SQL 语句来创建竞技场所需的 characters 和 battles 数据表。
+如果缺少了这些表，get-stats 和 generate-battle-story API 将会失败。
 */
