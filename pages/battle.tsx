@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import BattleReportCard, { NewsReport } from '../components/BattleReportCard';
+import QueueStatus from '../components/QueueStatus';
 import Link from 'next/link';
 import { PresetMagicalGirl } from './api/get-presets';
 import { StatsData } from './api/get-stats';
@@ -28,6 +29,8 @@ const BattlePage: React.FC = () => {
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     // 是否显示图片模态框
     const [showImageModal, setShowImageModal] = useState(false);
+    // 是否显示队列状态
+    const [showQueueStatus, setShowQueueStatus] = useState(false);
 
     // 冷却状态钩子，设置为2分钟
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
@@ -191,12 +194,14 @@ const BattlePage: React.FC = () => {
         setIsGenerating(true);
         setError(null);
         setNewsReport(null);
+        setShowQueueStatus(true); // 显示队列状态
 
         try {
             // 安全措施：检查上传内容中的敏感词
             const contentToCheck = JSON.stringify(magicalGirls);
             const checkResult = await quickCheck(contentToCheck);
             if (checkResult.hasSensitiveWords) {
+                setShowQueueStatus(false);
                 router.push('/arrested');
                 return;
             }
@@ -227,6 +232,7 @@ const BattlePage: React.FC = () => {
             }
         } finally {
             setIsGenerating(false);
+            setShowQueueStatus(false); // 隐藏队列状态
         }
     };
 
@@ -434,6 +440,16 @@ const BattlePage: React.FC = () => {
                         </div>
                     </div>
                 )}
+                
+                {/* 队列状态组件 */}
+                <QueueStatus 
+                    endpoint="generate-battle-story"
+                    isVisible={showQueueStatus}
+                    onComplete={() => {
+                        setShowQueueStatus(false);
+                        // 可以在这里添加完成后的逻辑
+                    }}
+                />
             </div>
         </>
     );

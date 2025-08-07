@@ -360,11 +360,13 @@ class RequestQueue {
 // 全局队列实例
 export const magicalGirlQueue = new RequestQueue();
 export const magicalGirlDetailsQueue = new RequestQueue();
+export const battleHistoryQueue = new RequestQueue();
 
 // 清理过期请求的辅助函数，由使用方调用
 export const cleanupQueues = () => {
   magicalGirlQueue.cleanup();
   magicalGirlDetailsQueue.cleanup();
+  battleHistoryQueue.cleanup();
 };
 
 export { RequestQueue };

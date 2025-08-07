@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { queryFromD1 } from '../../lib/d1'; // 导入 D1 查询函数
 import { getLogger } from '../../lib/logger';
+import { battleHistoryQueue } from '../../lib/queue-system';
+import { getClientIP } from '../../lib/rate-limiter';
 // 直接导入问卷JSON文件，而不是在运行时fetch
 import questionnaire from '../../public/questionnaire.json';
 
@@ -17,7 +19,7 @@ export const config = {
 const NewsReportSchema = z.object({
   headline: z.string().describe("本场比赛的新闻标题，可以使用震惊体等技巧来吸引读者。"),
   reporterInfo: z.object({
-    name: z.string().describe("一位虚构的新闻记者的名字，如果是魔法少女则应当按照格式“[花名]”。"),
+    name: z.string().describe("一位虚构的新闻记者的名字，如果是魔法少女则应当按照格式：“花名”。"),
     publication: z.string().describe("一个虚构的、听起来像是魔法少女世界观下的新闻媒体或自媒体的名称（例如：国度日报、祖母绿周刊、卢恩诺雷每日速报）。")
   }),
   article: z.object({
@@ -166,21 +168,38 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // 从导入的JSON中获取问卷问题
-    const questions = questionnaire.questions;
+    // 获取客户端IP
+    const ip = getClientIP(req as any);
 
-    // 生成新闻报道
-    const newsReportConfig = createNewsReportConfig(questions);
-    const newsReport = await generateWithAI(magicalGirls, newsReportConfig);
+    // 生成持久化键
+    const persistenceKey = `battle_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-    // 在返回结果前，异步更新数据库，不阻塞对用户的响应
-    const updatePromise = updateBattleStats(newsReport.officialReport.winner, magicalGirls);
+    // 将请求添加到队列中
+    const newsReport = await battleHistoryQueue.addToQueue(
+      'generate-battle-story',
+      { magicalGirls },
+      ip,
+      async () => {
+        // 从导入的JSON中获取问卷问题
+        const questions = questionnaire.questions;
 
-    // 在 Cloudflare Workers/Pages 环境下, 可以将 promise 传递给 waitUntil 以确保其在请求结束后仍能执行完成
-    const executionContext = (req as any).context;
-    if (executionContext && typeof executionContext.waitUntil === 'function') {
-      executionContext.waitUntil(updatePromise);
-    }
+        // 生成新闻报道
+        const newsReportConfig = createNewsReportConfig(questions);
+        const result = await generateWithAI(magicalGirls, newsReportConfig);
+
+        // 在返回结果前，异步更新数据库，不阻塞对用户的响应
+        const updatePromise = updateBattleStats(result.officialReport.winner, magicalGirls);
+
+        // 在 Cloudflare Workers/Pages 环境下, 可以将 promise 传递给 waitUntil 以确保其在请求结束后仍能执行完成
+        const executionContext = (req as any).context;
+        if (executionContext && typeof executionContext.waitUntil === 'function') {
+          executionContext.waitUntil(updatePromise);
+        }
+
+        return result;
+      },
+      persistenceKey
+    );
 
     return new Response(JSON.stringify(newsReport), {
       status: 200,
