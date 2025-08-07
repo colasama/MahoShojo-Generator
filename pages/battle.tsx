@@ -8,6 +8,8 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import BattleReportCard, { NewsReport } from '../components/BattleReportCard';
 import Link from 'next/link';
 import { PresetMagicalGirl } from './api/get-presets';
+import { StatsData } from './api/get-stats';
+import Leaderboard from '../components/Leaderboard';
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
@@ -33,28 +35,60 @@ const BattlePage: React.FC = () => {
     const [presets, setPresets] = useState<PresetMagicalGirl[]>([]);
     const [isLoadingPresets, setIsLoadingPresets] = useState(true);
 
-    // 组件加载时获取预设角色列表
+    // 状态：用于存储从API获取的统计数据
+    const [stats, setStats] = useState<StatsData | null>(null);
+    // 状态：用于存储预设角色的描述信息，方便在排行榜上显示
+    const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
+    // 状态：用于显示加载状态
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+    // 组件加载时获取预设角色列表和统计数据
     useEffect(() => {
-        const fetchPresets = async () => {
+        const fetchData = async () => {
             try {
-                const response = await fetch('/api/get-presets');
-                if (!response.ok) throw new Error('获取预设失败');
-                const data = await response.json();
-                setPresets(data);
+                // 并行获取预设角色和统计数据
+                const [presetsRes, statsRes] = await Promise.all([
+                    fetch('/api/get-presets'),
+                    fetch('/api/get-stats')
+                ]);
+
+                if (presetsRes.ok) {
+                    const presetsData = await presetsRes.json();
+                    setPresets(presetsData);
+
+                    // 将预设角色信息转换为Map，方便快速查找描述
+                    const infoMap = new Map<string, string>();
+                    presetsData.forEach((p: PresetMagicalGirl) => {
+                        infoMap.set(p.name, p.description);
+                    });
+                    setPresetInfo(infoMap);
+                } else {
+                    console.error("获取预设失败");
+                }
+
+                if (statsRes.ok) {
+                    const statsData = await statsRes.json();
+                    console.log('Stats data loaded:', statsData); // Debug log
+                    setStats(statsData);
+                } else {
+                    const errorText = await statsRes.text();
+                    console.error("获取统计数据失败:", statsRes.status, errorText);
+                }
             } catch (err) {
-                console.error(err);
-                setError('无法加载预设魔法少女列表。');
+                console.error('加载数据失败:', err);
+                setError('无法加载预设魔法少女列表或统计数据。');
             } finally {
                 setIsLoadingPresets(false);
+                setIsLoadingStats(false);
             }
         };
-        fetchPresets();
+        fetchData();
     }, []);
 
     // 处理选择预设角色的逻辑
     const handleSelectPreset = async (preset: PresetMagicalGirl) => {
-        if (magicalGirls.length >= 6) {
-            setError('最多只能选择 6 位魔法少女参战。');
+        if (magicalGirls.length >= 4) {
+            setError('最多只能选择 4 位魔法少女参战。');
             return;
         }
         if (filenames.includes(preset.filename)) {
@@ -83,7 +117,7 @@ const BattlePage: React.FC = () => {
         const files = event.target.files;
         if (!files || files.length === 0) return;
 
-        const totalSlots = 6 - magicalGirls.length;
+        const totalSlots = 4 - magicalGirls.length;
         if (files.length > totalSlots) {
             setError(`最多还能上传 ${totalSlots} 个文件。`);
             return;
@@ -138,8 +172,8 @@ const BattlePage: React.FC = () => {
             setError(`冷却中，请等待 ${remainingTime} 秒后再生成。`);
             return;
         }
-        if (magicalGirls.length < 2 || magicalGirls.length > 6) {
-            setError('⚠️ 请先提交 2 到 6 位魔法少女的情报');
+        if (magicalGirls.length < 2 || magicalGirls.length > 4) {
+            setError('⚠️ 请先提交 2 到 4 位魔法少女的情报');
             return;
         }
 
@@ -199,18 +233,18 @@ const BattlePage: React.FC = () => {
             </Head>
             <div className="magic-background-white">
                 <div className="container">
-                    <div className="card" style={{border: "2px solid #ccc", background: "#f9f9f9"}}>
+                    <div className="card" style={{ border: "2px solid #ccc", background: "#f9f9f9" }}>
                         <div className="text-center mb-4">
-                            <h1 className="text-3xl font-bold text-gray-800">魔法少女竞技场</h1>
-                            <p className="subtitle" style={{ marginBottom: '1rem' }}>能亲眼见到强者之战，这下就算死也会值回票价呀！</p>
+                            <img src="/arena-black.svg" width={320} height={90} alt="魔法少女竞技场" />
+                            <p className="subtitle" style={{ marginBottom: '1rem', marginTop: '1rem' }}>能亲眼见到强者之战，这下就算死也会值回票价呀！</p>
                         </div>
 
                         {/* 功能使用说明 */}
-                        <div className="mb-6 p-4 bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-800">
+                        <div className="mb-6 p-4 bg-gray-200 border border-gray-300 rounded-lg text-sm text-gray-800" style={{ padding: '1rem' }}>
                             <h3 className="font-bold mb-2">📰 使用须知</h3>
                             <ol className="list-decimal list-inside space-y-1">
                                 <li>前往<Link href="/details" className="footer-link">【奇妙妖精大调查】</Link>页面，生成魔法少女并下载其【设定文件】。</li>
-                                <li>收集 2-6 位魔法少女的设定文件（.json 格式）。</li>
+                                <li>收集 2-4 位魔法少女的设定文件（.json 格式）。</li>
                                 <li>在此处选择预设角色或上传你收集到的设定文件作为“情报”。</li>
                                 <li>接下来，敬请期待魔法少女们在「命运的舞台」之上的战斗吧！</li>
                             </ol>
@@ -218,7 +252,7 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 预设角色选择区域 --- */}
                         <div className="mb-6">
-                            <h3 className="input-label">选择预设魔法少女：</h3>
+                            <h3 className="input-label" style={{ marginTop: '0.5rem' }}>预设魔法少女</h3>
                             {isLoadingPresets ? (
                                 <p className="text-sm text-gray-500">正在加载预设角色...</p>
                             ) : (
@@ -228,8 +262,9 @@ const BattlePage: React.FC = () => {
                                             key={preset.filename}
                                             onClick={() => handleSelectPreset(preset)}
                                             title={preset.description}
-                                            disabled={magicalGirls.length >= 6}
-                                            className="px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded-full hover:bg-purple-200 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors"
+                                            disabled={magicalGirls.length >= 4}
+                                            className="px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded-full hover:bg-purple-200 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                            style={{ paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.5rem' }}
                                         >
                                             {preset.name}
                                         </button>
@@ -241,7 +276,7 @@ const BattlePage: React.FC = () => {
                         {/* --- 上传区域 --- */}
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">
-                                或上传自己的 .json 设定情报文件:
+                                上传自己的 .json 设定情报
                             </label>
                             <input
                                 ref={fileInputRef}
@@ -250,18 +285,18 @@ const BattlePage: React.FC = () => {
                                 multiple
                                 accept=".json"
                                 onChange={handleFileChange}
-                                className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"
+                                className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"
                             />
                         </div>
 
                         {/* --- 已选角色列表 --- */}
                         {filenames.length > 0 && (
-                            <div className="mb-4 p-3 bg-gray-200 rounded-lg">
+                            <div className="mb-4 p-3 bg-gray-200 rounded-lg" style={{ padding: '1rem', marginBottom: '1rem' }}>
                                 <div className="flex justify-between items-center">
                                     <p className="font-semibold text-sm text-gray-700">
-                                        已选角色 ({filenames.length}/6):
+                                        已选角色 ({filenames.length}/4):
                                     </p>
-                                    <button onClick={handleClearRoster} className="text-xs text-red-500 hover:underline">
+                                    <button onClick={handleClearRoster} className="text-sm text-red-500 hover:underline cursor-pointer">
                                         清空列表
                                     </button>
                                 </div>
@@ -295,6 +330,39 @@ const BattlePage: React.FC = () => {
                             report={newsReport}
                             onSaveImage={handleSaveImage}
                         />
+                    )}
+
+                    {/* --- 竞技场统计数据 --- */}
+                    {isLoadingStats ? (
+                        <div className="card mt-6 text-center text-gray-500">正在加载数据中心...</div>
+                    ) : stats ? (
+                        <div className="card mt-6">
+                            <h3 className="text-xl font-bold text-gray-800 text-center mb-4">
+                                竞技场数据中心
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 text-center mb-6">
+                                <div className="p-4 bg-gray-100 rounded-lg">
+                                    <p className="text-2xl font-bold text-pink-500">{stats.totalBattles || 0}</p>
+                                    <p className="text-sm text-gray-600">战斗总场数</p>
+                                </div>
+                                <div className="p-4 bg-gray-100 rounded-lg">
+                                    <p className="text-2xl font-bold text-blue-500">{stats.totalParticipants || 0}</p>
+                                    <p className="text-sm text-gray-600">总参战人次</p>
+                                </div>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <Leaderboard title="🏆 胜率排行榜" data={stats.winRateRank || []} presetInfo={presetInfo} />
+                                <Leaderboard title="⚔️ 参战数排行榜" data={stats.participationRank || []} presetInfo={presetInfo} />
+                                <Leaderboard title="🥇 胜利榜" data={stats.winsRank || []} presetInfo={presetInfo} />
+                                <Leaderboard title="💔 战败榜" data={stats.lossesRank || []} presetInfo={presetInfo} />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="card mt-6 text-center text-gray-500">
+                            <p>数据库还未初始化或暂无战斗数据</p>
+                            <p className="text-sm mt-2">开始使用竞技场功能后，这里将显示统计数据</p>
+                            <p className="text-xs mt-2 text-red-500">请在 Cloudflare D1 控制台执行建表 SQL 语句</p>
+                        </div>
                     )}
 
                     <div className="text-center" style={{ marginTop: '2rem' }}>

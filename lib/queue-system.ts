@@ -361,11 +361,11 @@ class RequestQueue {
 export const magicalGirlQueue = new RequestQueue();
 export const magicalGirlDetailsQueue = new RequestQueue();
 
-// 定期清理过期请求
-setInterval(() => {
+// 清理过期请求的辅助函数，由使用方调用
+export const cleanupQueues = () => {
   magicalGirlQueue.cleanup();
   magicalGirlDetailsQueue.cleanup();
-}, 5 * 60 * 1000); // 每5分钟清理一次
+};
 
 export { RequestQueue };
 export type { QueueStatus };

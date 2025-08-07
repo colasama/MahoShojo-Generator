@@ -1,74 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { StatsData, CharacterRank } from './api/get-stats'; // 导入API数据类型
-import { PresetMagicalGirl } from './api/get-presets';    // 导入预设角色类型
-
-/**
- * 排行榜组件
- * @param title - 排行榜标题
- * @param data - 排行榜数据
- * @param presetInfo - 预设角色的描述信息
- */
-const Leaderboard: React.FC<{ title: string; data: CharacterRank[]; presetInfo: Map<string, string> }> = ({ title, data, presetInfo }) => (
-  <div className="p-4 bg-white/50 rounded-lg shadow-inner">
-    <h4 className="font-bold text-gray-700 text-center mb-2">{title}</h4>
-    {data.length > 0 ? (
-      <ol className="list-decimal list-inside space-y-1 text-sm text-gray-800">
-        {data.map((item, index) => (
-          <li key={index} className="truncate" title={`${item.name}${item.is_preset ? ` (${presetInfo.get(item.name)})` : ''}`}>
-            <span className="font-semibold">{item.name}</span>
-            {item.is_preset && <span className="text-xs text-purple-600 ml-1">[预设]</span>}
-            <span className="float-right text-gray-600">{item.value}</span>
-          </li>
-        ))}
-      </ol>
-    ) : (
-      <p className="text-xs text-gray-500 text-center">暂无数据</p>
-    )}
-  </div>
-);
 
 export default function Home() {
   const [, setImagesLoaded] = useState(false);
-  // 状态：用于存储从API获取的统计数据
-  const [stats, setStats] = useState<StatsData | null>(null);
-  // 状态：用于存储预设角色的描述信息，方便在排行榜上显示
-  const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
-  // 状态：用于显示加载状态
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 加载信息
-    const fetchData = async () => {
-      try {
-        // 并行获取统计数据和预设角色信息，提高效率
-        const [statsRes, presetsRes] = await Promise.all([
-          fetch('/api/get-stats'),
-          fetch('/api/get-presets')
-        ]);
-
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setStats(statsData);
-        } else {
-          console.error("获取统计数据失败");
-          if (presetsRes.ok) {
-            const presetsData: PresetMagicalGirl[] = await presetsRes.json();
-            // 将预设角色信息转换为Map，方便快速查找描述
-            const infoMap = new Map(presetsData.map(p => [p.name, p.description]));
-            setPresetInfo(infoMap);
-          } else {
-            console.error("获取预设角色失败");
-          }
-        }
-      } catch (error) {
-        console.error("加载首页数据失败:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     // 预加载关键图片
     const preloadImages = async () => {
       const imageUrls = [
@@ -96,8 +33,6 @@ export default function Home() {
     };
 
     preloadImages();
-    fetchData();
-
   }, []);
 
   return (
@@ -160,7 +95,13 @@ export default function Home() {
                 <div className="gradient-overlay"></div>
                 <div className="feature-button-content">
                   <div className="feature-title-container">
-                    <span className="text-2xl font-bold text-white drop-shadow-md">魔法少女竞技场</span>
+                    <img
+                      src="/arena-white.svg"
+                      width={280}
+                      height={80}
+                      alt="魔法少女竞技场"
+                      className="feature-title-svg"
+                    />
                   </div>
                 </div>
               </Link>
@@ -172,33 +113,6 @@ export default function Home() {
               </p>
             </div>
           </div>
-
-          {/* --- 竞技场统计数据 --- */}
-          {isLoading ? (
-            <div className="card mt-6 text-center text-gray-500">正在加载数据中心...</div>
-          ) : stats && (
-            <div className="card mt-6">
-              <h3 className="text-xl font-bold text-gray-800 text-center mb-4">
-                竞技场数据中心
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-center mb-6">
-                <div className="p-4 bg-gray-100 rounded-lg">
-                  <p className="text-2xl font-bold text-pink-500">{stats.totalBattles}</p>
-                  <p className="text-sm text-gray-600">战斗总场数</p>
-                </div>
-                <div className="p-4 bg-gray-100 rounded-lg">
-                  <p className="text-2xl font-bold text-blue-500">{stats.totalParticipants}</p>
-                  <p className="text-sm text-gray-600">总参战人次</p>
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <Leaderboard title="🏆 胜率排行榜" data={stats.winRateRank} presetInfo={presetInfo} />
-                <Leaderboard title="⚔️ 参战数排行榜" data={stats.participationRank} presetInfo={presetInfo} />
-                <Leaderboard title="🥇 胜利榜" data={stats.winsRank} presetInfo={presetInfo} />
-                <Leaderboard title="💔 战败榜" data={stats.lossesRank} presetInfo={presetInfo} />
-              </div>
-            </div>
-          )}
 
           <footer className="footer">
             <p>

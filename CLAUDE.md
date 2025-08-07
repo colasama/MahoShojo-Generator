@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-IFMahouShoujo (魔法少女生成器) is a Magical Girl Generator - an AI-powered web application that creates personalized magical girl characters. Built with Next.js 15, React 19, Bun and TypeScript, it features a mobile-friendly design with a whimsical, magical theme.
+MahoShojo-Generator (魔法少女生成器) is a Magical Girl Generator - an AI-powered web application that creates personalized magical girl characters. Built with Next.js 15, React 19, Bun and TypeScript, it features a mobile-friendly design with a whimsical, magical theme.
 
 ## Commands
 

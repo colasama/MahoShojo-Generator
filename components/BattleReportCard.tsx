@@ -15,7 +15,6 @@ export interface NewsReport {
     analysis: string;
   };
   officialReport: {
-    summary: string;
     winner: string;
     impact: string;
   };
@@ -84,7 +83,6 @@ ${report.article.body}
 ---
 
 ## 官方通报
-- **战斗总结**: ${report.officialReport.summary}
 - **胜利者**: ${report.officialReport.winner}
 - **最终影响**: ${report.officialReport.impact}
     `.trim();
@@ -109,17 +107,21 @@ ${report.article.body}
       style={{ background: 'linear-gradient(135deg, #434343 0%, #000000 100%)' }}
     >
       <div className="result-content">
-        <h2 className="text-2xl font-bold text-center mb-2">{report.headline}</h2>
-        <p className="text-sm text-gray-300 text-center mb-4 italic">文 / {report.reporterInfo.name} | {report.reporterInfo.publication}</p>
-
+        <img src="/arena-white.svg" style={{ marginBottom: '1rem', marginTop: '1rem' }} width={320} height={90} alt="魔法少女竞技场" className="feature-title-svg" />
+        <h2 className="text-xl font-bold mb-2" style={{ marginLeft: '0.5rem' }}>{report.headline}</h2>
+        <p className="text-sm text-gray-300" style={{ marginLeft: '0.5rem' }}>
+          记者 | {report.reporterInfo.name}
+        </p>
+        <p className="text-sm text-gray-300" style={{ marginBottom: '0.5rem', marginLeft: '0.5rem' }}>
+          来源 | {report.reporterInfo.publication}
+        </p>
         <div className="result-item">
-          <div className="result-label">📰 新闻正文</div>
           <div className="result-value">
             <p className="text-sm opacity-90 whitespace-pre-line">{report.article.body}</p>
           </div>
         </div>
 
-        <div className="result-item" style={{ borderLeft: '4px solid #ff6b9d', background: 'rgba(0,0,0,0.2)'}}>
+        <div className="result-item" style={{ borderLeft: '4px solid #ff6b9d', background: 'rgba(0,0,0,0.2)' }}>
           <div className="result-label">🎤 记者点评</div>
           <div className="result-value">
             <p className="text-sm opacity-90 italic">{report.article.analysis}</p>
@@ -127,14 +129,11 @@ ${report.article.body}
         </div>
 
         <div className="result-item">
-          <div className="result-label">📊 战斗结算报告</div>
           <div className="result-value">
-            <h3 className="font-semibold mt-2">战斗简报：</h3>
-            <p className="text-sm opacity-90">{report.officialReport.summary}</p>
-            <h3 className="font-semibold mt-2">胜利者：</h3>
-            <p className="text-sm opacity-90">{report.officialReport.winner}</p>
-            <h3 className="font-semibold mt-3">最终影响：</h3>
-            <p className="text-sm opacity-90">{report.officialReport.impact}</p>
+            <h3 className="font-semibold mt-2">胜利者</h3>
+            <p className="text-sm opacity-90" style={{ marginBottom: '0.5rem' }}>{report.officialReport.winner}</p>
+            <h3 className="font-semibold mt-2">最终影响</h3>
+            <p className="text-sm opacity-90" style={{ marginBottom: '0.5rem' }}>{report.officialReport.impact}</p>
           </div>
         </div>
 

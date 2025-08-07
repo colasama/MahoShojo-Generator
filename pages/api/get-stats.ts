@@ -25,18 +25,28 @@ export interface CharacterRank {
 }
 
 async function executeQuery(sql: string, params: any[] = []): Promise<any[]> {
-    // 注释：Cloudflare D1 API 的返回格式可能嵌套在 'results' 属性下
-    const response = await queryFromD1(sql, params) as { results?: any[] };
-    // 有时它也在 'result' -> 'results'
-    if (response.results) {
-      return response.results;
+    try {
+        // 注释：Cloudflare D1 API 的返回格式可能嵌套在 'results' 属性下
+        const response = await queryFromD1(sql, params) as { results?: any[] };
+        // 有时它也在 'result' -> 'results'
+        if (response.results) {
+            return response.results;
+        }
+        // 兼容旧的或不同的返回格式
+        const legacyResponse = response as any;
+        if (legacyResponse.result && Array.isArray(legacyResponse.result)) {
+            return legacyResponse.result;
+        }
+        return [];
+    } catch (error) {
+        console.error('数据库查询失败:', error);
+        // 如果是表不存在的错误，返回空数组而不是抛出错误
+        if (error instanceof Error && error.message.includes('no such table')) {
+            console.warn('数据库表不存在，返回空数据');
+            return [];
+        }
+        throw error;
     }
-    // 兼容旧的或不同的返回格式
-    const legacyResponse = response as any;
-    if (legacyResponse.result && Array.isArray(legacyResponse.result)) {
-        return legacyResponse.result;
-    }
-    return [];
 }
 
 
@@ -129,6 +139,16 @@ export default async function handler(
         value: `${r.losses}败`,
       })),
     };
+
+    // 检查是否所有排行榜都为空（可能表示数据库未初始化）
+    const hasAnyData = totalBattles > 0 || totalParticipants > 0 || 
+                      winRateRank.length > 0 || participationRank.length > 0 || 
+                      winsRank.length > 0 || lossesRank.length > 0;
+
+    if (!hasAnyData) {
+      // 添加初始化提示
+      (responseData as any).needsInitialization = true;
+    }
 
     return new Response(JSON.stringify(responseData), {
       status: 200,

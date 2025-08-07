@@ -1,4 +1,4 @@
-import { magicalGirlQueue, magicalGirlDetailsQueue } from '../../lib/queue-system';
+import { magicalGirlQueue, magicalGirlDetailsQueue, cleanupQueues } from '../../lib/queue-system';
 import { getClientIP } from '../../lib/rate-limiter';
 import { getLogger } from '../../lib/logger';
 
@@ -19,6 +19,9 @@ async function handler(
   }
 
   try {
+    // 定期清理过期队列项
+    cleanupQueues();
+    
     const ip = getClientIP(req as any);
     const url = new URL(req.url);
     const endpoint = url.searchParams.get('endpoint');

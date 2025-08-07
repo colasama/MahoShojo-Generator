@@ -21,7 +21,7 @@ const PRESET_LIST: PresetMagicalGirl[] = [
   {
     name: "白百合",
     description: "一位神圣而典雅，宛如圣女的魔法少女。",
-    filename: "魔法少女_代号示例（描述示例）.json"
+    filename: "white_lily.json"
   }
   // 如果有更多预设，可以像下面这样继续添加：
   // {
