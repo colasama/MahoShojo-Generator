@@ -59,7 +59,8 @@ const createNewsReportConfig = (questions: string[], selectedLevel?: string): Ge
 请严格遵守以上战斗规则进行推演，构建一场等级合理、有来有回、充满战术博弈的精彩战斗，而不是一场单纯的能力碾压。
 `,
   temperature: 0.9,
-  promptBuilder: (magicalGirls: any[]) => {
+  promptBuilder: (input: { magicalGirls: any[] }) => {
+    const { magicalGirls } = input;
     const profiles = magicalGirls.map((mg, index) => {
       // isPreset 字段是前端添加的，不需要给 AI
       // 将用户答案和AI生成的其余设定分离开
@@ -171,11 +172,10 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    const questions = questionnaire.questions;
     // 将 selectedLevel 传递给配置生成函数
     const newsReportConfig = createNewsReportConfig(questionnaire.questions, selectedLevel);
     // 将 magicalGirls 传递给 AI 生成函数
-    const aiResult = await generateWithAI(magicalGirls, newsReportConfig);
+    const aiResult = await generateWithAI({ magicalGirls }, newsReportConfig);
 
     const reporterInfo = getRandomJournalist();
 

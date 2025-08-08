@@ -107,7 +107,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div style={{ marginTop: '3rem', textAlign: 'center' }}>
+            <div style={{ marginTop: '2rem', textAlign: 'center' }}>
               <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>
                 设定来源于小说《下班，然后变成魔法少女》
               </p>

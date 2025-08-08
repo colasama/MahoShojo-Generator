@@ -5,7 +5,6 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import { useCooldown } from '../lib/cooldown';
-import QueueStatus from '../components/QueueStatus';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 // 新增：导入 Link 组件，用于页面跳转
 import Link from 'next/link';
@@ -138,7 +137,6 @@ const DetailsPage: React.FC = () => {
   const [showIntroduction, setShowIntroduction] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [showQueueStatus, setShowQueueStatus] = useState(false);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateDetailsCooldown', 60000);
 
   useEffect(() => {
@@ -215,12 +213,10 @@ const DetailsPage: React.FC = () => {
     }
     setSubmitting(true);
     setError(null); // 清除之前的错误
-    setShowQueueStatus(true); // 显示队列状态
     // 检查
     console.log('检查敏感词:', finalAnswers.join(''));
     const result = await quickCheck(finalAnswers.join(''));
     if (result.hasSensitiveWords) {
-      setShowQueueStatus(false);
       router.push('/arrested');
       return;
     }
@@ -273,7 +269,6 @@ const DetailsPage: React.FC = () => {
       }
     } finally {
       setSubmitting(false);
-      setShowQueueStatus(false); // 隐藏队列状态
       startCooldown();
     }
   };
@@ -525,12 +520,12 @@ const DetailsPage: React.FC = () => {
                   <h3 className="text-lg font-medium text-blue-900" style={{ marginBottom: '1rem' }}>保存人物设定</h3>
                   <SaveJsonButton magicalGirlDetails={magicalGirlDetails} answers={answers} />
                   {/* 新增：前往竞技场的入口 */}
-                  <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+                  <div style={{ marginTop: '0.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
                     <p className="text-sm text-gray-600 mb-2">
                       保存好你的设定文件了吗？
                     </p>
-                    <Link href="/battle" className="footer-link" style={{ fontSize: '1.125rem' }}>
-                      前往竞技场，开始战斗！ →
+                    <Link href="/battle" className="footer-link" style={{ color: '#193cb8', fontSize: '1.125rem' }}>
+                      前往竞技场，开始战斗！→
                     </Link>
                   </div>
                 </div>
@@ -586,16 +581,7 @@ const DetailsPage: React.FC = () => {
             </div>
           </div>
         )}
-        
-        {/* 队列状态组件 */}
-        <QueueStatus 
-          endpoint="generate-magical-girl-details"
-          isVisible={showQueueStatus}
-          onComplete={() => {
-            setShowQueueStatus(false);
-            // 可以在这里添加完成后的逻辑
-          }}
-        />
+
       </div>
     </>
   );

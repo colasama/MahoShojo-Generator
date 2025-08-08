@@ -6,7 +6,6 @@ import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import BattleReportCard, { NewsReport } from '../components/BattleReportCard';
-import QueueStatus from '../components/QueueStatus';
 import Link from 'next/link';
 import { PresetMagicalGirl } from './api/get-presets';
 import { StatsData } from './api/get-stats';
@@ -18,12 +17,12 @@ const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule
 
 // 定义可选的战斗等级
 const battleLevels = [
-  { value: '', label: '默认 (AI自动分配)' },
-  { value: '种级', label: '种级 🌱' },
-  { value: '芽级', label: '芽级 🍃' },
-  { value: '叶级', label: '叶级 🌿' },
-  { value: '蕾级', label: '蕾级 🌸' },
-  { value: '花级', label: '花级 🌺' },
+    { value: '', label: '默认 (AI自动分配)' },
+    { value: '种级', label: '种级 🌱' },
+    { value: '芽级', label: '芽级 🍃' },
+    { value: '叶级', label: '叶级 🌿' },
+    { value: '蕾级', label: '蕾级 🌸' },
+    { value: '花级', label: '花级 🌺' },
 ];
 
 const BattlePage: React.FC = () => {
@@ -42,8 +41,6 @@ const BattlePage: React.FC = () => {
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     // 是否显示图片模态框
     const [showImageModal, setShowImageModal] = useState(false);
-    // 是否显示队列状态
-    const [showQueueStatus, setShowQueueStatus] = useState(false);
     // 用于复制粘贴设定文本
     const [pastedJson, setPastedJson] = useState<string>('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
@@ -54,6 +51,9 @@ const BattlePage: React.FC = () => {
 
     const [presets, setPresets] = useState<PresetMagicalGirl[]>([]);
     const [isLoadingPresets, setIsLoadingPresets] = useState(true);
+    // 分页状态
+    const [currentPresetPage, setCurrentPresetPage] = useState(1);
+    const presetsPerPage = 4;
 
     // 状态：用于存储从API获取的统计数据
     const [stats, setStats] = useState<StatsData | null>(null);
@@ -146,12 +146,18 @@ const BattlePage: React.FC = () => {
 
     // 处理选择预设角色的逻辑
     const handleSelectPreset = async (preset: PresetMagicalGirl) => {
-        if (magicalGirls.length >= 4) {
-            setError('最多只能选择 4 位魔法少女参战。');
+        // 如果已经选择，则取消选择
+        if (filenames.includes(preset.filename)) {
+            const filenameIndex = filenames.indexOf(preset.filename);
+            setMagicalGirls(prev => prev.filter((_, index) => index !== filenameIndex));
+            setFilenames(prev => prev.filter(filename => filename !== preset.filename));
+            setError(null);
             return;
         }
-        if (filenames.includes(preset.filename)) {
-            setError(`${preset.name} 已经在战斗列表中了。`);
+
+        // 如果未选择，则进行选择
+        if (magicalGirls.length >= 4) {
+            setError('最多只能选择 4 位魔法少女参战。');
             return;
         }
 
@@ -164,7 +170,7 @@ const BattlePage: React.FC = () => {
             let presetData;
             try {
                 presetData = JSON.parse(fileContent);
-            } catch (jsonError) {
+            } catch {
                 throw new Error(`预设文件 "${preset.name}" 格式错误，无法解析。`);
             }
 
@@ -212,7 +218,7 @@ const BattlePage: React.FC = () => {
                 // 增强：在解析JSON时进行try-catch，提供更友好的错误提示
                 try {
                     json = JSON.parse(text);
-                } catch (parseError) {
+                } catch {
                     throw new Error(`文件 "${file.name}" 的JSON格式有误，无法解析。请检查文件内容。`);
                 }
 
@@ -259,7 +265,7 @@ const BattlePage: React.FC = () => {
             try {
                 // 尝试直接解析
                 parsedData = JSON.parse(text);
-            } catch (e) {
+            } catch {
                 // 如果直接解析失败，尝试修复并解析为数组
                 // 这种方法可以处理多个JSON对象被直接拼接在一起的情况
                 const sanitizedText = `[${text.replace(/}\s*{/g, '},{')}]`;
@@ -320,14 +326,12 @@ const BattlePage: React.FC = () => {
         setIsGenerating(true);
         setError(null);
         setNewsReport(null);
-        setShowQueueStatus(true); // 显示队列状态
 
         try {
             // 安全措施：检查上传内容中的敏感词
             const contentToCheck = JSON.stringify(magicalGirls);
             const checkResult = await quickCheck(contentToCheck);
             if (checkResult.hasSensitiveWords) {
-                setShowQueueStatus(false);
                 router.push('/arrested');
                 return;
             }
@@ -349,7 +353,7 @@ const BattlePage: React.FC = () => {
                     const errorJson = JSON.parse(errorText);
                     // 如果成功，使用JSON中的详细错误信息
                     errorMessage = errorJson.message || errorJson.error || errorMessage;
-                } catch (e) {
+                } catch {
                     // 如果解析失败，说明响应不是JSON格式（可能是HTML错误页）
                     // 此时，我们可以显示一个更通用的消息，或者在开发模式下显示原始文本
                     console.error("收到了非JSON格式的错误响应:", errorText);
@@ -370,7 +374,6 @@ const BattlePage: React.FC = () => {
             }
         } finally {
             setIsGenerating(false);
-            setShowQueueStatus(false); // 隐藏队列状态
         }
     };
 
@@ -411,30 +414,86 @@ const BattlePage: React.FC = () => {
                             {isLoadingPresets ? (
                                 <p className="text-sm text-gray-500">正在加载预设角色...</p>
                             ) : (
-                                // 改为Grid布局以更好地展示描述
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {presets.map(preset => {
-                                        const isSelected = filenames.includes(preset.filename);
-                                        const isDisabled = !isSelected && magicalGirls.length >= 4;
-                                        return (
-                                            <div
-                                                key={preset.filename}
-                                                // 当角色未被选中且队伍未满时，才可点击
-                                                onClick={() => !isSelected && !isDisabled && handleSelectPreset(preset)}
-                                                // 根据状态（已选/禁用/可选）应用不同样式
-                                                className={`p-3 border rounded-lg transition-all duration-200 ${
-                                                    isSelected
-                                                        ? 'bg-purple-200 border-purple-400 cursor-default'
-                                                        : isDisabled
-                                                        ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed'
-                                                        : 'bg-white border-gray-300 hover:border-purple-400 hover:bg-purple-50 cursor-pointer'
-                                                }`}
+                                <div>
+                                    {/* 分页显示的预设角色 */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {(() => {
+                                            const startIndex = (currentPresetPage - 1) * presetsPerPage;
+                                            const endIndex = startIndex + presetsPerPage;
+                                            const currentPagePresets = presets.slice(startIndex, endIndex);
+
+                                            return currentPagePresets.map(preset => {
+                                                const isSelected = filenames.includes(preset.filename);
+                                                const isDisabled = !isSelected && magicalGirls.length >= 4;
+                                                return (
+                                                    <div
+                                                        key={preset.filename}
+                                                        // 允许点击已选择的角色（取消选择）或可选择的角色，但禁用的不能点击
+                                                        onClick={() => !isDisabled && handleSelectPreset(preset)}
+                                                        // 根据状态（已选/禁用/可选）应用不同样式
+                                                        className={`p-3 border rounded-lg transition-all duration-200 ${isSelected
+                                                            ? 'bg-pink-200 border-pink-400 hover:bg-pink-300 cursor-pointer'
+                                                            : isDisabled
+                                                                ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed'
+                                                                : 'bg-white border-gray-300 hover:border-pink-400 hover:bg-pink-50 cursor-pointer'
+                                                            }`}
+                                                    >
+                                                        <p className={`font-semibold ${isSelected ? 'text-pink-900' : 'text-pink-800'}`}>{preset.name}</p>
+                                                        <p className={`text-xs mt-1 ${isSelected ? 'text-pink-800' : 'text-gray-600'}`}>{preset.description}</p>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+
+                                    {/* 分页控件 */}
+                                    {presets.length > presetsPerPage && (
+                                        <div className="flex justify-center items-center mt-4 space-x-2">
+                                            <button
+                                                onClick={() => setCurrentPresetPage(prev => Math.max(prev - 1, 1))}
+                                                disabled={currentPresetPage === 1}
+                                                className={`px-3 py-1 rounded text-sm ${currentPresetPage === 1
+                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+                                                    }`}
                                             >
-                                                <p className={`font-semibold ${isSelected ? 'text-purple-900' : 'text-purple-800'}`}>{preset.name}</p>
-                                                <p className={`text-xs mt-1 ${isSelected ? 'text-purple-800' : 'text-gray-600'}`}>{preset.description}</p>
+                                                上一页
+                                            </button>
+
+                                            <div className="flex space-x-1">
+                                                {(() => {
+                                                    const totalPages = Math.ceil(presets.length / presetsPerPage);
+                                                    const pages = [];
+                                                    for (let i = 1; i <= totalPages; i++) {
+                                                        pages.push(
+                                                            <button
+                                                                key={i}
+                                                                onClick={() => setCurrentPresetPage(i)}
+                                                                className={`px-3 py-1 rounded text-sm ${currentPresetPage === i
+                                                                    ? 'bg-pink-600 text-white'
+                                                                    : 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+                                                                    }`}
+                                                            >
+                                                                {i}
+                                                            </button>
+                                                        );
+                                                    }
+                                                    return pages;
+                                                })()}
                                             </div>
-                                        );
-                                    })}
+
+                                            <button
+                                                onClick={() => setCurrentPresetPage(prev => Math.min(prev + 1, Math.ceil(presets.length / presetsPerPage)))}
+                                                disabled={currentPresetPage === Math.ceil(presets.length / presetsPerPage)}
+                                                className={`px-3 py-1 rounded text-sm ${currentPresetPage === Math.ceil(presets.length / presetsPerPage)
+                                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+                                                    }`}
+                                            >
+                                                下一页
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -457,11 +516,11 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 粘贴设定文本区域 --- */}
                         <div className="mb-6">
-                            <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-sm text-purple-700 hover:underline cursor-pointer mb-2 font-semibold">
+                            <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-pink-700 hover:underline cursor-pointer mb-2 font-semibold">
                                 {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
                             </button>
                             {isPasteAreaVisible && (
-                                <div className="input-group mt-2 p-4 bg-gray-100 rounded-lg">
+                                <div className="input-group mt-2">
                                     <textarea
                                         value={pastedJson}
                                         onChange={(e) => setPastedJson(e.target.value)}
@@ -470,11 +529,10 @@ const BattlePage: React.FC = () => {
                                     />
                                     <button
                                         onClick={handleAddFromPaste}
-                                        disabled={!pastedJson.trim() || isGenerating || magicalGirls.length >=4}
-                                        className="generate-button mt-2"
-                                        style={{ marginBottom: 0, background: 'linear-gradient(45deg, #8e44ad, #9b59b6)' }}
+                                        disabled={!pastedJson.trim() || isGenerating || magicalGirls.length >= 4}
+                                        className="generate-button mt-2 mb-0"
                                     >
-                                        从文本添加
+                                        从文本添加角色
                                     </button>
                                 </div>
                             )}
@@ -482,8 +540,8 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 已选角色列表 --- */}
                         {filenames.length > 0 && (
-                            <div className="mb-4 p-3 bg-gray-200 rounded-lg" style={{ padding: '1rem', marginBottom: '1rem' }}>
-                                <div className="flex justify-between items-center m-0 absolute top-0 right-0">
+                            <div className="mb-4 p-3 bg-gray-200 rounded-lg">
+                                <div className="flex justify-between items-center m-0 top-0 right-0">
                                     <p className="font-semibold text-sm text-gray-700">
                                         已选角色 ({filenames.length}/4):
                                     </p>
@@ -504,20 +562,20 @@ const BattlePage: React.FC = () => {
                         {/* --- 选择平均等级 --- */}
                         <div className="input-group">
                             <label htmlFor="level-select" className="input-label">
-                            指定平均等级 (可选):
+                                指定平均等级 (可选):
                             </label>
                             <select
-                            id="level-select"
-                            value={selectedLevel}
-                            onChange={(e) => setSelectedLevel(e.target.value)}
-                            className="input-field"
-                            style={{ cursor: 'pointer' }}
+                                id="level-select"
+                                value={selectedLevel}
+                                onChange={(e) => setSelectedLevel(e.target.value)}
+                                className="input-field"
+                                style={{ cursor: 'pointer' }}
                             >
-                            {battleLevels.map(level => (
-                                <option key={level.value} value={level.value}>
-                                {level.label}
-                                </option>
-                            ))}
+                                {battleLevels.map(level => (
+                                    <option key={level.value} value={level.value}>
+                                        {level.label}
+                                    </option>
+                                ))}
                             </select>
                             <p className="text-xs text-gray-500 mt-1">默认由 AI 根据角色强度自动分配，以保证战斗平衡和观赏性。</p>
                         </div>
@@ -635,16 +693,6 @@ const BattlePage: React.FC = () => {
                         </div>
                     </div>
                 )}
-
-                {/* 队列状态组件 */}
-                <QueueStatus
-                    endpoint="generate-battle-story"
-                    isVisible={showQueueStatus}
-                    onComplete={() => {
-                        setShowQueueStatus(false);
-                        // 可以在这里添加完成后的逻辑
-                    }}
-                />
             </div>
         </>
     );

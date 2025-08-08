@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import Head from 'next/head';
 import { snapdom } from '@zumer/snapdom';
 // TODO: 从这里引入怪怪的，但是先这样吧！
@@ -237,7 +237,7 @@ export default function Name() {
         // 在桌面端，直接触发下载
         const link = document.createElement('a');
         link.href = imageUrl;
-        link.download = `${magicalGirl.name}.png`; // 使用魔法少女代号作为文件名
+        link.download = `${magicalGirl?.name || 'magical-girl'}.png`; // 使用魔法少女代号作为文件名
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
