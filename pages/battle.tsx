@@ -13,6 +13,9 @@ import { StatsData } from './api/get-stats';
 import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
 
+// 新增：定义魔法少女设定的核心字段，用于验证
+const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule', 'blooming', 'analysis'];
+
 const BattlePage: React.FC = () => {
     const router = useRouter();
     // 存储解析后的魔法少女JSON数据
@@ -99,6 +102,25 @@ const BattlePage: React.FC = () => {
         fetchData();
     }, []);
 
+    // 新增：封装一个验证函数，用于检查JSON对象是否符合基本规范
+    const validateMagicalGirlData = (data: any, filename: string): boolean => {
+        // 兼容 “麻雀” 这类非规范但可用的文件
+        if (data.name && data.construct) {
+            data.codename = data.name; // 补充 codename 字段以供后续使用
+            return true;
+        }
+
+        // 检查所有核心字段是否存在
+        for (const field of CORE_FIELDS) {
+            if (data[field] === undefined) {
+                setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "${field}" 字段。`);
+                return false;
+            }
+        }
+        return true;
+    };
+
+
     // 处理选择预设角色的逻辑
     const handleSelectPreset = async (preset: PresetMagicalGirl) => {
         if (magicalGirls.length >= 4) {
@@ -113,7 +135,20 @@ const BattlePage: React.FC = () => {
         try {
             const response = await fetch(`/presets/${preset.filename}`);
             if (!response.ok) throw new Error(`无法加载 ${preset.name} 的设定文件。`);
-            const presetData = await response.json();
+
+            // 增强：使用 .text() 读取，以防预设文件格式错误
+            const fileContent = await response.text();
+            let presetData;
+            try {
+                presetData = JSON.parse(fileContent);
+            } catch (jsonError) {
+                throw new Error(`预设文件 "${preset.name}" 格式错误，无法解析。`);
+            }
+
+            // 增强：验证预设文件内容
+            if (!validateMagicalGirlData(presetData, preset.name)) {
+                return; // validateMagicalGirlData 内部会设置错误信息
+            }
 
             // 添加 isPreset 标志，用于数据库记录
             presetData.isPreset = true;
@@ -134,11 +169,14 @@ const BattlePage: React.FC = () => {
         const totalSlots = 4 - magicalGirls.length;
         if (files.length > totalSlots) {
             setError(`队伍已满！总人数不能超过4人，你当前还能添加 ${totalSlots} 人。`);
+            // 清空input的值，以便用户能重新选择
+            if (event.target) event.target.value = '';
             return;
         }
 
         const loadedGirls: any[] = [];
         const loadedFilenames: string[] = [];
+        let validationPassed = true;
 
         try {
             for (const file of Array.from(files)) {
@@ -146,17 +184,32 @@ const BattlePage: React.FC = () => {
                     throw new Error(`文件 "${file.name}" 不是有效的 JSON 文件。`);
                 }
                 const text = await file.text();
-                const json = JSON.parse(text);
-                if (!json.codename && !json.name) {
-                    throw new Error(`文件 "${file.name}" 似乎不是一个有效的魔法少女设定。`);
+                let json;
+
+                // 增强：在解析JSON时进行try-catch，提供更友好的错误提示
+                try {
+                    json = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error(`文件 "${file.name}" 的JSON格式有误，无法解析。请检查文件内容。`);
                 }
+
+                // 增强：验证文件内容结构
+                if (!validateMagicalGirlData(json, file.name)) {
+                    validationPassed = false;
+                    break; // 一旦有文件验证失败，就停止处理
+                }
+
                 loadedGirls.push(json);
                 loadedFilenames.push(file.name);
             }
-            // 修正：追加而不是覆盖
-            setMagicalGirls(prev => [...prev, ...loadedGirls]);
-            setFilenames(prev => [...prev, ...loadedFilenames]);
-            setError(null);
+
+            // 只有所有文件都通过验证才更新状态
+            if (validationPassed) {
+                setMagicalGirls(prev => [...prev, ...loadedGirls]);
+                setFilenames(prev => [...prev, ...loadedFilenames]);
+                setError(null);
+            }
+
         } catch (err) {
             if (err instanceof Error) {
                 setError(`❌ 文件读取失败: ${err.message}`);
@@ -164,7 +217,7 @@ const BattlePage: React.FC = () => {
                 setError('❌ 文件读取失败，请确保上传了正确的 JSON 文件。');
             }
         } finally {
-            // 清空input的值
+            // 清空input的值，以便用户可以重新选择相同的文件
             if (event.target) event.target.value = '';
         }
     };
