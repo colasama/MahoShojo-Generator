@@ -471,7 +471,7 @@ const BattlePage: React.FC = () => {
                         {/* --- 已选角色列表 --- */}
                         {filenames.length > 0 && (
                             <div className="mb-4 p-3 bg-gray-200 rounded-lg" style={{ padding: '1rem', marginBottom: '1rem' }}>
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center m-0 absolute top-0 right-0">
                                     <p className="font-semibold text-sm text-gray-700">
                                         已选角色 ({filenames.length}/4):
                                     </p>

@@ -563,7 +563,7 @@ const DetailsPage: React.FC = () => {
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
           >
             <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
-              <div className="flex justify-between items-center m-0">
+              <div className="flex justify-between items-center m-0 absolute top-0 right-0">
                 <div></div>
                 <button
                   onClick={() => setShowImageModal(false)}
