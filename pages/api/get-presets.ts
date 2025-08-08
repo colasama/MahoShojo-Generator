@@ -44,6 +44,11 @@ const PRESET_LIST: PresetMagicalGirl[] = [
     filename: "薄雪·以野兽的心境.json"
   },
   {
+    name: "麻雀",
+    description: "牢雀：正被关在调查院地牢里承受挠痒痒酷刑。",
+    filename: "麻雀·爪痕.json"
+  },
+  {
     name: "玛格丽特",
     description: "调酒师：以情绪为武器的万能‘润滑剂’，张扬自信的调查院前辈。",
     filename: "玛格丽特·酌情热醉.json"
