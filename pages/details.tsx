@@ -166,8 +166,8 @@ const DetailsPage: React.FC = () => {
       return;
     }
 
-    if (currentAnswer.length > 30) {
-      setError('⚠️ 答案不能超过30字');
+    if (currentAnswer.length > 80) {
+      setError('⚠️ 答案不能超过80字');
       return;
     }
 
@@ -399,12 +399,12 @@ const DetailsPage: React.FC = () => {
                   <textarea
                     value={currentAnswer}
                     onChange={(e) => setCurrentAnswer(e.target.value)}
-                    placeholder="请输入您的答案（不超过30字）"
+                    placeholder="请输入您的答案（不超过80字）"
                     className="input-field resize-none h-24"
-                    maxLength={30}
+                    maxLength={80}
                   />
                   <div className="text-right text-sm text-gray-500" style={{ marginTop: '-2rem', marginRight: '0.5rem' }}>
-                    {currentAnswer.length}/30
+                    {currentAnswer.length}/80
                   </div>
                 </div>
 
