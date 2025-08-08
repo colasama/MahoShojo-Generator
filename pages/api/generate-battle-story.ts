@@ -216,8 +216,16 @@ async function handler(req: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    log.error('生成新闻报道失败:', { error });
+    // --- 核心修改：增强日志记录 ---
     const errorMessage = error instanceof Error ? error.message : '未知错误';
+
+    // 记录完整的错误对象，包括堆栈信息，而不仅仅是消息字符串
+    log.error('生成新闻报道时发生顶层错误', {
+        error, // 这会包含堆栈等详细信息
+        errorMessage: errorMessage
+    });
+    // --- 修改结束 ---
+
     return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

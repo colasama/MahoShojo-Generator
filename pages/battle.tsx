@@ -265,19 +265,31 @@ const BattlePage: React.FC = () => {
                 body: JSON.stringify({ magicalGirls }),
             });
 
+            // --- 核心修改：增强错误处理 ---
             if (!response.ok) {
-                const errorData = await response.json();
-                // 优化错误提示，告知用户可能是服务器繁忙
-                if (response.status >= 500) {
-                    throw new Error('服务器繁忙，请稍后再试。');
+                // 首先，尝试将响应体作为文本读取
+                const errorText = await response.text();
+                let errorMessage = `服务器返回了错误 (状态码: ${response.status})。`;
+
+                try {
+                    // 尝试将文本解析为JSON
+                    const errorJson = JSON.parse(errorText);
+                    // 如果成功，使用JSON中的详细错误信息
+                    errorMessage = errorJson.message || errorJson.error || errorMessage;
+                } catch (e) {
+                    // 如果解析失败，说明响应不是JSON格式（可能是HTML错误页）
+                    // 此时，我们可以显示一个更通用的消息，或者在开发模式下显示原始文本
+                    console.error("收到了非JSON格式的错误响应:", errorText);
+                    errorMessage = '服务器响应异常，可能是服务暂时不可用，请稍后再试。';
                 }
-                throw new Error(errorData.message || errorData.error || '生成失败');
+                throw new Error(errorMessage);
             }
 
             const result: NewsReport = await response.json();
             setNewsReport(result);
             startCooldown();
         } catch (err) {
+            // 现在的 catch 块可以捕获到更明确的错误信息
             if (err instanceof Error) {
                 setError(`✨ 魔法失效了！${err.message}`);
             } else {
