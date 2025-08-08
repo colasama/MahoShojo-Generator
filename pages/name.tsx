@@ -226,8 +226,22 @@ export default function Name() {
       // toPng() 返回 Promise<HTMLImageElement>，可通过 .src 获取图片的 base64 url
       const imgElement = await result.toPng();
       const imageUrl = imgElement.src;
-      setSavedImageUrl(imageUrl);
-      setShowImageModal(true);
+
+      const isMobileDevice = /Mobi/i.test(window.navigator.userAgent);
+
+      if (isMobileDevice) {
+        // 在移动端，显示弹窗供用户长按保存
+        setSavedImageUrl(imageUrl);
+        setShowImageModal(true);
+      } else {
+        // 在桌面端，直接触发下载
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = `${magicalGirl.name}.png`; // 使用魔法少女代号作为文件名
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch {
       alert('生成图片失败，请重试');
       // 确保在失败时也恢复按钮显示
