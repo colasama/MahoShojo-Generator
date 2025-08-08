@@ -1,7 +1,7 @@
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { z } from 'zod';
 import { getRandomFlowers } from '../../lib/random-choose-hana-name';
-import { saveToD1 } from '../../lib/d1';
+// import { saveToD1 } from '../../lib/d1';
 import { getLogger } from '../../lib/logger';
 
 const log = getLogger('api-gen-details');
