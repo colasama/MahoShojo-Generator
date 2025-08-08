@@ -70,12 +70,12 @@ const PRESET_LIST: PresetMagicalGirl[] = [
   },
   {
     name: "艾草",
-    description: "圣地巡礼：言出法随的靠谱魔法少女，能将记录的话语化为力量。",
+    description: "言出必行：言出法随的靠谱魔法少女，能将记录的话语化为力量。",
     filename: "mugwort.json"
   },
   {
     name: "向日葵",
-    description: "圣地巡礼：追逐大新闻的乐子人，能将照片中的景象再现。",
+    description: "旧景重现：追逐大新闻的乐子人，能将照片中的景象再现。",
     filename: "sunflower.json"
   }
   // 如果有更多预设，可以像下面这样继续添加：
