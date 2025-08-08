@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { useRouter } from 'next/router';
+import TachieGenerator from '../components/TachieGenerator';
 
 // 注意：QueueStatus 组件及其相关逻辑已被移除，因为它在Serverless环境下无法正常工作。
 
@@ -397,12 +398,20 @@ export default function Name() {
                 </div>
               </div>
             )}
-            <div className="text-center w-full text-sm text-gray-500" style={{ marginTop: '8px' }}> 立绘生成功能开发中（大概）... </div>
+
+            {magicalGirl && (
+              <div className="text-center w-full" style={{ marginTop: '2rem' }}>
+                <h3 className="text-lg font-medium text-gray-900" style={{ marginBottom: '1rem' }}>立绘生成</h3>
+                <TachieGenerator
+                  prompt={`${JSON.stringify(magicalGirl.appearance)} , Xiabanmo, 二次元, 魔法少女`}
+                />
+              </div>
+            )}
           </div>
 
           <footer className="footer">
             <p>
-                竞技场、问卷与系统设计 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
+              竞技场、问卷与系统设计 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
             </p>
             <p>
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
