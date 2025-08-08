@@ -2,8 +2,6 @@ import { z } from "zod";
 import { generateWithAI, GenerationConfig } from "../../lib/ai";
 import { config as appConfig } from "../../lib/config";
 import { MainColor } from "../../lib/main-color";
-import { magicalGirlQueue } from "../../lib/queue-system";
-import { getClientIP } from "../../lib/rate-limiter";
 import { getLogger } from "../../lib/logger";
 
 const log = getLogger('api-gen-girl');
@@ -62,6 +60,11 @@ export async function generateMagicalGirlWithAI(
   return generateWithAI(realName, magicalGirlGenerationConfig);
 }
 
+// 处理器重构：
+// 移除了队列和速率限制系统。该系统基于内存，在Serverless/Edge环境中无法正确共享状态，
+// 导致功能失效并错误地拦截了前端的轮询请求。
+// 现在，请求将直接、异步地调用AI生成函数。
+// 并发和负载管理将由 `ai.ts` 中更强大的多提供商故障转移和重试逻辑来处理。
 async function handler(
   req: Request
 ): Promise<Response> {
@@ -72,7 +75,7 @@ async function handler(
     });
   }
 
-  const { name, persistenceKey } = await req.json();
+  const { name } = await req.json();
 
   if (!name || typeof name !== 'string') {
     return new Response(JSON.stringify({ error: 'Name is required' }), {
@@ -82,18 +85,8 @@ async function handler(
   }
 
   try {
-    const ip = getClientIP(req as any);
-
-    // 添加到队列并等待处理
-    const magicalGirl = await magicalGirlQueue.addToQueue(
-      'generate-magical-girl',
-      { name: name.trim() },
-      ip,
-      async () => {
-        return await generateMagicalGirlWithAI(name.trim());
-      },
-      persistenceKey
-    );
+    // 直接调用AI生成，不再入队
+    const magicalGirl = await generateMagicalGirlWithAI(name.trim());
 
     return new Response(JSON.stringify(magicalGirl), {
       status: 200,

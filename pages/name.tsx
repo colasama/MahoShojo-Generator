@@ -8,7 +8,8 @@ import Link from 'next/link';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { useRouter } from 'next/router';
-import QueueStatus from '../components/QueueStatus';
+
+// 注意：QueueStatus 组件及其相关逻辑已被移除，因为它在Serverless环境下无法正常工作。
 
 interface MagicalGirl {
   realName: string;
@@ -85,19 +86,19 @@ function checkNameLength(name: string): boolean {
 }
 
 // 使用 API 路由生成魔法少女
-async function generateMagicalGirl(inputName: string, persistenceKey?: string): Promise<MagicalGirl> {
+async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
   try {
     const response = await fetch('/api/generate-magical-girl', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name: inputName, persistenceKey }),
+      // 移除 persistenceKey，因为它依赖于已删除的队列系统
+      body: JSON.stringify({ name: inputName }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-
       // 处理不同的 HTTP 状态码
       if (response.status === 429) {
         const retryAfter = error.retryAfter || 60;
@@ -137,7 +138,6 @@ async function generateMagicalGirl(inputName: string, persistenceKey?: string): 
         throw error;
       }
     }
-
     // 处理网络连接错误
     if (error instanceof TypeError && error.message.includes('fetch')) {
       throw new Error('网络连接失败，请检查网络后重试');
@@ -155,23 +155,9 @@ export default function Name() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showQueueStatus, setShowQueueStatus] = useState(false);
-  const [persistenceKey, setPersistenceKey] = useState<string>('');
   const resultRef = useRef<HTMLDivElement>(null);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateMagicalGirlCooldown', 60000);
   const router = useRouter();
-
-  // 初始化持久化键
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      let key = localStorage.getItem('queuePersistenceKey');
-      if (!key) {
-        key = `queue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('queuePersistenceKey', key);
-      }
-      setPersistenceKey(key);
-    }
-  }, []);
 
   const handleGenerate = async () => {
     if (isCooldown) {
@@ -191,18 +177,15 @@ export default function Name() {
       return;
     }
     setIsGenerating(true);
-    setError(null); // 清除之前的错误
-    setShowQueueStatus(true); // 显示队列状态
+    setError(null);
 
     try {
-      const result = await generateMagicalGirl(inputName.trim(), persistenceKey);
+      const result = await generateMagicalGirl(inputName.trim());
       setMagicalGirl(result);
       setError(null); // 成功时清除错误
     } catch (error) {
-      // 处理不同类型的错误
       if (error instanceof Error) {
         const errorMessage = error.message;
-
         // 检查是否是 rate limit 错误
         if (errorMessage.includes('请求过于频繁')) {
           setError('🚫 请求太频繁了！每2分钟只能生成一次魔法少女哦~请稍后再试吧！');
@@ -216,7 +199,6 @@ export default function Name() {
       }
     } finally {
       setIsGenerating(false);
-      setShowQueueStatus(false); // 隐藏队列状态
       startCooldown();
     }
   };
@@ -374,7 +356,6 @@ export default function Name() {
                     📱 保存为图片
                   </button>
 
-                  {/* Logo placeholder for saved images */}
                   <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>
                     <img
                       src="/logo-white-qrcode.svg"
@@ -413,7 +394,6 @@ export default function Name() {
           </footer>
         </div>
 
-        {/* Image Modal */}
         {showImageModal && savedImageUrl && (
           <div className="fixed inset-0 bg-black flex items-center justify-center z-50"
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
@@ -442,17 +422,6 @@ export default function Name() {
             </div>
           </div>
         )}
-        
-        {/* 队列状态组件 */}
-        <QueueStatus 
-          endpoint="generate-magical-girl"
-          isVisible={showQueueStatus}
-          persistenceKey={persistenceKey}
-          onComplete={() => {
-            setShowQueueStatus(false);
-            // 可以在这里添加完成后的逻辑
-          }}
-        />
       </div>
     </>
   );

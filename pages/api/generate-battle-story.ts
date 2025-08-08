@@ -4,10 +4,7 @@ import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { queryFromD1 } from '../../lib/d1';
 import { getLogger } from '../../lib/logger';
-import { battleHistoryQueue } from '../../lib/queue-system';
-import { getClientIP } from '../../lib/rate-limiter';
 import questionnaire from '../../public/questionnaire.json';
-// 导入新的记者抽取函数
 import { getRandomJournalist } from '../../lib/random-choose-journalist';
 
 const log = getLogger('api-gen-battle-story');
@@ -164,59 +161,37 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // 获取客户端IP
-    const ip = getClientIP(req as any);
+    const questions = questionnaire.questions;
+    const newsReportConfig = createNewsReportConfig(questions);
 
-    // 生成持久化键
-    const persistenceKey = `battle_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    // 直接调用AI生成
+    const aiResult = await generateWithAI(magicalGirls, newsReportConfig);
 
-    // 将请求添加到队列中
-    const newsReport = await battleHistoryQueue.addToQueue(
-      'generate-battle-story',
-      { magicalGirls },
-      ip,
-      async () => {
-        // 从导入的JSON中获取问卷问题
-        const questions = questionnaire.questions;
+    const reporterInfo = getRandomJournalist();
 
-        // 生成新闻报道
-        const newsReportConfig = createNewsReportConfig(questions);
-        const result = await generateWithAI(magicalGirls, newsReportConfig);
-
-        // 在返回结果前，异步更新数据库，不阻塞对用户的响应
-        // 1. AI生成核心内容
-        const aiResult = await generateWithAI(magicalGirls, newsReportConfig);
-
-        // 2. 在代码中抽取记者和媒体信息
-        const reporterInfo = getRandomJournalist();
-
-        // 3. 将AI结果和代码抽取的结果合并成完整报告
-        const fullReport: NewsReport = {
-          ...aiResult,
-          reporterInfo: {
-            name: reporterInfo.name,
-            publication: reporterInfo.publication,
-          },
-        };
-
-        const updatePromise = updateBattleStats(fullReport.officialReport.winner, magicalGirls);
-
-        const executionContext = (req as any).context;
-        if (executionContext && typeof executionContext.waitUntil === 'function') {
-          executionContext.waitUntil(updatePromise);
-        }
-
-        return fullReport;
+    const fullReport: NewsReport = {
+      ...aiResult,
+      reporterInfo: {
+        name: reporterInfo.name,
+        publication: reporterInfo.publication,
       },
-      persistenceKey
-    );
+    };
 
-    return new Response(JSON.stringify(newsReport), {
+    // 异步更新数据库，不阻塞对用户的响应
+    const updatePromise = updateBattleStats(fullReport.officialReport.winner, magicalGirls);
+    const executionContext = (req as any).context;
+    if (executionContext && typeof executionContext.waitUntil === 'function') {
+      executionContext.waitUntil(updatePromise);
+    } else {
+      updatePromise.catch(err => log.error('更新战斗统计失败（非阻塞）', err));
+    }
+
+    return new Response(JSON.stringify(fullReport), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    // --- 核心修改：增强日志记录 ---
+    // --- 增强日志记录 ---
     const errorMessage = error instanceof Error ? error.message : '未知错误';
 
     // 记录完整的错误对象，包括堆栈信息，而不仅仅是消息字符串
@@ -224,7 +199,6 @@ async function handler(req: Request): Promise<Response> {
         error, // 这会包含堆栈等详细信息
         errorMessage: errorMessage
     });
-    // --- 修改结束 ---
 
     return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,

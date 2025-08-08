@@ -1,11 +1,8 @@
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { z } from 'zod';
 import { getRandomFlowers } from '../../lib/random-choose-hana-name';
-import { magicalGirlDetailsQueue } from '../../lib/queue-system';
-import { getClientIP } from '../../lib/rate-limiter';
 import { saveToD1 } from '../../lib/d1';
 import { getLogger } from '../../lib/logger';
-// import { MainColor } from '../../lib/main-color';
 
 const log = getLogger('api-gen-details');
 
@@ -53,7 +50,6 @@ const MagicalGirlDetailsSchema = z.object({
 type MagicalGirlDetails = z.infer<typeof MagicalGirlDetailsSchema>;
 
 // 配置详细信息生成
-// TODO: 或许可以直接从 questionnaire.json 中读取问题，然后根据问题生成系统提示
 const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> = {
   systemPrompt: `现在如果你是魔法国度的妖精，你准备通过问卷调查的形式，事先通过问卷结果分析某人成为魔法少女后的能力等各项素质。魔法少女的性格倾向、经历背景、行事准则等等都会影响到她们在魔法少女道路上的潜力和表现。
 以下是一位潜在魔法少女对问卷所给出的回答（对方可以不回答某些问题），请你据此预测她成为魔法少女后的情况。
@@ -74,7 +70,7 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
 14.你在执行任务时更倾向计划周密还是依赖直觉？
 15.你人生中最难忘的一个瞬间是什么？
 16.有没有一个你至今仍然后悔的决定？你现在会怎么做？
- 
+
 你需要严格按照提供的 JSON schema 格式返回你的预测结果和相应的解释内容，结果中的内容解释如下。
 1.魔力构装（简称魔装）：魔法少女的本相魔力所孕育的能力具现，是魔法少女能力体系的基础。一般呈现为魔法少女在现实生活中接触过，在冥冥之中与其命运关联或映射的物体，并且与魔法少女特色能力相关。例如，泡泡机形态的魔装可以使魔法少女制造魔法泡泡，而这些泡泡可以拥有产生幻象、缓冲防护、束缚困敌等能力。这部分的内容需包含魔装的名字（通常为2字词），魔装的形态，魔装的基本能力。
 2.奇境规则：魔法少女的本相灵魂所孕育的能力，是魔装能力的一体两面。奇境是魔装能力在规则层面上的升华，体现为与魔装相关的规则领域，而规则的倾向则会根据魔法少女的倾向而有不同的发展。例如，泡泡机形态的魔装升华而来的奇境规则可以是倾向于守护的“戳破泡泡的东西将会立即无效化”，也可以是倾向于进攻的“沾到身上的泡泡被戳破会立即遭受伤害”。
@@ -93,6 +89,10 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
   maxTokens: 8192,
 }
 
+// 处理器重构：
+// 移除了队列和速率限制系统。该系统基于内存，在Serverless/Edge环境中无法正确共享状态，
+// 导致功能失效并错误地拦截了前端的轮询请求。
+// 现在，请求将直接、异步地调用AI生成函数。
 async function handler(
   req: Request
 ): Promise<Response> {
@@ -103,7 +103,7 @@ async function handler(
     });
   }
 
-  const { answers, persistenceKey } = await req.json();
+  const { answers } = await req.json();
 
   if (!answers || !Array.isArray(answers) || answers.length === 0) {
     return new Response(JSON.stringify({ error: 'Answers array is required' }), {
@@ -129,29 +129,24 @@ async function handler(
   }
 
   try {
-    const ip = getClientIP(req as any);
+    // 直接调用AI生成，不再入队
+    const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
 
-    // 添加到队列并等待处理
-    const magicalGirlDetails = await magicalGirlDetailsQueue.addToQueue(
-      'generate-magical-girl-details',
-      { answers },
-      ip,
-      async () => {
-        return await generateWithAI(answers, magicalGirlDetailsConfig);
-      },
-      persistenceKey
-    );
-
-    // 保存到D1数据库
-    const result = await saveToD1(JSON.stringify({
+    // 异步保存到D1数据库，不阻塞对用户的响应
+    const saveData = {
       ...magicalGirlDetails,
       answers: answers
-    }));
-    if (!result) {
-      log.error('保存到 D1 数据库失败');
+    };
+
+    // 在Edge环境中，可以使用executionContext.waitUntil来确保异步任务完成
+    const executionContext = (req as any).context;
+    if (executionContext && typeof executionContext.waitUntil === 'function') {
+      executionContext.waitUntil(saveToD1(saveData));
     } else {
-      log.info('保存到 D1 数据库成功');
+      // 在非Edge环境中，直接调用（不等待完成）
+      saveToD1(saveData).catch(err => log.error('保存到D1失败（非阻塞）', err));
     }
+
     return new Response(JSON.stringify(magicalGirlDetails), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
