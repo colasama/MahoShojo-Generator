@@ -1,45 +1,71 @@
 @import "tailwindcss";
 
-* {
+/* 使用CSS层来控制优先级，确保Tailwind类优先 */
+@layer base {
+  * {
     box-sizing: border-box;
-    padding: 0;
+  }
+  
+  /* 只重置基础元素的margin和padding */
+  html, body {
     margin: 0;
+    padding: 0;
+  }
+  
+  /* 重置其他基础元素，但避免影响组件 */
+  h1, h2, h3, h4, h5, h6, p, blockquote, pre, ul, ol, li, figure, figcaption, dl, dt, dd {
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html,
 body {
-    max-width: 100vw;
-    overflow-x: hidden;
-    font-family: 'Arial', sans-serif;
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: 'Arial', sans-serif;
 }
 
 body {
-    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-    min-height: 100vh;
-}
-
-a {
-    color: inherit;
-    text-decoration: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  min-height: 100vh;
 }
 
 @media (prefers-color-scheme: dark) {
-    html {
-        color-scheme: dark;
-    }
+  html {
+    color-scheme: dark;
+  }
 }
 
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
 
-/* 蓝色主题样式 - 只在 .blue-theme 容器内生效 */
+.card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  margin-top: 100px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  max-width: 500px;
+}
 
-.blue-theme .magic-background {
+@layer components {
+  /* 蓝色主题样式 - 只在 .blue-theme 容器内生效 */
+  .blue-theme .magic-background {
     background: linear-gradient(45deg, #4f46e5 0%, #7c3aed 50%, #3b82f6 100%);
     min-height: 100vh;
     position: relative;
     overflow: hidden;
-}
+  }
 
-.magic-background::before {
+  .magic-background::before {
     content: '';
     position: absolute;
     top: 0;
@@ -49,37 +75,19 @@ a {
     background-image: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.2) 2px, transparent 2px), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.15) 1px, transparent 1px), radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
     background-size: 50px 50px, 30px 30px, 40px 40px;
     animation: sparkle 6s ease-in-out infinite;
-}
+  }
 
-@keyframes sparkle {
+  @keyframes sparkle {
     0%,
     100% {
-        opacity: 1;
+      opacity: 1;
     }
     50% {
-        opacity: 0.7;
+      opacity: 0.7;
     }
-}
+  }
 
-.container {
-    max-width: 500px;
-    margin: 0 auto;
-    padding: 20px;
-    position: relative;
-    z-index: 1;
-}
-
-.card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    margin-top: 100px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.blue-theme .title {
+  .blue-theme .title {
     text-align: center;
     font-size: 2rem;
     font-weight: bold;
@@ -88,20 +96,20 @@ a {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     margin-bottom: 30px;
-}
+  }
 
-.input-group {
+  .input-group {
     margin-bottom: 20px;
-}
+  }
 
-.input-label {
+  .input-label {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
     color: #555;
-}
+  }
 
-.input-field {
+  .input-field {
     width: 100%;
     padding: 15px;
     border: 2px solid #e0e0e0;
@@ -110,15 +118,15 @@ a {
     font-size: 16px;
     transition: all 0.3s ease;
     background: rgba(255, 255, 255, 0.8);
-}
+  }
 
-.blue-theme .input-field:focus {
+  .blue-theme .input-field:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
+  }
 
-.blue-theme .generate-button {
+  .blue-theme .generate-button {
     width: 100%;
     padding: 15px;
     background: linear-gradient(45deg, #3b82f6, #1d4ed8);
@@ -130,20 +138,20 @@ a {
     cursor: pointer;
     transition: all 0.3s ease;
     margin-bottom: 20px;
-}
+  }
 
-.blue-theme .generate-button:hover {
+  .blue-theme .generate-button:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
-}
+  }
 
-.generate-button:disabled {
+  .generate-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
-}
+  }
 
-.blue-theme .result-card {
+  .blue-theme .result-card {
     background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
     color: white;
     border-radius: 15px;
@@ -151,9 +159,9 @@ a {
     margin-top: 20px;
     position: relative;
     overflow: hidden;
-}
+  }
 
-.result-card::before {
+  .result-card::before {
     content: '';
     position: absolute;
     top: 0;
@@ -162,51 +170,51 @@ a {
     bottom: 0;
     background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="25" cy="25" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1.5" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="20" r="1" fill="rgba(255,255,255,0.1)"/></svg>');
     background-size: 100px 100px;
-}
+  }
 
-.title-container {
+  .title-container {
     display: flex;
     justify-content: center;
     align-items: center;
     margin-bottom: 1rem;
     background: transparent;
-}
+  }
 
-.result-content {
+  .result-content {
     position: relative;
     z-index: 1;
-}
+  }
 
-.result-item {
+  .result-item {
     margin-bottom: 20px;
     padding: 15px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     backdrop-filter: blur(5px);
-}
+  }
 
-.result-label {
+  .result-label {
     font-weight: bold;
     font-size: 14px;
     opacity: 0.9;
     margin-bottom: 5px;
-}
+  }
 
-.result-value {
+  .result-value {
     font-size: 16px;
     line-height: 1.5;
-}
+  }
 
-.level-badge {
+  .level-badge {
     display: inline-block;
     padding: 8px 16px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 20px;
     font-weight: bold;
     font-size: 18px;
-}
+  }
 
-.save-button {
+  .save-button {
     width: 100%;
     padding: 12px;
     background: rgba(255, 255, 255, 0.2);
@@ -217,18 +225,18 @@ a {
     cursor: pointer;
     transition: all 0.3s ease;
     margin-top: 15px;
-}
+  }
 
-.save-button:hover {
+  .save-button:hover {
     background: rgba(255, 255, 255, 0.3);
-}
+  }
 
-.save-instructions {
+  .save-instructions {
     text-align: center;
     margin-top: 10px;
     font-size: 12px;
     opacity: 0.8;
-}
+  }
 
 @media (max-width: 600px) {
     .container {
@@ -242,15 +250,15 @@ a {
     }
 }
 
-.subtitle {
+  .subtitle {
     text-align: center;
     font-size: 1rem;
     color: #666;
     margin-bottom: 25px;
     font-style: italic;
-}
+  }
 
-.blue-theme .error-message {
+  .blue-theme .error-message {
     background: linear-gradient(135deg, #3b82f6, #1d4ed8);
     color: white;
     padding: 15px;
@@ -259,35 +267,47 @@ a {
     text-align: center;
     font-weight: 500;
     animation: fadeIn 0.3s ease-in-out;
-}
+  }
 
-@keyframes fadeIn {
+  @keyframes fadeIn {
     from {
-        opacity: 0;
-        transform: translateY(-10px);
+      opacity: 0;
+      transform: translateY(-10px);
     }
     to {
-        opacity: 1;
-        transform: translateY(0);
+      opacity: 1;
+      transform: translateY(0);
     }
-}
+  }
 
-.footer {
+  .footer {
     text-align: center;
     padding: 20px 0;
     margin-top: 30px;
     color: #666;
     font-size: 14px;
-}
+  }
 
-.blue-theme .footer-link {
+  .blue-theme .footer-link {
     color: #abcbff;
     font-weight: 600;
     text-decoration: none;
     transition: all 0.3s ease;
-}
+  }
 
-.blue-theme .footer-link:hover {
+  .blue-theme .footer-link:hover {
     color: #8298d6;
     text-decoration: underline;
+  }
+}
+@media (max-width: 600px) {
+  .container {
+    padding: 15px;
+  }
+  .card {
+    padding: 20px;
+  }
+  .blue-theme .title {
+    font-size: 1.5rem;
+  }
 }

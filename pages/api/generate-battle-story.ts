@@ -2,12 +2,10 @@
 
 import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
-import { queryFromD1 } from '../../lib/d1'; // 导入 D1 查询函数
+import { queryFromD1 } from '../../lib/d1';
 import { getLogger } from '../../lib/logger';
-import { battleHistoryQueue } from '../../lib/queue-system';
-import { getClientIP } from '../../lib/rate-limiter';
-// 直接导入问卷JSON文件，而不是在运行时fetch
 import questionnaire from '../../public/questionnaire.json';
+import { getRandomJournalist } from '../../lib/random-choose-journalist';
 
 const log = getLogger('api-gen-battle-story');
 
@@ -15,27 +13,24 @@ export const config = {
   runtime: 'edge',
 };
 
-// 定义AI响应的Zod schema - 已从战斗故事更新为新闻报道
-const NewsReportSchema = z.object({
+// 为 AI 定义一个更专注的核心 Schema，不再包含记者信息
+const BattleReportCoreSchema = z.object({
   headline: z.string().describe("本场比赛的新闻标题，可以使用震惊体等技巧来吸引读者。"),
-  reporterInfo: z.object({
-    name: z.string().describe("一位虚构的新闻记者的名字，如果是魔法少女则应当按照格式：“花名”。"),
-    publication: z.string().describe("一个虚构的、听起来像是魔法少女世界观下的新闻媒体或自媒体的名称（例如：国度日报、祖母绿周刊、卢恩诺雷每日速报）。")
-  }),
   article: z.object({
     body: z.string().describe("战斗简报的正文。"),
     analysis: z.string().describe("记者的分析与猜测。这部分内容可以带有记者的主观色彩，看热闹不嫌事大，进行一些有逻辑但可能不完全真实的猜测和引申，制造“爆点”，字数约100-150字。")
   }),
   officialReport: z.object({
-    winner: z.string().describe("记者观察到的胜利者的魔法少女代号。如果是平局，则返回'平局'。"),
+    winner: z.string().describe("胜利者的魔法少女代号。如果是平局，则返回'平局'。"),
     impact: z.string().describe("对本次事件的总结点评，描述战斗带来的最终影响，包括对参战者和比赛的后续影响。"),
   })
 });
 
-type NewsReport = z.infer<typeof NewsReportSchema>;
+// 从组件中导入的类型，用于最终返回给前端的完整数据结构
+import { NewsReport } from '../../components/BattleReportCard';
 
-// 定义生成配置 - 已更新为新闻报道
-const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsReport, any[]> => ({
+// AI 生成配置现在只关注核心内容生成
+const createNewsReportConfig = (questions: string[], selectedLevel?: string): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[] }> => ({
   systemPrompt: `
   现在魔法少女在 A.R.E.N.A. 也就是 Awakened Rune Enchantress Nova Arena 中展开竞技性的战斗，请根据以下规则生成战斗简报：
   战斗推演核心规则：
@@ -64,7 +59,8 @@ const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsRepor
 请严格遵守以上战斗规则进行推演，构建一场等级合理、有来有回、充满战术博弈的精彩战斗，而不是一场单纯的能力碾压。
 `,
   temperature: 0.9,
-  promptBuilder: (magicalGirls: any[]) => {
+  promptBuilder: (input: { magicalGirls: any[] }) => {
+    const { magicalGirls } = input;
     const profiles = magicalGirls.map((mg, index) => {
       // isPreset 字段是前端添加的，不需要给 AI
       // 将用户答案和AI生成的其余设定分离开
@@ -84,13 +80,21 @@ const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsRepor
         }).join('\n');
         profileString += qaBlock;
       }
-
       return profileString;
     }).join('\n\n');
 
-    return `这是本次对战的魔法少女们的情报信息。每个角色包含【角色核心设定】和【问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n请根据以上设定，创作她们之间的冲突新闻稿。`;
+    // 根据 selectedLevel 是否存在，构建不同的最终指令
+    let finalPrompt = `这是本次对战的魔法少女们的情报信息。每个角色包含【角色核心设定】和【问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n`;
+
+    if (selectedLevel && selectedLevel.trim() !== '') {
+      finalPrompt += `注意：请将本次战斗的参与者的平均等级设定为【${selectedLevel}】，并严格根据该等级的能力限制进行战斗推演和描述。`;
+    } else {
+      finalPrompt += `请根据以上设定，创作她们之间的冲突新闻稿。`;
+    }
+
+    return finalPrompt;
   },
-  schema: NewsReportSchema,
+  schema: BattleReportCoreSchema,
   taskName: "生成魔法少女新闻报道",
   maxTokens: 8192,
 });
@@ -128,7 +132,7 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
           'UPDATE characters SET losses = losses + 1, participations = participations + 1 WHERE name = ?;',
           [name]
         );
-      } else { // 平局情况
+      } else {
         await queryFromD1(
           'UPDATE characters SET participations = participations + 1 WHERE name = ?;',
           [name]
@@ -149,7 +153,6 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
   }
 }
 
-
 async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -159,7 +162,8 @@ async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { magicalGirls } = await req.json();
+    // 从请求体中解构出 magicalGirls 和 selectedLevel
+    const { magicalGirls, selectedLevel } = await req.json();
 
     if (!Array.isArray(magicalGirls) || magicalGirls.length < 2 || magicalGirls.length > 6) {
       return new Response(JSON.stringify({ error: '必须提供2到6个魔法少女的设定' }), {
@@ -168,46 +172,44 @@ async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // 获取客户端IP
-    const ip = getClientIP(req as any);
+    // 将 selectedLevel 传递给配置生成函数
+    const newsReportConfig = createNewsReportConfig(questionnaire.questions, selectedLevel);
+    // 将 magicalGirls 传递给 AI 生成函数
+    const aiResult = await generateWithAI({ magicalGirls }, newsReportConfig);
 
-    // 生成持久化键
-    const persistenceKey = `battle_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    const reporterInfo = getRandomJournalist();
 
-    // 将请求添加到队列中
-    const newsReport = await battleHistoryQueue.addToQueue(
-      'generate-battle-story',
-      { magicalGirls },
-      ip,
-      async () => {
-        // 从导入的JSON中获取问卷问题
-        const questions = questionnaire.questions;
-
-        // 生成新闻报道
-        const newsReportConfig = createNewsReportConfig(questions);
-        const result = await generateWithAI(magicalGirls, newsReportConfig);
-
-        // 在返回结果前，异步更新数据库，不阻塞对用户的响应
-        const updatePromise = updateBattleStats(result.officialReport.winner, magicalGirls);
-
-        // 在 Cloudflare Workers/Pages 环境下, 可以将 promise 传递给 waitUntil 以确保其在请求结束后仍能执行完成
-        const executionContext = (req as any).context;
-        if (executionContext && typeof executionContext.waitUntil === 'function') {
-          executionContext.waitUntil(updatePromise);
-        }
-
-        return result;
+    const fullReport: NewsReport = {
+      ...aiResult,
+      reporterInfo: {
+        name: reporterInfo.name,
+        publication: reporterInfo.publication,
       },
-      persistenceKey
-    );
+    };
 
-    return new Response(JSON.stringify(newsReport), {
+    // 异步更新数据库，不阻塞对用户的响应
+    const updatePromise = updateBattleStats(fullReport.officialReport.winner, magicalGirls);
+    const executionContext = (req as any).context;
+    if (executionContext && typeof executionContext.waitUntil === 'function') {
+      executionContext.waitUntil(updatePromise);
+    } else {
+      updatePromise.catch(err => log.error('更新战斗统计失败（非阻塞）', err));
+    }
+
+    return new Response(JSON.stringify(fullReport), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    log.error('生成新闻报道失败:', { error });
+    // --- 增强日志记录 ---
     const errorMessage = error instanceof Error ? error.message : '未知错误';
+
+    // 记录完整的错误对象，包括堆栈信息，而不仅仅是消息字符串
+    log.error('生成新闻报道时发生顶层错误', {
+        error, // 这会包含堆栈等详细信息
+        errorMessage: errorMessage
+    });
+
     return new Response(JSON.stringify({ error: '生成失败，当前服务器可能正忙，请稍后重试', message: errorMessage }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

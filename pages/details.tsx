@@ -1,10 +1,13 @@
+// pages/details.tsx
+
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import { useCooldown } from '../lib/cooldown';
-import QueueStatus from '../components/QueueStatus';
 import { quickCheck } from '@/lib/sensitive-word-filter';
+// 新增：导入 Link 组件，用于页面跳转
+import Link from 'next/link';
 
 interface Questionnaire {
   questions: string[];
@@ -85,6 +88,11 @@ const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails; answers
     return (
       <div className="text-left">
         <div className="mb-4 text-center">
+          <div className="p-3 mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 text-xs rounded-r-lg">
+            <p className="font-bold">手机用户操作提示：</p>
+            <p className="mt-1">建议使用电脑进行文件操作。手机用户请复制下方全部内容，并将其手动保存为一个以 <code className="bg-yellow-200 px-1 rounded">.json</code> 结尾的文件。</p>
+            <p className="mt-1">您也可以直接将复制的内容粘贴到【魔法少女竞技场】的文本输入框中，但此方式可能较为不便。</p>
+          </div>
           <p className="text-sm text-gray-600 mb-2">请复制以下数据并保存</p>
           <button
             onClick={() => setShowJsonText(false)}
@@ -129,7 +137,6 @@ const DetailsPage: React.FC = () => {
   const [showIntroduction, setShowIntroduction] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [showQueueStatus, setShowQueueStatus] = useState(false);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateDetailsCooldown', 60000);
 
   useEffect(() => {
@@ -159,8 +166,8 @@ const DetailsPage: React.FC = () => {
       return;
     }
 
-    if (currentAnswer.length > 30) {
-      setError('⚠️ 答案不能超过30字');
+    if (currentAnswer.length > 80) {
+      setError('⚠️ 答案不能超过80字');
       return;
     }
 
@@ -206,12 +213,10 @@ const DetailsPage: React.FC = () => {
     }
     setSubmitting(true);
     setError(null); // 清除之前的错误
-    setShowQueueStatus(true); // 显示队列状态
     // 检查
     console.log('检查敏感词:', finalAnswers.join(''));
     const result = await quickCheck(finalAnswers.join(''));
     if (result.hasSensitiveWords) {
-      setShowQueueStatus(false);
       router.push('/arrested');
       return;
     }
@@ -264,7 +269,6 @@ const DetailsPage: React.FC = () => {
       }
     } finally {
       setSubmitting(false);
-      setShowQueueStatus(false); // 隐藏队列状态
       startCooldown();
     }
   };
@@ -395,12 +399,12 @@ const DetailsPage: React.FC = () => {
                   <textarea
                     value={currentAnswer}
                     onChange={(e) => setCurrentAnswer(e.target.value)}
-                    placeholder="请输入您的答案（不超过30字）"
+                    placeholder="请输入您的答案（不超过80字）"
                     className="input-field resize-none h-24"
-                    maxLength={30}
+                    maxLength={80}
                   />
                   <div className="text-right text-sm text-gray-500" style={{ marginTop: '-2rem', marginRight: '0.5rem' }}>
-                    {currentAnswer.length}/30
+                    {currentAnswer.length}/80
                   </div>
                 </div>
 
@@ -515,6 +519,15 @@ const DetailsPage: React.FC = () => {
                 <div className="text-center">
                   <h3 className="text-lg font-medium text-blue-900" style={{ marginBottom: '1rem' }}>保存人物设定</h3>
                   <SaveJsonButton magicalGirlDetails={magicalGirlDetails} answers={answers} />
+                  {/* 新增：前往竞技场的入口 */}
+                  <div style={{ marginTop: '0.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+                    <p className="text-sm text-gray-600 mb-2">
+                      保存好你的设定文件了吗？
+                    </p>
+                    <Link href="/battle" className="footer-link" style={{ color: '#193cb8', fontSize: '1.125rem' }}>
+                      前往竞技场，开始战斗！→
+                    </Link>
+                  </div>
                 </div>
               </div>
             </>
@@ -545,7 +558,7 @@ const DetailsPage: React.FC = () => {
             style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', paddingLeft: '2rem', paddingRight: '2rem' }}
           >
             <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative">
-              <div className="flex justify-between items-center m-0">
+              <div className="flex justify-between items-center m-0 absolute top-0 right-0">
                 <div></div>
                 <button
                   onClick={() => setShowImageModal(false)}
@@ -568,16 +581,7 @@ const DetailsPage: React.FC = () => {
             </div>
           </div>
         )}
-        
-        {/* 队列状态组件 */}
-        <QueueStatus 
-          endpoint="generate-magical-girl-details"
-          isVisible={showQueueStatus}
-          onComplete={() => {
-            setShowQueueStatus(false);
-            // 可以在这里添加完成后的逻辑
-          }}
-        />
+
       </div>
     </>
   );
