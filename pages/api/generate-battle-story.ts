@@ -30,7 +30,7 @@ const BattleReportCoreSchema = z.object({
 import { NewsReport } from '../../components/BattleReportCard';
 
 // AI 生成配置现在只关注核心内容生成
-const createNewsReportConfig = (questions: string[]): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, any[]> => ({
+const createNewsReportConfig = (questions: string[], selectedLevel?: string): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[] }> => ({
   systemPrompt: `
   现在魔法少女在 A.R.E.N.A. 也就是 Awakened Rune Enchantress Nova Arena 中展开竞技性的战斗，请根据以下规则生成战斗简报：
   战斗推演核心规则：
@@ -81,8 +81,17 @@ const createNewsReportConfig = (questions: string[]): GenerationConfig<z.infer<t
       }
       return profileString;
     }).join('\n\n');
-    // 简化后的Prompt，不再包含记者信息
-    return `这是本次对战的魔法少女们的情报信息。每个角色包含【角色核心设定】和【问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n请根据以上设定，创作她们之间的冲突新闻稿。`;
+
+    // 根据 selectedLevel 是否存在，构建不同的最终指令
+    let finalPrompt = `这是本次对战的魔法少女们的情报信息。每个角色包含【角色核心设定】和【问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n`;
+
+    if (selectedLevel && selectedLevel.trim() !== '') {
+      finalPrompt += `注意：请将本次战斗的参与者的平均等级设定为【${selectedLevel}】，并严格根据该等级的能力限制进行战斗推演和描述。`;
+    } else {
+      finalPrompt += `请根据以上设定，创作她们之间的冲突新闻稿。`;
+    }
+
+    return finalPrompt;
   },
   schema: BattleReportCoreSchema,
   taskName: "生成魔法少女新闻报道",
@@ -152,7 +161,8 @@ async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { magicalGirls } = await req.json();
+    // 从请求体中解构出 magicalGirls 和 selectedLevel
+    const { magicalGirls, selectedLevel } = await req.json();
 
     if (!Array.isArray(magicalGirls) || magicalGirls.length < 2 || magicalGirls.length > 6) {
       return new Response(JSON.stringify({ error: '必须提供2到6个魔法少女的设定' }), {
@@ -162,9 +172,9 @@ async function handler(req: Request): Promise<Response> {
     }
 
     const questions = questionnaire.questions;
-    const newsReportConfig = createNewsReportConfig(questions);
-
-    // 直接调用AI生成
+    // 将 selectedLevel 传递给配置生成函数
+    const newsReportConfig = createNewsReportConfig(questionnaire.questions, selectedLevel);
+    // 将 magicalGirls 传递给 AI 生成函数
     const aiResult = await generateWithAI(magicalGirls, newsReportConfig);
 
     const reporterInfo = getRandomJournalist();

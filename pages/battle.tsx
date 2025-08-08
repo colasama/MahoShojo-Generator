@@ -13,8 +13,18 @@ import { StatsData } from './api/get-stats';
 import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
 
-// 新增：定义魔法少女设定的核心字段，用于验证
+// 定义魔法少女设定的核心字段，用于验证
 const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule', 'blooming', 'analysis'];
+
+// 定义可选的战斗等级
+const battleLevels = [
+  { value: '', label: '默认 (AI自动分配)' },
+  { value: '种级', label: '种级 🌱' },
+  { value: '芽级', label: '芽级 🍃' },
+  { value: '叶级', label: '叶级 🌿' },
+  { value: '蕾级', label: '蕾级 🌸' },
+  { value: '花级', label: '花级 🌺' },
+];
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
@@ -47,6 +57,8 @@ const BattlePage: React.FC = () => {
 
     // 状态：用于存储从API获取的统计数据
     const [stats, setStats] = useState<StatsData | null>(null);
+    // 状态：用于存储用户选择等级的状态
+    const [selectedLevel, setSelectedLevel] = useState<string>('');
     // 状态：用于存储预设角色的描述信息，方便在排行榜上显示
     const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
     // 状态：用于显示加载状态
@@ -323,7 +335,7 @@ const BattlePage: React.FC = () => {
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ magicalGirls }),
+                body: JSON.stringify({ magicalGirls, selectedLevel }),
             });
 
             // --- 核心修改：增强错误处理 ---
@@ -488,6 +500,27 @@ const BattlePage: React.FC = () => {
                                 </ul>
                             </div>
                         )}
+
+                        {/* --- 选择平均等级 --- */}
+                        <div className="input-group">
+                            <label htmlFor="level-select" className="input-label">
+                            指定平均等级 (可选):
+                            </label>
+                            <select
+                            id="level-select"
+                            value={selectedLevel}
+                            onChange={(e) => setSelectedLevel(e.target.value)}
+                            className="input-field"
+                            style={{ cursor: 'pointer' }}
+                            >
+                            {battleLevels.map(level => (
+                                <option key={level.value} value={level.value}>
+                                {level.label}
+                                </option>
+                            ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">默认由 AI 根据角色强度自动分配，以保证战斗平衡和观赏性。</p>
+                        </div>
 
                         <button
                             onClick={handleGenerate}
