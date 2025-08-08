@@ -52,13 +52,13 @@ const BattlePage: React.FC = () => {
             try {
                 // 根据配置决定是否需要获取统计数据
                 const shouldFetchStats = appConfig.SHOW_STAT_DATA;
-                
+
                 // 构建请求数组
                 const requests = [fetch('/api/get-presets')];
                 if (shouldFetchStats) {
                     requests.push(fetch('/api/get-stats'));
                 }
-                
+
                 // 并行获取数据
                 const responses = await Promise.all(requests);
                 const [presetsRes, statsRes] = responses;
@@ -269,23 +269,34 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 预设角色选择区域 --- */}
                         <div className="mb-6">
-                            <h3 className="input-label" style={{ marginTop: '0.5rem' }}>预设魔法少女</h3>
+                            <h3 className="input-label" style={{ marginTop: '0.5rem' }}>选择预设魔法少女</h3>
                             {isLoadingPresets ? (
                                 <p className="text-sm text-gray-500">正在加载预设角色...</p>
                             ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    {presets.map(preset => (
-                                        <button
-                                            key={preset.filename}
-                                            onClick={() => handleSelectPreset(preset)}
-                                            title={preset.description}
-                                            disabled={magicalGirls.length >= 4}
-                                            className="px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded-full hover:bg-purple-200 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                                            style={{ paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.5rem' }}
-                                        >
-                                            {preset.name}
-                                        </button>
-                                    ))}
+                                // 改为Grid布局以更好地展示描述
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {presets.map(preset => {
+                                        const isSelected = filenames.includes(preset.filename);
+                                        const isDisabled = !isSelected && magicalGirls.length >= 4;
+                                        return (
+                                            <div
+                                                key={preset.filename}
+                                                // 当角色未被选中且队伍未满时，才可点击
+                                                onClick={() => !isSelected && !isDisabled && handleSelectPreset(preset)}
+                                                // 根据状态（已选/禁用/可选）应用不同样式
+                                                className={`p-3 border rounded-lg transition-all duration-200 ${
+                                                    isSelected
+                                                        ? 'bg-purple-200 border-purple-400 cursor-default'
+                                                        : isDisabled
+                                                        ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed'
+                                                        : 'bg-white border-gray-300 hover:border-purple-400 hover:bg-purple-50 cursor-pointer'
+                                                }`}
+                                            >
+                                                <p className={`font-semibold ${isSelected ? 'text-purple-900' : 'text-purple-800'}`}>{preset.name}</p>
+                                                <p className={`text-xs mt-1 ${isSelected ? 'text-purple-800' : 'text-gray-600'}`}>{preset.description}</p>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -440,9 +451,9 @@ const BattlePage: React.FC = () => {
                         </div>
                     </div>
                 )}
-                
+
                 {/* 队列状态组件 */}
-                <QueueStatus 
+                <QueueStatus
                     endpoint="generate-battle-story"
                     isVisible={showQueueStatus}
                     onComplete={() => {

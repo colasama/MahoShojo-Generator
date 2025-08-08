@@ -2,12 +2,13 @@
 
 import { z } from 'zod';
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
-import { queryFromD1 } from '../../lib/d1'; // 导入 D1 查询函数
+import { queryFromD1 } from '../../lib/d1';
 import { getLogger } from '../../lib/logger';
 import { battleHistoryQueue } from '../../lib/queue-system';
 import { getClientIP } from '../../lib/rate-limiter';
-// 直接导入问卷JSON文件，而不是在运行时fetch
 import questionnaire from '../../public/questionnaire.json';
+// 导入新的记者抽取函数
+import { getRandomJournalist } from '../../lib/random-choose-journalist';
 
 const log = getLogger('api-gen-battle-story');
 
@@ -15,27 +16,24 @@ export const config = {
   runtime: 'edge',
 };
 
-// 定义AI响应的Zod schema - 已从战斗故事更新为新闻报道
-const NewsReportSchema = z.object({
+// 为 AI 定义一个更专注的核心 Schema，不再包含记者信息
+const BattleReportCoreSchema = z.object({
   headline: z.string().describe("本场比赛的新闻标题，可以使用震惊体等技巧来吸引读者。"),
-  reporterInfo: z.object({
-    name: z.string().describe("一位虚构的新闻记者的名字，如果是魔法少女则应当按照格式：“花名”。"),
-    publication: z.string().describe("一个虚构的、听起来像是魔法少女世界观下的新闻媒体或自媒体的名称（例如：国度日报、祖母绿周刊、卢恩诺雷每日速报）。")
-  }),
   article: z.object({
     body: z.string().describe("战斗简报的正文。"),
     analysis: z.string().describe("记者的分析与猜测。这部分内容可以带有记者的主观色彩，看热闹不嫌事大，进行一些有逻辑但可能不完全真实的猜测和引申，制造“爆点”，字数约100-150字。")
   }),
   officialReport: z.object({
-    winner: z.string().describe("记者观察到的胜利者的魔法少女代号。如果是平局，则返回'平局'。"),
+    winner: z.string().describe("胜利者的魔法少女代号。如果是平局，则返回'平局'。"),
     impact: z.string().describe("对本次事件的总结点评，描述战斗带来的最终影响，包括对参战者和比赛的后续影响。"),
   })
 });
 
-type NewsReport = z.infer<typeof NewsReportSchema>;
+// 从组件中导入的类型，用于最终返回给前端的完整数据结构
+import { NewsReport } from '../../components/BattleReportCard';
 
-// 定义生成配置 - 已更新为新闻报道
-const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsReport, any[]> => ({
+// AI 生成配置现在只关注核心内容生成
+const createNewsReportConfig = (questions: string[]): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, any[]> => ({
   systemPrompt: `
   现在魔法少女在 A.R.E.N.A. 也就是 Awakened Rune Enchantress Nova Arena 中展开竞技性的战斗，请根据以下规则生成战斗简报：
   战斗推演核心规则：
@@ -84,13 +82,12 @@ const createNewsReportConfig = (questions: string[]): GenerationConfig<NewsRepor
         }).join('\n');
         profileString += qaBlock;
       }
-
       return profileString;
     }).join('\n\n');
-
+    // 简化后的Prompt，不再包含记者信息
     return `这是本次对战的魔法少女们的情报信息。每个角色包含【角色核心设定】和【问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n请根据以上设定，创作她们之间的冲突新闻稿。`;
   },
-  schema: NewsReportSchema,
+  schema: BattleReportCoreSchema,
   taskName: "生成魔法少女新闻报道",
   maxTokens: 8192,
 });
@@ -128,7 +125,7 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
           'UPDATE characters SET losses = losses + 1, participations = participations + 1 WHERE name = ?;',
           [name]
         );
-      } else { // 平局情况
+      } else {
         await queryFromD1(
           'UPDATE characters SET participations = participations + 1 WHERE name = ?;',
           [name]
@@ -148,7 +145,6 @@ async function updateBattleStats(winnerName: string, participants: any[]) {
     log.error('更新 D1 数据库失败:', { error });
   }
 }
-
 
 async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
@@ -188,15 +184,29 @@ async function handler(req: Request): Promise<Response> {
         const result = await generateWithAI(magicalGirls, newsReportConfig);
 
         // 在返回结果前，异步更新数据库，不阻塞对用户的响应
-        const updatePromise = updateBattleStats(result.officialReport.winner, magicalGirls);
+        // 1. AI生成核心内容
+        const aiResult = await generateWithAI(magicalGirls, newsReportConfig);
 
-        // 在 Cloudflare Workers/Pages 环境下, 可以将 promise 传递给 waitUntil 以确保其在请求结束后仍能执行完成
+        // 2. 在代码中抽取记者和媒体信息
+        const reporterInfo = getRandomJournalist();
+
+        // 3. 将AI结果和代码抽取的结果合并成完整报告
+        const fullReport: NewsReport = {
+          ...aiResult,
+          reporterInfo: {
+            name: reporterInfo.name,
+            publication: reporterInfo.publication,
+          },
+        };
+
+        const updatePromise = updateBattleStats(fullReport.officialReport.winner, magicalGirls);
+
         const executionContext = (req as any).context;
         if (executionContext && typeof executionContext.waitUntil === 'function') {
           executionContext.waitUntil(updatePromise);
         }
 
-        return result;
+        return fullReport;
       },
       persistenceKey
     );
