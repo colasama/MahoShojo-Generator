@@ -15,6 +15,17 @@ import { config as appConfig } from '../lib/config';
 // 定义魔法少女设定的核心字段，用于验证
 const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule', 'blooming', 'analysis'];
 
+// 新增：定义一个映射，用于描述核心字段及其必需的子字段
+// 这将用于兼容缺少父级但包含子级的不规范JSON
+const CORE_FIELD_CHILDREN: Record<string, string[]> = {
+    appearance: ['outfit', 'accessories', 'colorScheme', 'overallLook'],
+    magicConstruct: ['name', 'form', 'basicAbilities', 'description'],
+    wonderlandRule: ['name', 'description', 'tendency', 'activation'],
+    blooming: ['name', 'evolvedAbilities', 'evolvedForm', 'evolvedOutfit', 'powerLevel'],
+    analysis: ['personalityAnalysis', 'abilityReasoning', 'coreTraits', 'predictionBasis']
+};
+
+
 // 定义可选的战斗等级
 const battleLevels = [
     { value: '', label: '默认 (AI自动分配)' },
@@ -33,7 +44,7 @@ const BattlePage: React.FC = () => {
     const [filenames, setFilenames] = useState<string[]>([]);
     // 是否正在生成中
     const [isGenerating, setIsGenerating] = useState(false);
-    // 错误信息
+    // 错误或警告信息
     const [error, setError] = useState<string | null>(null);
     // 更新状态以匹配新的数据结构
     const [newsReport, setNewsReport] = useState<NewsReport | null>(null);
@@ -44,6 +55,8 @@ const BattlePage: React.FC = () => {
     // 用于复制粘贴设定文本
     const [pastedJson, setPastedJson] = useState<string>('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+    // 新增：用于显示当前点击的预设角色说明
+    const [selectedPresetDescription, setSelectedPresetDescription] = useState<string | null>(null);
 
     // 冷却状态钩子，设置为2分钟
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
@@ -125,7 +138,7 @@ const BattlePage: React.FC = () => {
         fetchData();
     }, []);
 
-    // 新增：封装一个验证函数，用于检查JSON对象是否符合基本规范
+    // 修改：重构验证函数以兼容不规范的JSON
     const validateMagicalGirlData = (data: any, filename: string): boolean => {
         // 兼容 “麻雀” 这类非规范但可用的文件
         if (data.name && data.construct) {
@@ -133,19 +146,52 @@ const BattlePage: React.FC = () => {
             return true;
         }
 
-        // 检查所有核心字段是否存在
-        for (const field of CORE_FIELDS) {
-            if (data[field] === undefined) {
-                setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "${field}" 字段。`);
-                return false;
+        // 检查codename字段
+        if (typeof data.codename !== 'string' || !data.codename) {
+            setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "codename" 字段。`);
+            return false;
+        }
+
+        let warningMessage = '';
+
+        // 遍历所有核心字段进行检查和修复
+        for (const parentKey of Object.keys(CORE_FIELD_CHILDREN)) {
+            // 如果父级项目不存在
+            if (data[parentKey] === undefined) {
+                const childKeys = CORE_FIELD_CHILDREN[parentKey];
+                const allChildrenExist = childKeys.every(childKey => data[childKey] !== undefined);
+
+                // 如果所有子级项目都存在于顶层
+                if (allChildrenExist) {
+                    // 记录一个警告，告知用户格式问题
+                    warningMessage += `检测到缺失的顶层项目 "${parentKey}"，但其子项目齐全，已自动兼容。\n`;
+                    // 创建父级项目并将子级项目移动进去
+                    data[parentKey] = {};
+                    childKeys.forEach(childKey => {
+                        data[parentKey][childKey] = data[childKey];
+                        delete data[childKey]; // 从顶层删除已移动的子项目
+                    });
+                } else {
+                    // 如果父级和子级都不完整，则这是一个真正的错误
+                    setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "${parentKey}" 字段或其部分子字段。`);
+                    return false;
+                }
             }
+        }
+
+        // 如果有任何警告信息，则显示出来（不会中断流程）
+        if (warningMessage) {
+            setError(`✔️ 文件 "${filename}" 已加载，但格式稍有不规范:\n${warningMessage.trim()}`);
         }
         return true;
     };
 
 
-    // 处理选择预设角色的逻辑
+    // 修改：处理选择预设角色的逻辑，增加显示说明的功能
     const handleSelectPreset = async (preset: PresetMagicalGirl) => {
+        // 点击后立即显示说明
+        setSelectedPresetDescription(`[${preset.name}] ${preset.description}`);
+
         // 如果已经选择，则取消选择
         if (filenames.includes(preset.filename)) {
             const filenameIndex = filenames.indexOf(preset.filename);
@@ -236,7 +282,12 @@ const BattlePage: React.FC = () => {
             if (validationPassed) {
                 setMagicalGirls(prev => [...prev, ...loadedGirls]);
                 setFilenames(prev => [...prev, ...loadedFilenames]);
-                setError(null);
+                // 如果没有硬性错误，之前的兼容性警告可以保留
+                if (!error?.startsWith('❌')) {
+                    // 如果有兼容性警告，保留它，否则清空
+                } else {
+                    setError(null);
+                }
             }
 
         } catch (err) {
@@ -290,7 +341,11 @@ const BattlePage: React.FC = () => {
             setMagicalGirls(prev => [...prev, ...loadedGirls]);
             setFilenames(prev => [...prev, ...loadedFilenames]);
             setPastedJson(''); // 清空文本域
-            setError(null);
+             if (!error?.startsWith('❌')) {
+                // 如果有兼容性警告，保留它，否则清空
+             } else {
+                setError(null);
+             }
 
         } catch (err) {
             if (err instanceof Error) {
@@ -301,12 +356,13 @@ const BattlePage: React.FC = () => {
         }
     };
 
-    // 清空已选角色列表
+    // 修改：清空列表时也清空选中的预设描述
     const handleClearRoster = () => {
         setMagicalGirls([]);
         setFilenames([]);
         setNewsReport(null);
         setError(null);
+        setSelectedPresetDescription(null); // 新增：清空描述
         if (fileInputRef.current) {
             fileInputRef.current.value = ''; // 重置文件输入框
         }
@@ -445,6 +501,13 @@ const BattlePage: React.FC = () => {
                                             });
                                         })()}
                                     </div>
+
+                                    {/* 新增：显示选定预设的描述 */}
+                                    {selectedPresetDescription && (
+                                        <p className="text-sm italic text-gray-700 mt-3 p-2 bg-gray-100 rounded-md">
+                                            {selectedPresetDescription}
+                                        </p>
+                                    )}
 
                                     {/* 分页控件 */}
                                     {presets.length > presetsPerPage && (
@@ -592,7 +655,8 @@ const BattlePage: React.FC = () => {
                                     : '生成独家新闻 (๑•̀ㅂ•́)و✧'}
                         </button>
 
-                        {error && <div className="error-message">{error}</div>}
+                        {error && <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${error.startsWith('❌') ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{error}</div>}
+
                     </div>
 
                     {newsReport && (
