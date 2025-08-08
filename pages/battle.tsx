@@ -34,6 +34,9 @@ const BattlePage: React.FC = () => {
     const [showImageModal, setShowImageModal] = useState(false);
     // 是否显示队列状态
     const [showQueueStatus, setShowQueueStatus] = useState(false);
+    // 用于复制粘贴设定文本
+    const [pastedJson, setPastedJson] = useState<string>('');
+    const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
 
     // 冷却状态钩子，设置为2分钟
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
@@ -48,6 +51,14 @@ const BattlePage: React.FC = () => {
     const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
     // 状态：用于显示加载状态
     const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+    // 检测移动端并默认展开文本域
+    useEffect(() => {
+        const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
+        if (isMobileDevice) {
+            setIsPasteAreaVisible(true);
+        }
+    }, []);
 
     // 组件加载时获取预设角色列表和统计数据
     useEffect(() => {
@@ -222,6 +233,56 @@ const BattlePage: React.FC = () => {
         }
     };
 
+    // 处理粘贴文本的函数
+    const handleAddFromPaste = () => {
+        const text = pastedJson.trim();
+        if (!text) return;
+
+        const loadedGirls: any[] = [];
+        const loadedFilenames: string[] = [];
+
+        try {
+            // 尝试将文本解析为 JSON 对象或数组
+            let parsedData;
+            try {
+                // 尝试直接解析
+                parsedData = JSON.parse(text);
+            } catch (e) {
+                // 如果直接解析失败，尝试修复并解析为数组
+                // 这种方法可以处理多个JSON对象被直接拼接在一起的情况
+                const sanitizedText = `[${text.replace(/}\s*{/g, '},{')}]`;
+                parsedData = JSON.parse(sanitizedText);
+            }
+
+            const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+            if (dataArray.length > (4 - magicalGirls.length)) {
+                throw new Error(`队伍将超出4人上限！`);
+            }
+
+            for (const item of dataArray) {
+                if (!validateMagicalGirlData(item, item.codename || '粘贴的内容')) {
+                    // 如果有一个验证失败，则停止处理
+                    return;
+                }
+                loadedGirls.push(item);
+                loadedFilenames.push(item.codename); // 使用代号作为唯一标识
+            }
+
+            setMagicalGirls(prev => [...prev, ...loadedGirls]);
+            setFilenames(prev => [...prev, ...loadedFilenames]);
+            setPastedJson(''); // 清空文本域
+            setError(null);
+
+        } catch (err) {
+            if (err instanceof Error) {
+                setError(`❌ 文本解析失败: ${err.message}. 请确保粘贴的是一个或多个完整的JSON对象。`);
+            } else {
+                setError('❌ 文本解析失败，请检查粘贴内容的格式。');
+            }
+        }
+    };
+
     // 清空已选角色列表
     const handleClearRoster = () => {
         setMagicalGirls([]);
@@ -380,6 +441,31 @@ const BattlePage: React.FC = () => {
                                 onChange={handleFileChange}
                                 className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"
                             />
+                        </div>
+
+                        {/* --- 粘贴设定文本区域 --- */}
+                        <div className="mb-6">
+                            <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-sm text-purple-700 hover:underline cursor-pointer mb-2 font-semibold">
+                                {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
+                            </button>
+                            {isPasteAreaVisible && (
+                                <div className="input-group mt-2 p-4 bg-gray-100 rounded-lg">
+                                    <textarea
+                                        value={pastedJson}
+                                        onChange={(e) => setPastedJson(e.target.value)}
+                                        placeholder="在此处粘贴一个或多个魔法少女的设定文件(.json)内容..."
+                                        className="input-field resize-y h-32"
+                                    />
+                                    <button
+                                        onClick={handleAddFromPaste}
+                                        disabled={!pastedJson.trim() || isGenerating || magicalGirls.length >=4}
+                                        className="generate-button mt-2"
+                                        style={{ marginBottom: 0, background: 'linear-gradient(45deg, #8e44ad, #9b59b6)' }}
+                                    >
+                                        从文本添加
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* --- 已选角色列表 --- */}

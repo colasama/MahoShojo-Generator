@@ -1,3 +1,5 @@
+// pages/details.tsx
+
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -87,6 +89,11 @@ const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails; answers
     return (
       <div className="text-left">
         <div className="mb-4 text-center">
+          <div className="p-3 mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 text-xs rounded-r-lg">
+            <p className="font-bold">手机用户操作提示：</p>
+            <p className="mt-1">建议使用电脑进行文件操作。手机用户请复制下方全部内容，并将其手动保存为一个以 <code className="bg-yellow-200 px-1 rounded">.json</code> 结尾的文件。</p>
+            <p className="mt-1">您也可以直接将复制的内容粘贴到【魔法少女竞技场】的文本输入框中，但此方式可能较为不便。</p>
+          </div>
           <p className="text-sm text-gray-600 mb-2">请复制以下数据并保存</p>
           <button
             onClick={() => setShowJsonText(false)}
