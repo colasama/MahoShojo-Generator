@@ -18,7 +18,6 @@ export interface PresetMagicalGirl {
 // 因此，我们将预设角色的列表直接定义在这里。
 // 未来如果增加新的预设角色，也需要在此数组中添加对应的条目。
 const PRESET_LIST: PresetMagicalGirl[] = [
-const PRESET_LIST: PresetMagicalGirl[] = [
   {
     name: "白百合",
     description: "测试用角色：神圣典雅的圣女型魔法少女。",

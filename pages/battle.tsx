@@ -133,7 +133,7 @@ const BattlePage: React.FC = () => {
 
         const totalSlots = 4 - magicalGirls.length;
         if (files.length > totalSlots) {
-            setError(`最多还能上传 ${totalSlots} 个文件。`);
+            setError(`队伍已满！总人数不能超过4人，你当前还能添加 ${totalSlots} 人。`);
             return;
         }
 
