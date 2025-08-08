@@ -56,7 +56,7 @@ const PRESET_LIST: PresetMagicalGirl[] = [
   {
     name: "朝颜",
     description: "祖母绿的科技与狠活：背负他人身影的'记录者'，活在悔恨与爱恋中的败犬，让人怀疑她是不是有在吃代餐。",
-    filename: "morning_glory.json"
+    filename: "asagao.json"
   },
   {
     name: "鸢",
