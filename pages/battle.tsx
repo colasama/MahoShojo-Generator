@@ -13,6 +13,19 @@ import { StatsData } from './api/get-stats';
 import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
 
+// 定义魔法少女设定的核心字段，用于验证
+const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule', 'blooming', 'analysis'];
+
+// 定义可选的战斗等级
+const battleLevels = [
+  { value: '', label: '默认 (AI自动分配)' },
+  { value: '种级', label: '种级 🌱' },
+  { value: '芽级', label: '芽级 🍃' },
+  { value: '叶级', label: '叶级 🌿' },
+  { value: '蕾级', label: '蕾级 🌸' },
+  { value: '花级', label: '花级 🌺' },
+];
+
 const BattlePage: React.FC = () => {
     const router = useRouter();
     // 存储解析后的魔法少女JSON数据
@@ -31,6 +44,9 @@ const BattlePage: React.FC = () => {
     const [showImageModal, setShowImageModal] = useState(false);
     // 是否显示队列状态
     const [showQueueStatus, setShowQueueStatus] = useState(false);
+    // 用于复制粘贴设定文本
+    const [pastedJson, setPastedJson] = useState<string>('');
+    const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
 
     // 冷却状态钩子，设置为2分钟
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
@@ -41,10 +57,20 @@ const BattlePage: React.FC = () => {
 
     // 状态：用于存储从API获取的统计数据
     const [stats, setStats] = useState<StatsData | null>(null);
+    // 状态：用于存储用户选择等级的状态
+    const [selectedLevel, setSelectedLevel] = useState<string>('');
     // 状态：用于存储预设角色的描述信息，方便在排行榜上显示
     const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
     // 状态：用于显示加载状态
     const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+    // 检测移动端并默认展开文本域
+    useEffect(() => {
+        const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
+        if (isMobileDevice) {
+            setIsPasteAreaVisible(true);
+        }
+    }, []);
 
     // 组件加载时获取预设角色列表和统计数据
     useEffect(() => {
@@ -52,13 +78,13 @@ const BattlePage: React.FC = () => {
             try {
                 // 根据配置决定是否需要获取统计数据
                 const shouldFetchStats = appConfig.SHOW_STAT_DATA;
-                
+
                 // 构建请求数组
                 const requests = [fetch('/api/get-presets')];
                 if (shouldFetchStats) {
                     requests.push(fetch('/api/get-stats'));
                 }
-                
+
                 // 并行获取数据
                 const responses = await Promise.all(requests);
                 const [presetsRes, statsRes] = responses;
@@ -99,6 +125,25 @@ const BattlePage: React.FC = () => {
         fetchData();
     }, []);
 
+    // 新增：封装一个验证函数，用于检查JSON对象是否符合基本规范
+    const validateMagicalGirlData = (data: any, filename: string): boolean => {
+        // 兼容 “麻雀” 这类非规范但可用的文件
+        if (data.name && data.construct) {
+            data.codename = data.name; // 补充 codename 字段以供后续使用
+            return true;
+        }
+
+        // 检查所有核心字段是否存在
+        for (const field of CORE_FIELDS) {
+            if (data[field] === undefined) {
+                setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "${field}" 字段。`);
+                return false;
+            }
+        }
+        return true;
+    };
+
+
     // 处理选择预设角色的逻辑
     const handleSelectPreset = async (preset: PresetMagicalGirl) => {
         if (magicalGirls.length >= 4) {
@@ -113,7 +158,20 @@ const BattlePage: React.FC = () => {
         try {
             const response = await fetch(`/presets/${preset.filename}`);
             if (!response.ok) throw new Error(`无法加载 ${preset.name} 的设定文件。`);
-            const presetData = await response.json();
+
+            // 增强：使用 .text() 读取，以防预设文件格式错误
+            const fileContent = await response.text();
+            let presetData;
+            try {
+                presetData = JSON.parse(fileContent);
+            } catch (jsonError) {
+                throw new Error(`预设文件 "${preset.name}" 格式错误，无法解析。`);
+            }
+
+            // 增强：验证预设文件内容
+            if (!validateMagicalGirlData(presetData, preset.name)) {
+                return; // validateMagicalGirlData 内部会设置错误信息
+            }
 
             // 添加 isPreset 标志，用于数据库记录
             presetData.isPreset = true;
@@ -133,12 +191,15 @@ const BattlePage: React.FC = () => {
 
         const totalSlots = 4 - magicalGirls.length;
         if (files.length > totalSlots) {
-            setError(`最多还能上传 ${totalSlots} 个文件。`);
+            setError(`队伍已满！总人数不能超过4人，你当前还能添加 ${totalSlots} 人。`);
+            // 清空input的值，以便用户能重新选择
+            if (event.target) event.target.value = '';
             return;
         }
 
         const loadedGirls: any[] = [];
         const loadedFilenames: string[] = [];
+        let validationPassed = true;
 
         try {
             for (const file of Array.from(files)) {
@@ -146,17 +207,32 @@ const BattlePage: React.FC = () => {
                     throw new Error(`文件 "${file.name}" 不是有效的 JSON 文件。`);
                 }
                 const text = await file.text();
-                const json = JSON.parse(text);
-                if (!json.codename && !json.name) {
-                    throw new Error(`文件 "${file.name}" 似乎不是一个有效的魔法少女设定。`);
+                let json;
+
+                // 增强：在解析JSON时进行try-catch，提供更友好的错误提示
+                try {
+                    json = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error(`文件 "${file.name}" 的JSON格式有误，无法解析。请检查文件内容。`);
                 }
+
+                // 增强：验证文件内容结构
+                if (!validateMagicalGirlData(json, file.name)) {
+                    validationPassed = false;
+                    break; // 一旦有文件验证失败，就停止处理
+                }
+
                 loadedGirls.push(json);
                 loadedFilenames.push(file.name);
             }
-            // 修正：追加而不是覆盖
-            setMagicalGirls(prev => [...prev, ...loadedGirls]);
-            setFilenames(prev => [...prev, ...loadedFilenames]);
-            setError(null);
+
+            // 只有所有文件都通过验证才更新状态
+            if (validationPassed) {
+                setMagicalGirls(prev => [...prev, ...loadedGirls]);
+                setFilenames(prev => [...prev, ...loadedFilenames]);
+                setError(null);
+            }
+
         } catch (err) {
             if (err instanceof Error) {
                 setError(`❌ 文件读取失败: ${err.message}`);
@@ -164,8 +240,58 @@ const BattlePage: React.FC = () => {
                 setError('❌ 文件读取失败，请确保上传了正确的 JSON 文件。');
             }
         } finally {
-            // 清空input的值
+            // 清空input的值，以便用户可以重新选择相同的文件
             if (event.target) event.target.value = '';
+        }
+    };
+
+    // 处理粘贴文本的函数
+    const handleAddFromPaste = () => {
+        const text = pastedJson.trim();
+        if (!text) return;
+
+        const loadedGirls: any[] = [];
+        const loadedFilenames: string[] = [];
+
+        try {
+            // 尝试将文本解析为 JSON 对象或数组
+            let parsedData;
+            try {
+                // 尝试直接解析
+                parsedData = JSON.parse(text);
+            } catch (e) {
+                // 如果直接解析失败，尝试修复并解析为数组
+                // 这种方法可以处理多个JSON对象被直接拼接在一起的情况
+                const sanitizedText = `[${text.replace(/}\s*{/g, '},{')}]`;
+                parsedData = JSON.parse(sanitizedText);
+            }
+
+            const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+            if (dataArray.length > (4 - magicalGirls.length)) {
+                throw new Error(`队伍将超出4人上限！`);
+            }
+
+            for (const item of dataArray) {
+                if (!validateMagicalGirlData(item, item.codename || '粘贴的内容')) {
+                    // 如果有一个验证失败，则停止处理
+                    return;
+                }
+                loadedGirls.push(item);
+                loadedFilenames.push(item.codename); // 使用代号作为唯一标识
+            }
+
+            setMagicalGirls(prev => [...prev, ...loadedGirls]);
+            setFilenames(prev => [...prev, ...loadedFilenames]);
+            setPastedJson(''); // 清空文本域
+            setError(null);
+
+        } catch (err) {
+            if (err instanceof Error) {
+                setError(`❌ 文本解析失败: ${err.message}. 请确保粘贴的是一个或多个完整的JSON对象。`);
+            } else {
+                setError('❌ 文本解析失败，请检查粘贴内容的格式。');
+            }
         }
     };
 
@@ -209,22 +335,34 @@ const BattlePage: React.FC = () => {
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ magicalGirls }),
+                body: JSON.stringify({ magicalGirls, selectedLevel }),
             });
 
+            // --- 核心修改：增强错误处理 ---
             if (!response.ok) {
-                const errorData = await response.json();
-                // 优化错误提示，告知用户可能是服务器繁忙
-                if (response.status >= 500) {
-                    throw new Error('服务器繁忙，请稍后再试。');
+                // 首先，尝试将响应体作为文本读取
+                const errorText = await response.text();
+                let errorMessage = `服务器返回了错误 (状态码: ${response.status})。`;
+
+                try {
+                    // 尝试将文本解析为JSON
+                    const errorJson = JSON.parse(errorText);
+                    // 如果成功，使用JSON中的详细错误信息
+                    errorMessage = errorJson.message || errorJson.error || errorMessage;
+                } catch (e) {
+                    // 如果解析失败，说明响应不是JSON格式（可能是HTML错误页）
+                    // 此时，我们可以显示一个更通用的消息，或者在开发模式下显示原始文本
+                    console.error("收到了非JSON格式的错误响应:", errorText);
+                    errorMessage = '服务器响应异常，可能是服务暂时不可用，请稍后再试。';
                 }
-                throw new Error(errorData.message || errorData.error || '生成失败');
+                throw new Error(errorMessage);
             }
 
             const result: NewsReport = await response.json();
             setNewsReport(result);
             startCooldown();
         } catch (err) {
+            // 现在的 catch 块可以捕获到更明确的错误信息
             if (err instanceof Error) {
                 setError(`✨ 魔法失效了！${err.message}`);
             } else {
@@ -269,23 +407,34 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 预设角色选择区域 --- */}
                         <div className="mb-6">
-                            <h3 className="input-label" style={{ marginTop: '0.5rem' }}>预设魔法少女</h3>
+                            <h3 className="input-label" style={{ marginTop: '0.5rem' }}>选择预设魔法少女</h3>
                             {isLoadingPresets ? (
                                 <p className="text-sm text-gray-500">正在加载预设角色...</p>
                             ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    {presets.map(preset => (
-                                        <button
-                                            key={preset.filename}
-                                            onClick={() => handleSelectPreset(preset)}
-                                            title={preset.description}
-                                            disabled={magicalGirls.length >= 4}
-                                            className="px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded-full hover:bg-purple-200 disabled:bg-gray-200 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                                            style={{ paddingLeft: '0.5rem', paddingRight: '0.5rem', marginBottom: '0.5rem' }}
-                                        >
-                                            {preset.name}
-                                        </button>
-                                    ))}
+                                // 改为Grid布局以更好地展示描述
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {presets.map(preset => {
+                                        const isSelected = filenames.includes(preset.filename);
+                                        const isDisabled = !isSelected && magicalGirls.length >= 4;
+                                        return (
+                                            <div
+                                                key={preset.filename}
+                                                // 当角色未被选中且队伍未满时，才可点击
+                                                onClick={() => !isSelected && !isDisabled && handleSelectPreset(preset)}
+                                                // 根据状态（已选/禁用/可选）应用不同样式
+                                                className={`p-3 border rounded-lg transition-all duration-200 ${
+                                                    isSelected
+                                                        ? 'bg-purple-200 border-purple-400 cursor-default'
+                                                        : isDisabled
+                                                        ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed'
+                                                        : 'bg-white border-gray-300 hover:border-purple-400 hover:bg-purple-50 cursor-pointer'
+                                                }`}
+                                            >
+                                                <p className={`font-semibold ${isSelected ? 'text-purple-900' : 'text-purple-800'}`}>{preset.name}</p>
+                                                <p className={`text-xs mt-1 ${isSelected ? 'text-purple-800' : 'text-gray-600'}`}>{preset.description}</p>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -306,10 +455,35 @@ const BattlePage: React.FC = () => {
                             />
                         </div>
 
+                        {/* --- 粘贴设定文本区域 --- */}
+                        <div className="mb-6">
+                            <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-sm text-purple-700 hover:underline cursor-pointer mb-2 font-semibold">
+                                {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
+                            </button>
+                            {isPasteAreaVisible && (
+                                <div className="input-group mt-2 p-4 bg-gray-100 rounded-lg">
+                                    <textarea
+                                        value={pastedJson}
+                                        onChange={(e) => setPastedJson(e.target.value)}
+                                        placeholder="在此处粘贴一个或多个魔法少女的设定文件(.json)内容..."
+                                        className="input-field resize-y h-32"
+                                    />
+                                    <button
+                                        onClick={handleAddFromPaste}
+                                        disabled={!pastedJson.trim() || isGenerating || magicalGirls.length >=4}
+                                        className="generate-button mt-2"
+                                        style={{ marginBottom: 0, background: 'linear-gradient(45deg, #8e44ad, #9b59b6)' }}
+                                    >
+                                        从文本添加
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         {/* --- 已选角色列表 --- */}
                         {filenames.length > 0 && (
                             <div className="mb-4 p-3 bg-gray-200 rounded-lg" style={{ padding: '1rem', marginBottom: '1rem' }}>
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center m-0 absolute top-0 right-0">
                                     <p className="font-semibold text-sm text-gray-700">
                                         已选角色 ({filenames.length}/4):
                                     </p>
@@ -326,6 +500,27 @@ const BattlePage: React.FC = () => {
                                 </ul>
                             </div>
                         )}
+
+                        {/* --- 选择平均等级 --- */}
+                        <div className="input-group">
+                            <label htmlFor="level-select" className="input-label">
+                            指定平均等级 (可选):
+                            </label>
+                            <select
+                            id="level-select"
+                            value={selectedLevel}
+                            onChange={(e) => setSelectedLevel(e.target.value)}
+                            className="input-field"
+                            style={{ cursor: 'pointer' }}
+                            >
+                            {battleLevels.map(level => (
+                                <option key={level.value} value={level.value}>
+                                {level.label}
+                                </option>
+                            ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">默认由 AI 根据角色强度自动分配，以保证战斗平衡和观赏性。</p>
+                        </div>
 
                         <button
                             onClick={handleGenerate}
@@ -440,9 +635,9 @@ const BattlePage: React.FC = () => {
                         </div>
                     </div>
                 )}
-                
+
                 {/* 队列状态组件 */}
-                <QueueStatus 
+                <QueueStatus
                     endpoint="generate-battle-story"
                     isVisible={showQueueStatus}
                     onComplete={() => {

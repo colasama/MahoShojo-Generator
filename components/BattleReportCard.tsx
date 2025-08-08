@@ -49,8 +49,24 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
       const imgElement = await result.toPng();
       const imageUrl = imgElement.src;
 
-      if (onSaveImage) {
-        onSaveImage(imageUrl);
+      // 检测设备类型以提供最佳保存体验
+      const isMobileDevice = /Mobi/i.test(window.navigator.userAgent);
+
+      if (isMobileDevice) {
+        // 在移动端，调用回调函数以显示弹窗供用户长按保存
+        if (onSaveImage) {
+          onSaveImage(imageUrl);
+        }
+      } else {
+        // 在桌面端，直接触发文件下载
+        const downloadLink = document.createElement('a');
+        downloadLink.href = imageUrl;
+        // 使用新闻标题并清理特殊字符作为文件名
+        const sanitizedTitle = report.headline.replace(/[^a-z0-9\u4e00-\u9fa5]/gi, '_');
+        downloadLink.download = `魔法少女速报_${sanitizedTitle}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
       }
     } catch (err) {
       alert('生成图片失败，请重试');
