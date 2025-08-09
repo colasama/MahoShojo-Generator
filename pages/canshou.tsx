@@ -4,7 +4,6 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import Link from 'next/link';
-// We will create this component next
 import CanshouCard, { CanshouDetails } from '../components/CanshouCard';
 
 // 定义问卷和问题的类型
@@ -22,6 +21,81 @@ interface CanshouQuestionnaire {
   description: string;
   questions: Question[];
 }
+
+// 新增：用于保存JSON的按钮组件
+const SaveJsonButton: React.FC<{ canshouDetails: CanshouDetails; answers: Record<string, string> }> = ({ canshouDetails, answers }) => {
+  const [isMobile, setIsMobile] = useState(false);
+  const [showJsonText, setShowJsonText] = useState(false);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
+    setIsMobile(isMobileDevice);
+  }, []);
+
+  const downloadJson = () => {
+    // 将用户答案添加到保存的数据中
+    const dataToSave = {
+      ...canshouDetails,
+      userAnswers: answers
+    };
+    const jsonData = JSON.stringify(dataToSave, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `残兽档案_${canshouDetails.name || 'data'}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSave = () => {
+    if (isMobile) {
+      setShowJsonText(true);
+    } else {
+      downloadJson();
+    }
+  };
+
+  if (showJsonText) {
+    return (
+      <div className="text-left">
+        <div className="mb-4 text-center">
+          <div className="p-3 mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 text-xs rounded-r-lg">
+            <p className="font-bold">手机用户操作提示：</p>
+            <p className="mt-1">建议使用电脑进行文件操作。手机用户请复制下方全部内容，并将其手动保存为一个以 <code className="bg-yellow-200 px-1 rounded">.json</code> 结尾的文件。</p>
+          </div>
+          <p className="text-sm text-gray-600 mb-2">请复制以下数据并保存</p>
+          <button
+            onClick={() => setShowJsonText(false)}
+            className="text-pink-700 text-sm"
+          >
+            返回
+          </button>
+        </div>
+        <textarea
+          value={JSON.stringify({ ...canshouDetails, userAnswers: answers }, null, 2)}
+          readOnly
+          className="w-full h-64 p-3 border rounded-lg text-xs font-mono bg-gray-50 text-gray-900"
+          onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+        />
+        <p className="text-xs text-gray-500 mt-2 text-center">点击文本框可全选内容</p>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleSave}
+      className="generate-button"
+    >
+      {isMobile ? '查看原始数据' : '下载设定文件'}
+    </button>
+  );
+};
+
 
 const CanshouPage: React.FC = () => {
   const router = useRouter();
@@ -231,6 +305,14 @@ const CanshouPage: React.FC = () => {
             ) : (
                 <>
                     <CanshouCard canshou={canshouDetails} onSaveImage={handleSaveImage} />
+
+                    {/* 新增：保存JSON文件功能 */}
+                    <div className="card" style={{ marginTop: '1rem' }}>
+                        <div className="text-center">
+                            <h3 className="text-lg font-medium text-gray-800" style={{ marginBottom: '1rem' }}>保存残兽档案</h3>
+                            <SaveJsonButton canshouDetails={canshouDetails} answers={answers} />
+                        </div>
+                    </div>
 
                     {/* 设定说明 */}
                     <div className="card mt-4">
