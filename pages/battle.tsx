@@ -13,7 +13,7 @@ import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
 
 // 定义魔法少女设定的核心字段，用于验证
-const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule', 'blooming', 'analysis'];
+// const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule', 'blooming', 'analysis'];
 
 // 新增：定义一个映射，用于描述核心字段及其必需的子字段
 // 这将用于兼容缺少父级但包含子级的不规范JSON
