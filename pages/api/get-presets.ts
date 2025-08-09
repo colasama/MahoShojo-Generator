@@ -110,6 +110,30 @@ const PRESET_LIST: Preset[] = [
     description: "湿地魅影：拥有双头和野兽智慧的敏捷猎手，擅长追猎与夹击。",
     filename: "pupa.json",
     type: "canshou"
+  },
+  {
+    name: "合唱团与舞者-蛹",
+    description: "下水道的歌剧：歌声操控一切的巨大鱼形残兽，极度危险的区域控制者。",
+    filename: "choir_and_dancer.json",
+    type: "canshou"
+  },
+  {
+    name: "血肉蛛网-蛹",
+    description: "捕食的巢穴：由血肉构成的巨大蛛网，能扭曲空间并捕获猎物。",
+    filename: "flesh_spider_web.json",
+    type: "canshou"
+  },
+  {
+    name: "殿前烬卫白蛛-半蜕",
+    description: "忠诚的守护者：与人类融合的巨大白色蜘蛛，掌握规则之力的强大战士。",
+    filename: "cinder_guard_spider.json",
+    type: "canshou"
+  },
+  {
+    name: "蛾-蜕",
+    description: "黑夜，黎明：梦幻而致命的巨大飞蛾，拥有完整巢穴与规则的灾难化身。",
+    filename: "moth.json",
+    type: "canshou"
   }
 ];
 
