@@ -15,6 +15,17 @@ import { config as appConfig } from '../lib/config';
 // 定义魔法少女设定的核心字段，用于验证
 const CORE_FIELDS = ['codename', 'appearance', 'magicConstruct', 'wonderlandRule', 'blooming', 'analysis'];
 
+// 新增：定义一个映射，用于描述核心字段及其必需的子字段
+// 这将用于兼容缺少父级但包含子级的不规范JSON
+const CORE_FIELD_CHILDREN: Record<string, string[]> = {
+    appearance: ['outfit', 'accessories', 'colorScheme', 'overallLook'],
+    magicConstruct: ['name', 'form', 'basicAbilities', 'description'],
+    wonderlandRule: ['name', 'description', 'tendency', 'activation'],
+    blooming: ['name', 'evolvedAbilities', 'evolvedForm', 'evolvedOutfit', 'powerLevel'],
+    analysis: ['personalityAnalysis', 'abilityReasoning', 'coreTraits', 'predictionBasis']
+};
+
+
 // 定义可选的战斗等级
 const battleLevels = [
     { value: '', label: '默认 (AI自动分配)' },
@@ -33,7 +44,7 @@ const BattlePage: React.FC = () => {
     const [filenames, setFilenames] = useState<string[]>([]);
     // 是否正在生成中
     const [isGenerating, setIsGenerating] = useState(false);
-    // 错误信息
+    // 错误或警告信息
     const [error, setError] = useState<string | null>(null);
     // 更新状态以匹配新的数据结构
     const [newsReport, setNewsReport] = useState<NewsReport | null>(null);
@@ -44,6 +55,11 @@ const BattlePage: React.FC = () => {
     // 用于复制粘贴设定文本
     const [pastedJson, setPastedJson] = useState<string>('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+    // 新增：用于跟踪哪些文件被自动修正过
+    const [correctedFiles, setCorrectedFiles] = useState<Record<string, boolean>>({});
+    // 新增：用于跟踪复制操作的状态
+    const [copiedStatus, setCopiedStatus] = useState<Record<string, boolean>>({});
+
 
     // 冷却状态钩子，设置为2分钟
     const { isCooldown, startCooldown, remainingTime } = useCooldown('generateBattleCooldown', 120000);
@@ -125,22 +141,54 @@ const BattlePage: React.FC = () => {
         fetchData();
     }, []);
 
-    // 新增：封装一个验证函数，用于检查JSON对象是否符合基本规范
-    const validateMagicalGirlData = (data: any, filename: string): boolean => {
-        // 兼容 “麻雀” 这类非规范但可用的文件
+    // 修改：重构验证函数以兼容不规范的JSON，并返回是否被修正过的状态
+    const validateMagicalGirlData = (data: any, filename: string): { success: boolean, wasCorrected: boolean } => {
+        // 兼容非规范但可用的文件
         if (data.name && data.construct) {
             data.codename = data.name; // 补充 codename 字段以供后续使用
-            return true;
+            return { success: true, wasCorrected: false };
         }
 
-        // 检查所有核心字段是否存在
-        for (const field of CORE_FIELDS) {
-            if (data[field] === undefined) {
-                setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "${field}" 字段。`);
-                return false;
+        // 检查codename字段
+        if (typeof data.codename !== 'string' || !data.codename) {
+            setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "codename" 字段。`);
+            return { success: false, wasCorrected: false };
+        }
+
+        let warningMessage = '';
+        let wasCorrected = false;
+
+        // 遍历所有核心字段进行检查和修复
+        for (const parentKey of Object.keys(CORE_FIELD_CHILDREN)) {
+            // 如果父级项目不存在
+            if (data[parentKey] === undefined) {
+                const childKeys = CORE_FIELD_CHILDREN[parentKey];
+                const allChildrenExist = childKeys.every(childKey => data[childKey] !== undefined);
+
+                // 如果所有子级项目都存在于顶层
+                if (allChildrenExist) {
+                    // 记录一个警告，告知用户格式问题
+                    wasCorrected = true;
+                    warningMessage += `检测到缺失的顶层项目 "${parentKey}"，但其子项目齐全，已自动兼容。\n`;
+                    // 创建父级项目并将子级项目移动进去
+                    data[parentKey] = {};
+                    childKeys.forEach(childKey => {
+                        data[parentKey][childKey] = data[childKey];
+                        delete data[childKey]; // 从顶层删除已移动的子项目
+                    });
+                } else {
+                    // 如果父级和子级都不完整，则这是一个真正的错误
+                    setError(`❌ 文件 "${filename}" 格式不规范，缺少必需的 "${parentKey}" 字段或其部分子字段。`);
+                    return { success: false, wasCorrected: false };
+                }
             }
         }
-        return true;
+
+        // 如果有任何警告信息，则显示出来（不会中断流程）
+        if (warningMessage) {
+            setError(`✔️ 文件 "${filename}" 已加载，但格式稍有不规范:\n${warningMessage.trim()}`);
+        }
+        return { success: true, wasCorrected };
     };
 
 
@@ -165,7 +213,6 @@ const BattlePage: React.FC = () => {
             const response = await fetch(`/presets/${preset.filename}`);
             if (!response.ok) throw new Error(`无法加载 ${preset.name} 的设定文件。`);
 
-            // 增强：使用 .text() 读取，以防预设文件格式错误
             const fileContent = await response.text();
             let presetData;
             try {
@@ -174,12 +221,10 @@ const BattlePage: React.FC = () => {
                 throw new Error(`预设文件 "${preset.name}" 格式错误，无法解析。`);
             }
 
-            // 增强：验证预设文件内容
-            if (!validateMagicalGirlData(presetData, preset.name)) {
-                return; // validateMagicalGirlData 内部会设置错误信息
+            if (!validateMagicalGirlData(presetData, preset.name).success) {
+                return;
             }
 
-            // 添加 isPreset 标志，用于数据库记录
             presetData.isPreset = true;
 
             setMagicalGirls(prev => [...prev, presetData]);
@@ -198,13 +243,13 @@ const BattlePage: React.FC = () => {
         const totalSlots = 4 - magicalGirls.length;
         if (files.length > totalSlots) {
             setError(`队伍已满！总人数不能超过4人，你当前还能添加 ${totalSlots} 人。`);
-            // 清空input的值，以便用户能重新选择
             if (event.target) event.target.value = '';
             return;
         }
 
         const loadedGirls: any[] = [];
         const loadedFilenames: string[] = [];
+        const newCorrectedFiles: Record<string, boolean> = {};
         let validationPassed = true;
 
         try {
@@ -215,28 +260,33 @@ const BattlePage: React.FC = () => {
                 const text = await file.text();
                 let json;
 
-                // 增强：在解析JSON时进行try-catch，提供更友好的错误提示
                 try {
                     json = JSON.parse(text);
                 } catch {
                     throw new Error(`文件 "${file.name}" 的JSON格式有误，无法解析。请检查文件内容。`);
                 }
 
-                // 增强：验证文件内容结构
-                if (!validateMagicalGirlData(json, file.name)) {
+                const validationResult = validateMagicalGirlData(json, file.name);
+                if (!validationResult.success) {
                     validationPassed = false;
-                    break; // 一旦有文件验证失败，就停止处理
+                    break;
+                }
+
+                if (validationResult.wasCorrected) {
+                    newCorrectedFiles[json.codename] = true;
                 }
 
                 loadedGirls.push(json);
                 loadedFilenames.push(file.name);
             }
 
-            // 只有所有文件都通过验证才更新状态
             if (validationPassed) {
                 setMagicalGirls(prev => [...prev, ...loadedGirls]);
                 setFilenames(prev => [...prev, ...loadedFilenames]);
-                setError(null);
+                setCorrectedFiles(prev => ({ ...prev, ...newCorrectedFiles }));
+                if (!error?.startsWith('✔️')) {
+                    setError(null);
+                }
             }
 
         } catch (err) {
@@ -246,7 +296,6 @@ const BattlePage: React.FC = () => {
                 setError('❌ 文件读取失败，请确保上传了正确的 JSON 文件。');
             }
         } finally {
-            // 清空input的值，以便用户可以重新选择相同的文件
             if (event.target) event.target.value = '';
         }
     };
@@ -258,6 +307,7 @@ const BattlePage: React.FC = () => {
 
         const loadedGirls: any[] = [];
         const loadedFilenames: string[] = [];
+        const newCorrectedFiles: Record<string, boolean> = {};
 
         try {
             // 尝试将文本解析为 JSON 对象或数组
@@ -279,18 +329,24 @@ const BattlePage: React.FC = () => {
             }
 
             for (const item of dataArray) {
-                if (!validateMagicalGirlData(item, item.codename || '粘贴的内容')) {
-                    // 如果有一个验证失败，则停止处理
+                const validationResult = validateMagicalGirlData(item, item.codename || '粘贴的内容');
+                if (!validationResult.success) {
                     return;
                 }
+                if (validationResult.wasCorrected) {
+                    newCorrectedFiles[item.codename] = true;
+                }
                 loadedGirls.push(item);
-                loadedFilenames.push(item.codename); // 使用代号作为唯一标识
+                loadedFilenames.push(item.codename);
             }
 
             setMagicalGirls(prev => [...prev, ...loadedGirls]);
             setFilenames(prev => [...prev, ...loadedFilenames]);
-            setPastedJson(''); // 清空文本域
-            setError(null);
+            setCorrectedFiles(prev => ({ ...prev, ...newCorrectedFiles }));
+            setPastedJson('');
+            if (!error?.startsWith('✔️')) {
+                setError(null);
+            }
 
         } catch (err) {
             if (err instanceof Error) {
@@ -307,9 +363,41 @@ const BattlePage: React.FC = () => {
         setFilenames([]);
         setNewsReport(null);
         setError(null);
+        setCorrectedFiles({}); // 清空修正记录
         if (fileInputRef.current) {
             fileInputRef.current.value = ''; // 重置文件输入框
         }
+    };
+
+    // 新增：下载修正后的JSON文件
+    const handleDownloadCorrectedJson = (codename: string) => {
+        const girlData = magicalGirls.find(g => (g.codename || g.name) === codename);
+        if (!girlData) return;
+
+        const jsonData = JSON.stringify(girlData, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `魔法少女_${codename}_修正版.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    // 新增：复制修正后的JSON文本
+    const handleCopyCorrectedJson = (codename: string) => {
+        const girlData = magicalGirls.find(g => (g.codename || g.name) === codename);
+        if (!girlData) return;
+
+        const jsonData = JSON.stringify(girlData, null, 2);
+        navigator.clipboard.writeText(jsonData).then(() => {
+            setCopiedStatus(prev => ({ ...prev, [codename]: true }));
+            setTimeout(() => {
+                setCopiedStatus(prev => ({ ...prev, [codename]: false }));
+            }, 2000); // 2秒后恢复按钮状态
+        });
     };
 
     // 处理生成按钮点击事件
@@ -461,25 +549,18 @@ const BattlePage: React.FC = () => {
                                             </button>
 
                                             <div className="flex space-x-1">
-                                                {(() => {
-                                                    const totalPages = Math.ceil(presets.length / presetsPerPage);
-                                                    const pages = [];
-                                                    for (let i = 1; i <= totalPages; i++) {
-                                                        pages.push(
-                                                            <button
-                                                                key={i}
-                                                                onClick={() => setCurrentPresetPage(i)}
-                                                                className={`px-3 py-1 rounded text-sm ${currentPresetPage === i
-                                                                    ? 'bg-pink-600 text-white'
-                                                                    : 'bg-pink-100 text-pink-700 hover:bg-pink-200'
-                                                                    }`}
-                                                            >
-                                                                {i}
-                                                            </button>
-                                                        );
-                                                    }
-                                                    return pages;
-                                                })()}
+                                                {Array.from({ length: Math.ceil(presets.length / presetsPerPage) }, (_, i) => (
+                                                    <button
+                                                        key={i + 1}
+                                                        onClick={() => setCurrentPresetPage(i + 1)}
+                                                        className={`px-3 py-1 rounded text-sm ${currentPresetPage === i + 1
+                                                            ? 'bg-pink-600 text-white'
+                                                            : 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+                                                            }`}
+                                                    >
+                                                        {i + 1}
+                                                    </button>
+                                                ))}
                                             </div>
 
                                             <button
@@ -549,12 +630,27 @@ const BattlePage: React.FC = () => {
                                         清空列表
                                     </button>
                                 </div>
-                                <ul className="list-disc list-inside text-sm text-gray-600 mt-2">
-                                    {magicalGirls.map(girl => (
-                                        <li key={girl.codename || girl.name}>
-                                            {girl.codename || girl.name} {girl.isPreset && ' (预设)'}
-                                        </li>
-                                    ))}
+                                <ul className="list-disc list-inside text-sm text-gray-600 mt-2 space-y-2">
+                                    {magicalGirls.map(girl => {
+                                        const codename = girl.codename || girl.name;
+                                        const isCorrected = correctedFiles[codename];
+                                        return (
+                                            <li key={codename} className="flex justify-between items-center">
+                                                <span>
+                                                    {codename} {girl.isPreset && ' (预设)'}
+                                                    {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
+                                                </span>
+                                                {isCorrected && (
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleDownloadCorrectedJson(codename)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">下载</button>
+                                                        <button onClick={() => handleCopyCorrectedJson(codename)} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">
+                                                            {copiedStatus[codename] ? '已复制!' : '复制'}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             </div>
                         )}
@@ -592,7 +688,7 @@ const BattlePage: React.FC = () => {
                                     : '生成独家新闻 (๑•̀ㅂ•́)و✧'}
                         </button>
 
-                        {error && <div className="error-message">{error}</div>}
+                        {error && <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${error.startsWith('❌') ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{error}</div>}
                     </div>
 
                     {newsReport && (

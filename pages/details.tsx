@@ -334,6 +334,7 @@ const DetailsPage: React.FC = () => {
                 >
                   你在魔法少女道路上的潜力和表现将会如何？<br />
                   <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>本测试设定来源于小说《下班，然后变成魔法少女》</p>
+                  <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>首页：mahoshojo.colanns.me</p>
                   <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>以及广告位募集中</del></p>
                   <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>如有意向请联系魔法国度研究院院长 @祖母绿：1********</del></p>
                 </div>
