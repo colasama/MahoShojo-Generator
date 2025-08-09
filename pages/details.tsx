@@ -206,6 +206,14 @@ const DetailsPage: React.FC = () => {
     }
   };
 
+  const checkSensitiveWords = async (content: string) => {
+    const checkResult = await quickCheck(content);
+    if (checkResult.hasSensitiveWords) {
+      router.push('/arrested');
+      return;
+    }
+  }
+
   const handleSubmit = async (finalAnswers: string[]) => {
     if (isCooldown) {
       setError(`请等待 ${remainingTime} 秒后再生成`);
@@ -215,11 +223,7 @@ const DetailsPage: React.FC = () => {
     setError(null); // 清除之前的错误
     // 检查
     console.log('检查敏感词:', finalAnswers.join(''));
-    const result = await quickCheck(finalAnswers.join(''));
-    if (result.hasSensitiveWords) {
-      router.push('/arrested');
-      return;
-    }
+    await checkSensitiveWords(finalAnswers.join(''));
 
     try {
       console.log('提交答案:', finalAnswers);
@@ -247,6 +251,9 @@ const DetailsPage: React.FC = () => {
 
       const result: MagicalGirlDetails = await response.json();
       console.log('生成结果:', result);
+      // 加入后置生成敏感词检测
+      await checkSensitiveWords(JSON.stringify(result));
+
       setMagicalGirlDetails(result);
       setError(null); // 成功时清除错误
     } catch (error) {

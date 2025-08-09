@@ -400,6 +400,14 @@ const BattlePage: React.FC = () => {
         });
     };
 
+    const checkSensitiveWords = async (content: string) => {
+        const checkResult = await quickCheck(content);
+        if (checkResult.hasSensitiveWords) {
+            router.push('/arrested');
+            return;
+        }
+    }
+
     // 处理生成按钮点击事件
     const handleGenerate = async () => {
         if (isCooldown) {
@@ -418,11 +426,7 @@ const BattlePage: React.FC = () => {
         try {
             // 安全措施：检查上传内容中的敏感词
             const contentToCheck = JSON.stringify(magicalGirls);
-            const checkResult = await quickCheck(contentToCheck);
-            if (checkResult.hasSensitiveWords) {
-                router.push('/arrested');
-                return;
-            }
+            await checkSensitiveWords(contentToCheck);
 
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
@@ -451,6 +455,9 @@ const BattlePage: React.FC = () => {
             }
 
             const result: NewsReport = await response.json();
+            // 加入后置生成敏感词检测
+            await checkSensitiveWords(JSON.stringify(result));
+
             setNewsReport(result);
             startCooldown();
         } catch (err) {
