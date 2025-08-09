@@ -2,6 +2,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getSignedUrl } from "@/lib/tachie/liblib/utils";
 import type { StatusResponse } from "@/lib/tachie/liblib/types";
 
+export const config = {
+  runtime: 'edge',
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
