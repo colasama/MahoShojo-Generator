@@ -1,4 +1,3 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { getSignedUrl } from "@/lib/tachie/liblib/utils";
 import type { GenerateResponse, ComfyUIAppParams } from "@/lib/tachie/liblib/types";
 
@@ -6,23 +5,26 @@ export const config = {
   runtime: 'edge',
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: Request) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      { status: 405, headers: { "Content-Type": "application/json" } }
+    );
   }
 
-  const { accessKey, secretKey, prompt } = req.body;
+  const { accessKey, secretKey, prompt } = await req.json();
 
   if (!accessKey || !secretKey || !prompt) {
-    return res.status(400).json({ error: "Missing required parameters" });
+    return new Response(
+      JSON.stringify({ error: "Missing required parameters" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   try {
     const endpoint = "/api/generate/comfyui/app";
-    const signedUrl = getSignedUrl(accessKey, secretKey, endpoint);
+    const signedUrl = await getSignedUrl(accessKey, secretKey, endpoint);
 
     // 预设参数
     const generateParams: ComfyUIAppParams = {
@@ -46,24 +48,32 @@ export default async function handler(
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        error: `LibLib API error: ${response.status}`
-      });
+      return new Response(
+        JSON.stringify({ error: `LibLib API error: ${response.status}` }),
+        { status: response.status, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const result: GenerateResponse = await response.json();
 
     if (result.code !== 0) {
-      return res.status(400).json({
-        error: `LibLib API error: ${result.msg}`
-      });
+      return new Response(
+        JSON.stringify({ error: `LibLib API error: ${result.msg}` }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
-    res.status(200).json(result);
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
   } catch (error) {
     console.error("Generate API error:", error);
-    res.status(500).json({
-      error: error instanceof Error ? error.message : "Internal server error"
-    });
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Internal server error"
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
 }

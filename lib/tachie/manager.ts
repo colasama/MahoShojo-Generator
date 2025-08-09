@@ -46,14 +46,14 @@ export const generateTachieWithProgress = async (
                 onProgress?.(10, "任务已提交，开始生成...");
                 let attempts = 0;
                 const maxAttempts = 30;
-                const interval = 5000; // 5秒轮询
+                const interval = 12000; // 12秒轮询
 
                 // 实时轮询状态并更新进度
                 while (attempts < maxAttempts) {
                     const status = await getGenerateStatus(request.accessKey, request.secretKey, generateUuid);
                     const progress = calculateProgress(status.generateStatus, attempts);
                     const statusText = getStatusDescription(status.generateStatus);
-                    
+
                     onProgress?.(progress, statusText);
 
                     // 检查完成状态
