@@ -18,7 +18,7 @@ export const urlSignature = (url: string, secretKey: string) => {
     const hash = createHmac("sha1", secretKey).update(str).digest("base64");
     // 最后一步： encodeBase64URLSafeString(密文)
     // 这一步很重要，生成安全字符串。java、Python 以外的语言，可以参考这个 JS 的处理
-    let signature = hash
+    const signature = hash
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
         .replace(/=+$/, "");
