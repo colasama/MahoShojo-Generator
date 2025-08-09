@@ -128,6 +128,18 @@ async function handler(
     }
   }
 
+  // 安全检查：检查用户输入是否包含敏感词
+  const answersString = answers.join(' ');
+  const checkResult = await quickCheck(answersString);
+  if (checkResult.hasSensitiveWords) {
+    // 在服务器端记录日志，然后返回一个特定错误，让前端处理跳转
+    log.warn('检测到敏感词，请求被拒绝', { detected: checkResult.detectedWords });
+    return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     // 直接调用AI生成，不再入队
     const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
