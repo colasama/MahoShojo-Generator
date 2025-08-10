@@ -21,12 +21,6 @@ export interface Preset {
 const PRESET_LIST: Preset[] = [
   // 魔法少女
   {
-    name: "白百合",
-    description: "测试用角色：神圣典雅的圣女型魔法少女。",
-    filename: "white_lily.json",
-    type: "magical-girl"
-  },
-  {
     name: "翠雀",
     description: "樊笼下的蓝翠雀：身经百战的前辈，外冷内热的魔法少女。",
     filename: "centaurea.json",
@@ -90,6 +84,18 @@ const PRESET_LIST: Preset[] = [
     name: "向日葵",
     description: "旧景重现：追逐大新闻的乐子人，能将照片中的景象再现。",
     filename: "sunflower.json",
+    type: "magical-girl"
+  },
+  {
+    name: "雪绒",
+    description: "大道至简：专打机制怪和说书人，大概是鸢师傅Alter",
+    filename: "greatness_in_simplicity.json",
+    type: "magical-girl"
+  },
+  {
+    name: "白百合",
+    description: "测试用角色：神圣典雅的圣女型魔法少女。",
+    filename: "white_lily.json",
     type: "magical-girl"
   },
   // 如果有更多预设，可以像下面这样继续添加：
