@@ -8,6 +8,7 @@ import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 // 新增：导入 Link 组件，用于页面跳转
 import Link from 'next/link';
+import TachieGenerator from '../components/TachieGenerator';
 
 interface Questionnaire {
   questions: string[];
@@ -543,6 +544,16 @@ const DetailsPage: React.FC = () => {
                       前往竞技场，开始战斗！→
                     </Link>
                   </div>
+                </div>
+              </div>
+
+              {/* 立绘生成器 */}
+              <div className="card" style={{ marginTop: '1rem' }}>
+                <div className="text-center">
+                  <h3 className="text-lg font-medium text-blue-900" style={{ marginBottom: '1rem' }}>生成立绘</h3>
+                  <TachieGenerator
+                    prompt={`${JSON.stringify(magicalGirlDetails.appearance)} , Xiabanmo, 二次元, 魔法少女`}
+                  />
                 </div>
               </div>
             </>
