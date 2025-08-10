@@ -15,10 +15,10 @@ const MagicalGirlDetailsSchema = z.object({
   codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名。
     请从我提供的花名中选取最合适的一个，也可以生成一个其他的更合适的花名，但是生成的时候需要减少鸢尾的出现概率`),
   appearance: z.object({
-    outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，大约50字左右"),
-    accessories: z.string().describe("变身后的饰品细节描述，大约50字左右"),
+    outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，50字左右"),
+    accessories: z.string().describe("变身后的饰品细节描述，50字左右"),
     colorScheme: z.string().describe("参考问卷生成主要色调和配色方案"),
-    overallLook: z.string().describe("整体外观风格，大约50字左右")
+    overallLook: z.string().describe("整体外观风格，包括发色、瞳色、发型、体型、服饰和神态表情，60字左右")
   }),
   magicConstruct: z.object({
     name: z.string().describe("魔装的名字"),
