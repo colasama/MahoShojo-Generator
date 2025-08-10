@@ -45,6 +45,12 @@ const PRESET_LIST: Preset[] = [
     type: "magical-girl"
   },
   {
+    name: "鸢",
+    description: "爪痕兽心：只相信自身技艺的武痴，行走于阴影中的反权威者。",
+    filename: "kite.json",
+    type: "magical-girl"
+  },
+  {
     name: "麻雀",
     description: "牢雀：正被关在调查院地牢里承受挠痒痒酷刑。",
     filename: "sparrow.json",
@@ -60,12 +66,6 @@ const PRESET_LIST: Preset[] = [
     name: "朝颜",
     description: "科技与狠活：背负他人身影的'记录者'，活在悔恨与爱恋中的败犬，让人怀疑她是不是有在吃代餐。",
     filename: "asagao.json",
-    type: "magical-girl"
-  },
-  {
-    name: "鸢",
-    description: "爪痕兽心：只相信自身技艺的武痴，行走于阴影中的反权威者。",
-    filename: "kite.json",
     type: "magical-girl"
   },
   {
