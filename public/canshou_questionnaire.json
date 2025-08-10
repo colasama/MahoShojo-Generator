@@ -1,0 +1,75 @@
+{
+  "title": "研究院残兽调查",
+  "description": "通过回答一系列问题，生成专属的残兽设定。",
+  "logoUrl": "/questionnaire-logo.svg",
+  "questions": [
+    {
+      "id": "coreConcept",
+      "question": "残兽的核心概念是什么？",
+      "options": ["腐蚀", "穿透", "同化", "蛛网", "火焰", "吞噬", "畸变", "寄生"],
+      "allowCustom": true
+    },
+    {
+      "id": "coreEmotion",
+      "question": "它的核心情感或欲望是什么？",
+      "options": ["破坏欲", "吞噬欲", "怨念", "占有欲", "混沌", "恐惧", "痛苦", "饥饿"],
+      "allowCustom": true
+    },
+    {
+      "id": "evolutionStage",
+      "question": "它的进化阶段处于？",
+      "options": [
+        {"value": "卵", "label": "卵"},
+        {"value": "蠖", "label": "蠖"},
+        {"value": "蛹", "label": "蛹"},
+        {"value": "半蜕", "label": "半蜕"},
+        {"value": "蜕", "label": "蜕"},
+        {"value": "王蜕", "label": "王蜕"},
+        {"value": "羽", "label": "羽 (不可选)", "disabled": true}
+      ],
+      "allowCustom": false
+    },
+    {
+      "id": "appearanceForm",
+      "question": "它的外貌形态更接近？",
+      "options": ["野兽", "昆虫", "植物", "矿物", "液体", "无定形", "几何体", "人形"],
+      "allowCustom": true
+    },
+    {
+      "id": "materialAndSkin",
+      "question": "它的材质与表皮是？",
+      "type": "text",
+      "placeholder": "例如：湿滑的黏液、乌紫色的皮毛、金属般的外壳……"
+    },
+    {
+      "id": "featuresAndAppendages",
+      "question": "它有哪些显著的特征与附属物？",
+      "type": "text",
+      "placeholder": "例如：多个头颅、奇异的管状结构、流淌着涎水的巨口……"
+    },
+    {
+      "id": "attackMethod",
+      "question": "它的主要攻击方式是什么？",
+      "type": "text",
+      "placeholder": "例如：利爪挥砍、毒液喷射、精神冲击……"
+    },
+    {
+      "id": "specialAbility",
+      "question": "它是否拥有特殊能力？",
+      "type": "text",
+      "placeholder": "例如：伪装、再生、空间扭曲……"
+    },
+    {
+      "id": "origin",
+      "question": "它的起源是？",
+      "options": ["野生", "黑烬黎明（反国度组织）", "爪痕（叛逃魔法少女）", "间界", "魔法国度", "未知"],
+      "allowCustom": true
+    },
+    {
+      "id": "birthEnvironment",
+      "question": "它的诞生环境是？",
+      "type": "text",
+      "placeholder": "例如：废弃的医院、幽深的下水道、充满辐射的工业区……"
+    }
+  ]
+}

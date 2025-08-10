@@ -101,6 +101,16 @@
     #434343 100%);
 }
 
+.canshou-generator .gradient-overlay {
+  background: linear-gradient(45deg,
+    #8E2DE2 0%,
+    #4A00E0 25%,
+    #240b36 50%,
+    #c31432 75%,
+    #8E2DE2 100%
+  );
+}
+
 .feature-button:hover .gradient-overlay {
   /* 恢复原始动画，但使用GPU加速 */
   animation: gradientFlowFast 4s ease-in-out infinite;

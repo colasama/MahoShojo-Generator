@@ -238,10 +238,16 @@ const DetailsPage: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ message: '无法解析的服务器错误' }));
 
         // 处理不同的 HTTP 状态码
-        if (response.status === 429) {
+        if (errorData.shouldRedirect) {
+          // 如果API返回需要重定向的标志，则执行跳转
+          router.push('/arrested');
+          // 返回以停止进一步执行
+          return;
+        }
+        else if (response.status === 429) {
           const retryAfter = errorData.retryAfter || 60;
           throw new Error(`请求过于频繁！请等待 ${retryAfter} 秒后再试。`);
         } else if (response.status >= 500) {
