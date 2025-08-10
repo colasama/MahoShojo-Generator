@@ -93,6 +93,12 @@ const PRESET_LIST: Preset[] = [
     type: "magical-girl"
   },
   {
+    name: "千日红",
+    description: "大道至繁：星穹的魔女，大道至简的对立面，头脑简单的莽夫之大敌。",
+    filename: "greatness_in_complexity.json",
+    type: "magical-girl"
+  },
+  {
     name: "白百合",
     description: "测试用角色：神圣典雅的圣女型魔法少女。",
     filename: "white_lily.json",
