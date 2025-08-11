@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useCooldown } from '../lib/cooldown';
 import Link from 'next/link';
 import CanshouCard, { CanshouDetails } from '../components/CanshouCard';
+import { CANSHOU_LORE } from '../lib/canshou-lore';
 
 // 定义问卷和问题的类型
 interface Question {
@@ -112,27 +113,18 @@ const CanshouPage: React.FC = () => {
   const [showIntroduction, setShowIntroduction] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLore, setShowLore] = useState(false);
-  const [loreContent, setLoreContent] = useState('');
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateCanshouCooldown', 60000);
 
-  // 加载问卷和设定文件
+  // 加载问卷文件
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [questionnaireRes, loreRes] = await Promise.all([
-          fetch('/canshou_questionnaire.json'),
-          fetch('/残兽设定整理.md')
-        ]);
+        const questionnaireRes = await fetch('/canshou_questionnaire.json');
 
         if (!questionnaireRes.ok) throw new Error('加载问卷文件失败');
         const questionnaireData: CanshouQuestionnaire = await questionnaireRes.json();
         setQuestionnaire(questionnaireData);
         setAnswers({});
-
-        if (loreRes.ok) {
-          const markdown = await loreRes.text();
-          setLoreContent(markdown);
-        }
 
       } catch (error) {
         console.error('加载页面数据失败:', error);
@@ -314,13 +306,13 @@ const CanshouPage: React.FC = () => {
                 </div>
 
                 {/* 设定说明 */}
-                <div className="card mt-4">
+                <div className="card">
                   <button onClick={() => setShowLore(!showLore)} className="text-lg font-medium text-gray-800 w-full text-left">
                     {showLore ? '▼ ' : '▶ '}残兽设定说明
                   </button>
                   {showLore && (
                     <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-100 p-4 rounded-lg">
-                      {loreContent}
+                      {CANSHOU_LORE}
                     </div>
                   )}
                 </div>
