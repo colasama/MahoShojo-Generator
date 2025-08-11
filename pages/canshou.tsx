@@ -218,7 +218,7 @@ const CanshouPage: React.FC = () => {
 
   if (loading || !questionnaire) {
     return (
-      <div className="magic-background-white">
+      <div className="magic-background-dark">
         <div className="container"><div className="card text-center">加载中...</div></div>
       </div>
     );
@@ -230,24 +230,23 @@ const CanshouPage: React.FC = () => {
   return (
     <>
       <Head>
-        <title>残兽生成器 - 研究院残兽调查</title>
+        <title>残兽生成器 - 间界残兽前进基地</title>
       </Head>
-      <div className="magic-background-white">
+      <div className="magic-background-dark">
         <div className="container">
           <div className="card">
             <div className="text-center mb-4">
-              <img src="/questionnaire-logo.svg" width={250} height={160} alt="残兽调查" />
-              <h2 className="text-2xl font-bold text-gray-800 mt-4">{questionnaire.title}</h2>
+              <img src="/beast-logo.svg" className="w-full px-8" alt="残兽调查" />
               <p className="text-gray-600 mt-2">{questionnaire.description}</p>
             </div>
 
             {showIntroduction ? (
-                <div className="text-center">
-                    <button onClick={() => setShowIntroduction(false)} className="generate-button text-lg">开始调查</button>
-                    <div className="mt-8">
-                        <Link href="/" className="footer-link">返回首页</Link>
-                    </div>
+              <div className="text-center">
+                <button onClick={() => setShowIntroduction(false)} className="generate-button text-lg">开始调查</button>
+                <div className="mt-8">
+                  <Link href="/" className="footer-link">返回首页</Link>
                 </div>
+              </div>
             ) : !canshouDetails ? (
               <>
                 <div className="mb-6">
@@ -255,7 +254,7 @@ const CanshouPage: React.FC = () => {
                     <span className="text-sm text-gray-600">问题 {currentQuestionIndex + 1} / {questionnaire.questions.length}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="h-2 rounded-full bg-pink-500 transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / questionnaire.questions.length) * 100}%` }}/>
+                    <div className="h-2 rounded-full bg-pink-500 transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / questionnaire.questions.length) * 100}%` }} />
                   </div>
                 </div>
 
@@ -268,28 +267,28 @@ const CanshouPage: React.FC = () => {
                 {currentQuestion.options && (
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     {currentQuestion.options.map((option, index) => {
-                        const value = typeof option === 'string' ? option : option.value;
-                        const label = typeof option === 'string' ? option : option.label;
-                        const disabled = typeof option !== 'string' && option.disabled;
-                        return (
-                            <button key={index} onClick={() => !disabled && handleOptionClick(value)} disabled={disabled} className={`p-3 border rounded-lg text-sm text-center transition-colors ${disabled ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-pink-50 hover:border-pink-300'}`}>
-                                {label}
-                            </button>
-                        );
+                      const value = typeof option === 'string' ? option : option.value;
+                      const label = typeof option === 'string' ? option : option.label;
+                      const disabled = typeof option !== 'string' && option.disabled;
+                      return (
+                        <button key={index} onClick={() => !disabled && handleOptionClick(value)} disabled={disabled} className={`p-3 border rounded-lg text-sm text-center transition-colors ${disabled ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-pink-50 hover:border-pink-300'}`}>
+                          {label}
+                        </button>
+                      );
                     })}
                   </div>
                 )}
 
                 {(currentQuestion.type === 'text' || currentQuestion.allowCustom) && (
-                    <div className="input-group">
-                        <textarea
-                            value={currentAnswer}
-                            onChange={(e) => setCurrentAnswer(e.target.value)}
-                            placeholder={currentQuestion.placeholder || "请在此输入你的想法..."}
-                            className="input-field resize-y h-24"
-                            maxLength={100}
-                        />
-                    </div>
+                  <div className="input-group">
+                    <textarea
+                      value={currentAnswer}
+                      onChange={(e) => setCurrentAnswer(e.target.value)}
+                      placeholder={currentQuestion.placeholder || "请在此输入你的想法..."}
+                      className="input-field resize-y h-24"
+                      maxLength={100}
+                    />
+                  </div>
                 )}
 
                 <button onClick={handleNext} disabled={submitting || isCooldown || !currentAnswer.trim()} className="generate-button">
@@ -299,42 +298,42 @@ const CanshouPage: React.FC = () => {
                 {error && <div className="error-message">{error}</div>}
 
                 <div className="mt-8 text-center">
-                    <Link href="/" className="footer-link">返回首页</Link>
+                  <Link href="/" className="footer-link">返回首页</Link>
                 </div>
               </>
             ) : (
-                <>
-                    <CanshouCard canshou={canshouDetails} onSaveImage={handleSaveImage} />
+              <>
+                <CanshouCard canshou={canshouDetails} onSaveImage={handleSaveImage} />
 
-                    {/* 新增：保存JSON文件功能 */}
-                    <div className="card" style={{ marginTop: '1rem' }}>
-                        <div className="text-center">
-                            <h3 className="text-lg font-medium text-gray-800" style={{ marginBottom: '1rem' }}>保存残兽档案</h3>
-                            <SaveJsonButton canshouDetails={canshouDetails} answers={answers} />
-                        </div>
-                    </div>
+                {/* 新增：保存JSON文件功能 */}
+                <div className="card" style={{ marginTop: '1rem' }}>
+                  <div className="text-center">
+                    <h3 className="text-lg font-medium text-gray-800" style={{ marginBottom: '1rem' }}>保存残兽档案</h3>
+                    <SaveJsonButton canshouDetails={canshouDetails} answers={answers} />
+                  </div>
+                </div>
 
-                    {/* 设定说明 */}
-                    <div className="card mt-4">
-                        <button onClick={() => setShowLore(!showLore)} className="text-lg font-medium text-gray-800 w-full text-left">
-                        {showLore ? '▼ ' : '▶ '}残兽设定说明
-                        </button>
-                        {showLore && (
-                            <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-100 p-4 rounded-lg">
-                                {loreContent}
-                            </div>
-                        )}
+                {/* 设定说明 */}
+                <div className="card mt-4">
+                  <button onClick={() => setShowLore(!showLore)} className="text-lg font-medium text-gray-800 w-full text-left">
+                    {showLore ? '▼ ' : '▶ '}残兽设定说明
+                  </button>
+                  {showLore && (
+                    <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-100 p-4 rounded-lg">
+                      {loreContent}
                     </div>
-                    <div className="mt-8 text-center">
-                        <Link href="/" className="footer-link">返回首页</Link>
-                    </div>
-                </>
+                  )}
+                </div>
+                <div className="mt-8 text-center">
+                  <Link href="/" className="footer-link">返回首页</Link>
+                </div>
+              </>
             )}
           </div>
 
-          <footer className="footer">
+          <footer className="footer text-gray-300">
             <p>
-                设计与制作 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
+              设计与制作 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
             </p>
             <p>
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
@@ -353,14 +352,14 @@ const CanshouPage: React.FC = () => {
       </div>
 
       {showImageModal && savedImageUrl && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative p-4">
-                <button onClick={() => setShowImageModal(false)} className="absolute top-2 right-2 text-3xl text-gray-600 hover:text-gray-900">&times;</button>
-                <p className="text-center text-sm text-gray-600 mb-2">长按图片保存到相册</p>
-                <img src={savedImageUrl} alt="残兽档案" className="w-full h-auto rounded-lg"/>
-            </div>
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative p-4">
+            <button onClick={() => setShowImageModal(false)} className="absolute top-2 right-2 text-3xl text-gray-600 hover:text-gray-900">&times;</button>
+            <p className="text-center text-sm text-gray-600 mb-2">长按图片保存到相册</p>
+            <img src={savedImageUrl} alt="残兽档案" className="w-full h-auto rounded-lg" />
           </div>
-        )}
+        </div>
+      )}
     </>
   );
 };

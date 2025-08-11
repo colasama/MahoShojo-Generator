@@ -49,7 +49,13 @@ const CanshouCard: React.FC<CanshouCardProps> = ({ canshou, onSaveImage }) => {
   return (
     <div ref={cardRef} className="result-card" style={{ background: 'linear-gradient(135deg, #434343 0%, #000000 100%)' }}>
       <div className="result-content">
-        <h2 className="text-2xl font-bold text-center mb-4 text-red-300">残兽档案</h2>
+        <div className="flex justify-center">
+          <img
+            src="/beast-title.svg"
+            alt="残兽档案"
+            className="w-72 mb-4"
+          />
+        </div>
 
         <div className="result-item">
           <div className="result-label">名称</div>

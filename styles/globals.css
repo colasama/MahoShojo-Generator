@@ -83,6 +83,13 @@ body {
     overflow: hidden;
   }
 
+  .magic-background-dark {
+    background: linear-gradient(45deg, #404555 0%, #4a3e5271 50%, #36233f 100%);
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
   .magic-background::before {
     content: '';
     position: absolute;

@@ -96,8 +96,8 @@ export default function Home() {
                 <div className="feature-button-content">
                   <div className="feature-title-container">
                     <img
-                      src="/questionnaire-logo.svg"
-                      width={250}
+                      src="/beast-logo-white.svg"
+                      width={280}
                       height={40}
                       alt="危险残兽大调查"
                       className="feature-title-svg"

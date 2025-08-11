@@ -11,7 +11,7 @@ import { GoogleAnalytics } from '@next/third-parties/google';
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const isDetailsPage = router.pathname === '/details';
+  const isDetailsPage = router.pathname === '/details' || router.pathname === '/canshou';
 
   return (
     <>
