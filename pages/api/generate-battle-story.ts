@@ -96,7 +96,7 @@ const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel
 
       // 如果存在用户问卷回答，则将其与问题配对
       if (userAnswers && Array.isArray(userAnswers)) {
-        profileString += `\n// 用户问卷回答 (用于理解角色深层性格与理念)\n`;
+        profileString += `\n// 问卷回答 (用于理解角色深层性格与理念)\n`;
         const qaBlock = userAnswers.map((answer, i) => {
           // 使用索引从问卷中找到对应的问题
           const question = questions[i] || `问题 ${i + 1}`; // 如果问题列表长度不够，则使用备用标题
@@ -143,7 +143,7 @@ const createMagicalGirlVsCanshouConfig = (questions: string[]): GenerationConfig
       profileString += `// AI生成的角色核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
 
       if (userAnswers && Array.isArray(userAnswers)) {
-        profileString += `\n// 用户问卷回答 (用于理解角色深层性格与理念)\n`;
+        profileString += `\n// 问卷回答 (用于理解角色深层性格与理念)\n`;
         const qaBlock = userAnswers.map((answer, i) => {
           const question = questions[i] || `问题 ${i + 1}`;
           return `Q: ${question}\nA: ${answer}`;
