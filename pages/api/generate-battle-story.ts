@@ -54,9 +54,9 @@ const BattleReportCoreSchema = z.object({
 import { NewsReport } from '../../components/BattleReportCard';
 
 // 场景一：魔法少女 vs 魔法少女
-const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel?: string): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; cans hou: any[] }> => ({
+const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel?: string): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; canshou: any[] }> => ({
   systemPrompt: `
-  现在魔法少女在 A.R.E.N.A. 也就是 Awakened Rune Enchantress Nova Arena 中展开竞技性的战斗，请根据以下规则生成战斗简报：
+  现在魔法少女在 A.R.E.N.A.竞技场中展开战斗，请根据以下规则生成战斗简报：
   战斗推演核心规则：
 1.  等级与能力限制：魔法少女的能力与她的等级严格挂钩。在推演开始前，请根据角色设定的强度，为每位魔法少女分配合理的等级以确保战斗的平衡性和观赏性。
     * 平衡原则：通常，参加战斗的魔法少女等级应当是一致的。但作为最后的平衡手段，能力设定严重过强的角色可以比其他人低1级，而设定严重过弱的角色则可以比其他人高1级。
@@ -96,7 +96,7 @@ const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel
 
       // 如果存在用户问卷回答，则将其与问题配对
       if (userAnswers && Array.isArray(userAnswers)) {
-        profileString += `\n// 用户问卷回答 (用于理解角色深层性格与理念)\n`;
+        profileString += `\n// 问卷回答 (用于理解角色深层性格与理念)\n`;
         const qaBlock = userAnswers.map((answer, i) => {
           // 使用索引从问卷中找到对应的问题
           const question = questions[i] || `问题 ${i + 1}`; // 如果问题列表长度不够，则使用备用标题
@@ -122,7 +122,8 @@ const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel
 });
 
 // 场景二：魔法少女 vs 残兽
-const createMagicalGirlVsCanshouConfig = (): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; canshou: any[] }> => ({
+// 将函数签名从 () 修改为 (questions: string[])
+const createMagicalGirlVsCanshouConfig = (questions: string[]): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; canshou: any[] }> => ({
   systemPrompt: `你是一名战地记者，负责报道魔法少女与残兽之间的战斗。
   --- 残兽核心设定 ---
   ${canshouLore}
@@ -138,7 +139,18 @@ const createMagicalGirlVsCanshouConfig = (): GenerationConfig<z.infer<typeof Bat
       // isPreset 字段是前端添加的，不需要给 AI
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { userAnswers, isPreset: _, ...restOfProfile } = mg.data;
-      return `--- 魔法少女 #${index + 1} ---\n${JSON.stringify(restOfProfile, null, 2)}`;
+      let profileString = `--- 魔法少女 #${index + 1} ---\n`;
+      profileString += `// AI生成的角色核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
+
+      if (userAnswers && Array.isArray(userAnswers)) {
+        profileString += `\n// 问卷回答 (用于理解角色深层性格与理念)\n`;
+        const qaBlock = userAnswers.map((answer, i) => {
+          const question = questions[i] || `问题 ${i + 1}`;
+          return `Q: ${question}\nA: ${answer}`;
+        }).join('\n');
+        profileString += qaBlock;
+      }
+      return profileString;
     }).join('\n\n');
 
     const canshouProfiles = input.canshou.map((c, index) => {
@@ -169,7 +181,9 @@ const createCanshouVsCanshouConfig = (): GenerationConfig<z.infer<typeof BattleR
     temperature: 0.8,
     promptBuilder: (input: { magicalGirls: any[]; canshou: any[] }) => {
         const canshouProfiles = input.canshou.map((c, index) => {
-            const { userAnswers, isPreset: _, ...restOfProfile } = c.data;
+        // 告诉 ESLint “忽略下一行的未使用变量错误”
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { userAnswers: _userAnswers, isPreset: _, ...restOfProfile } = c.data;
             return `--- 残兽 #${index + 1} ---\n${JSON.stringify(restOfProfile, null, 2)}`;
         }).join('\n\n');
 
@@ -268,7 +282,8 @@ async function handler(req: Request): Promise<Response> {
     } else {
       // 混合对战
       log.info('场景：魔法少女 vs 残兽');
-      generationConfig = createMagicalGirlVsCanshouConfig();
+      // 在这里传入 questionnaire.questions
+      generationConfig = createMagicalGirlVsCanshouConfig(questionnaire.questions);
     }
 
     const aiResult = await generateWithAI({ magicalGirls, canshou }, generationConfig);

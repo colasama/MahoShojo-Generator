@@ -113,6 +113,7 @@ const BattlePage: React.FC = () => {
                 }
 
                 // 并行获取数据
+                const responses = await Promise.all(requests);
                 const [presetsRes, statsRes] = responses;
 
                 if (presetsRes.ok) {
@@ -367,10 +368,22 @@ const BattlePage: React.FC = () => {
         const jsonData = JSON.stringify(combatant.data, null, 2);
         navigator.clipboard.writeText(jsonData).then(() => {
             setCopiedStatus(prev => ({ ...prev, [codename]: true }));
-            setTimeout(() => setCopiedStatus(prev => ({ ...prev, [codename]: false })), 2000);
+            setTimeout(() => {
+                setCopiedStatus(prev => ({ ...prev, [codename]: false }));
+            }, 2000); // 2秒后恢复按钮状态
         });
     };
 
+        const checkSensitiveWords = async (content: string) => {
+        const checkResult = await quickCheck(content);
+        if (checkResult.hasSensitiveWords) {
+            router.push('/arrested');
+            return true;
+        }
+        return false;
+    }
+
+    // 处理生成按钮点击事件
     const handleGenerate = async () => {
         if (isCooldown) {
             setError(`冷却中，请等待 ${remainingTime} 秒后再生成。`);
