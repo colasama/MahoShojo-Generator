@@ -12,7 +12,7 @@ import { GoogleAdSense } from "nextjs-google-adsense";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const isDetailsPage = router.pathname === '/details';
+  const isDetailsPage = router.pathname === '/details' || router.pathname === '/canshou';
 
   return (
     <>

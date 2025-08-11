@@ -90,6 +90,22 @@ export default function Home() {
                 </div>
               </Link>
 
+              {/* 残兽生成器按钮 */}
+              <Link href="/canshou" className="feature-button canshou-generator">
+                <div className="gradient-overlay"></div>
+                <div className="feature-button-content">
+                  <div className="feature-title-container">
+                    <img
+                      src="/beast-logo-white.svg"
+                      width={280}
+                      height={40}
+                      alt="危险残兽大调查"
+                      className="feature-title-svg"
+                    />
+                  </div>
+                </div>
+              </Link>
+
               {/* 魔法少女竞技场按钮 */}
               <Link href="/battle" className="feature-button battle-arena">
                 <div className="gradient-overlay"></div>
