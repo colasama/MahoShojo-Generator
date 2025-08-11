@@ -62,12 +62,12 @@ const CanshouCard: React.FC<CanshouCardProps> = ({ canshou, onSaveImage }) => {
           <div className="result-value">{canshou.name}</div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="result-item">
+        <div className="flex">
+          <div className="result-item w-full mr-4">
             <div className="result-label">核心概念</div>
             <div className="result-value">{canshou.coreConcept}</div>
           </div>
-          <div className="result-item">
+          <div className="result-item w-full">
             <div className="result-label">核心情感/欲望</div>
             <div className="result-value">{canshou.coreEmotion}</div>
           </div>
