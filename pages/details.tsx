@@ -6,7 +6,6 @@ import { useRouter } from 'next/router';
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
-// 新增：导入 Link 组件，用于页面跳转
 import Link from 'next/link';
 import TachieGenerator from '../components/TachieGenerator';
 
@@ -177,6 +176,13 @@ const DetailsPage: React.FC = () => {
     proceedToNextQuestion(currentAnswer.trim());
   };
 
+  // “返回上题”功能的函数
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  };
+
   const handleQuickOption = (option: string) => {
     proceedToNextQuestion(option);
   };
@@ -286,6 +292,22 @@ const DetailsPage: React.FC = () => {
       setSubmitting(false);
       startCooldown();
     }
+  };
+
+  // “一键复制”功能的函数
+  const handleCopyContent = () => {
+    // 将已填写的答案格式化为字符串
+    const contentToCopy = Object.entries(answers)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('\n');
+
+    // 使用剪贴板API进行复制
+    navigator.clipboard.writeText(contentToCopy).then(() => {
+      alert('已填写内容已复制到剪贴板！');
+    }).catch(err => {
+      console.error('复制失败: ', err);
+      alert('复制失败，请稍后再试。');
+    });
   };
 
   const handleSaveImage = (imageUrl: string) => {
@@ -467,12 +489,26 @@ const DetailsPage: React.FC = () => {
                         : '下一题'}
                 </button>
 
+                <button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0}>
+                  返回上题
+                </button>
+
                 {/* 错误信息显示 */}
                 {error && (
                   <div className="error-message">
                     {error}
                   </div>
                 )}
+
+                {/* 复制已填写内容 */}
+                <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                  <button onClick={handleCopyContent} style={{ marginRight: '10px' }}>
+                    复制已填写内容
+                  </button>
+                  <p style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>
+                    为避免生成失败丢失信息的可能，建议在提交生成前复制保存已填写信息。
+                  </p>
+                </div>
 
                 {/* 返回首页链接 */}
                 <div className="text-center" style={{ marginTop: '1rem' }}>
