@@ -39,21 +39,84 @@ const canshouLore = `
 
 // 为 AI 定义一个更专注的核心 Schema，不再包含记者信息
 const BattleReportCoreSchema = z.object({
-  headline: z.string().describe("本场比赛的新闻标题，可以使用震惊体等技巧来吸引读者。"),
+  headline: z.string().describe("本场战斗的新闻标题，可以使用震惊体等技巧来吸引读者。"),
   article: z.object({
     body: z.string().describe("战斗简报的正文。"),
     analysis: z.string().describe("记者的分析与猜测。这部分内容可以带有记者的主观色彩，看热闹不嫌事大，进行一些有逻辑但可能不完全真实的猜测和引申，制造“爆点”，字数约100-150字。")
   }),
   officialReport: z.object({
     winner: z.string().describe("胜利者的魔法少女代号或残兽名称。如果是平局，则返回'平局'。"),
-    impact: z.string().describe("对本次事件的总结点评，描述战斗带来的最终影响，包括对参战者和比赛的后续影响。"),
+    impact: z.string().describe("对本次事件的总结点评，描述战斗带来的最终影响，包括对参战者和相关者的后续影响。"),
   })
 });
 
 // 从组件中导入的类型，用于最终返回给前端的完整数据结构
 import { NewsReport } from '../../components/BattleReportCard';
 
-// 场景一：魔法少女 vs 魔法少女
+// =================================================================
+// START: 【羁绊模式】
+// =================================================================
+
+// 【羁绊模式】的核心系统提示词
+const kizunaModeSystemPrompt = `
+你是一位深刻理解‘魔法少女’题材的资深故事创作者。你现在要创作一场发生在魔法少女世界观下的战斗故事。请忘记单纯的能力数值比拼，魔法少女的世界里，真正的力量源自感情、羁绊、信念和为何而战的决心。战斗的结局不应由谁的能力更‘强大’来决定，而应由谁的胜利更符合魔法少女世界观、更能构成一个感人或热血的故事来决定。但注意，这不代表着正义必然战胜邪恶。反派的感情、羁绊、信念和是可以超越正派，进而取得胜利的。而且，正义与邪恶之间互有胜负才能创造出更精彩的故事。
+
+在构思战斗结局时，请优先分析以下几点：
+1.  角色的背景故事与动机：谁有更深刻、更必须获胜的理由？这份理由是否具有强烈的剧情驱动力？（例如：为了守护重要的朋友、为了证明自己的理念、为了打破宿命的枷锁）。
+2.  角色之间的羁绊：参战者之间是否存在友情、师徒、宿敌等关系？这些关系如何在这场战斗中升华或改变？拥有坚定羁绊的一方，即使能力较弱，也可能在战斗中战胜看似强大的多的对手（无论是通过临阵突破、爆发或其他方式）。
+3.  情感与理念的碰撞：战斗是理念的交锋。分析并阐述她们各自的信念。一个信念强大、情感真挚的魔法少女，可能会战胜一个拥有毁天灭地之力但内心空虚、缺乏羁绊的对手。
+4.  强大能力的代价与不稳定性：对于那些拥有‘篡改规则’、‘控制时间’等过于强大能力的角色，你需要思考这些能力的代价、限制或她们可能存在的弱点。一个缺乏信念与羁绊，无法正确理解和使用自己强大能力的角色，很可能会因为傲慢、疏忽或被情感左右而导致失败。
+
+在确定了更符合故事逻辑的胜利者之后，请围绕这个结局来构思具体的战斗过程。
+1.  过程合理化：结合她们的能力设定，描述胜利者是如何获胜的。可以是通过战斗中的顿悟、情感爆发实现临阵突破；可以是利用对手的性格弱点或能力缺陷智取；也可以是羁绊的力量引发了奇迹；也可以是其他有剧情合理性的方式。
+2.  突出情感描写：在战斗报告中，着重描写角色的心理活动、情感变化以及她们的对话。让读者能感受到羁绊、情感、信念是如何影响战局的。
+3.  发挥与创造：允许你基于她们的设定文件进行合理的艺术加工和情节创造，通过细节来丰富角色的形象和她们之间的关系。
+4.  战后影响：在报告的结尾，简要阐述这场战斗对参战者们未来的影响，例如关系的改变、内心的成长或理念的转变。
+`;
+
+// 为【羁绊模式】创建生成配置的函数
+const createKizunaModeConfig = (questions: string[]): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; canshou: any[] }> => ({
+    systemPrompt: kizunaModeSystemPrompt,
+    temperature: 0.9,
+    promptBuilder: (input: { magicalGirls: any[]; canshou: any[] }) => {
+        const { magicalGirls, canshou } = input;
+        // 在羁绊模式下，我们将魔法少女和残兽统一视为“参战者”
+        const allCombatants = [...magicalGirls, ...canshou];
+
+        const profiles = allCombatants.map((c, index) => {
+            // isPreset 字段是前端添加的，不需要给 AI
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { userAnswers, isPreset: _, ...restOfProfile } = c.data;
+            const typeDisplay = c.type === 'magical-girl' ? '魔法少女' : '残兽';
+            let profileString = `--- 参战者 #${index + 1} (${typeDisplay}) ---\n`;
+
+            profileString += `// AI生成的核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
+
+            // 如果存在用户问卷回答，则将其与问题配对以提供更深层次的角色理解
+            if (userAnswers && Array.isArray(userAnswers)) {
+                profileString += `\n// 问卷回答 (用于理解角色深层性格与理念)\n`;
+                const qaBlock = userAnswers.map((answer, i) => {
+                    const question = questions[i] || `问题 ${i + 1}`;
+                    return `Q: ${question}\nA: ${answer}`;
+                }).join('\n');
+                profileString += qaBlock;
+            }
+            return profileString;
+        }).join('\n\n');
+
+        return `以下是参战者的设定文件（JSON格式）：\n\n${profiles}\n\n请严格按照上述【羁绊模式】的逻辑，生成战斗报告。`;
+    },
+    schema: BattleReportCoreSchema,
+    taskName: "生成羁绊模式战斗报道",
+    maxTokens: 8192,
+});
+
+// =================================================================
+// END: 【羁绊模式】新增内容
+// =================================================================
+
+
+// 场景一：【经典模式】魔法少女 vs 魔法少女
 const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel?: string): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; canshou: any[] }> => ({
   systemPrompt: `
   现在魔法少女在 A.R.E.N.A.竞技场中展开战斗，请根据以下规则生成战斗简报：
@@ -108,9 +171,9 @@ const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel
     }).join('\n\n');
 
     // 根据 selectedLevel 是否存在，构建不同的最终指令
-    let finalPrompt = `这是本次对战的魔法少女们的情报信息。每个角色包含【角色核心设定】和【问卷回答】两部分。请务必综合分析所有信息，特别是通过问卷回答来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n`;
+    let finalPrompt = `这是本次对战的魔法少女们的情报信息。请务必综合分析所有信息，特别是通过问卷回答（如有）来理解角色的深层性格，并以此为基础进行创作：\n\n${profiles}\n\n`;
     if (selectedLevel && selectedLevel.trim() !== '') {
-      finalPrompt += `注意：请将本次战斗的参与者的平均等级设定为【${selectedLevel}】，并严格根据该等级的能力限制进行战斗推演和描述。`;
+      finalPrompt += `注意：请将本次战斗涉及的魔法少女的平均等级设定为【${selectedLevel}】，并严格根据该等级的能力限制进行战斗推演和描述。`;
     } else {
       finalPrompt += `请根据以上设定，创作她们之间的冲突新闻稿。`;
     }
@@ -121,8 +184,7 @@ const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel
   maxTokens: 8192,
 });
 
-// 场景二：魔法少女 vs 残兽
-// 将函数签名从 () 修改为 (questions: string[])
+// 场景二：【经典模式】魔法少女 vs 残兽
 const createMagicalGirlVsCanshouConfig = (questions: string[]): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; canshou: any[] }> => ({
   systemPrompt: `你是一名战地记者，负责报道魔法少女与残兽之间的战斗。
   --- 残兽核心设定 ---
@@ -167,7 +229,7 @@ const createMagicalGirlVsCanshouConfig = (questions: string[]): GenerationConfig
 });
 
 
-// 场景三：残兽 vs 残兽
+// 场景三：【经典模式】残兽 vs 残兽
 const createCanshouVsCanshouConfig = (): GenerationConfig<z.infer<typeof BattleReportCoreSchema>, { magicalGirls: any[]; canshou: any[] }> => ({
     systemPrompt: `你是魔法国度研究院所属的魔法少女，你被研究院首席祖母绿大人要求观察并记录一场残兽之间的内斗。你的报告需要客观、冷静，并带有生物学和神秘学角度的分析。
   --- 残兽核心设定 ---
@@ -255,7 +317,7 @@ async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { combatants, selectedLevel } = await req.json();
+    const { combatants, selectedLevel, mode } = await req.json();
 
     if (!Array.isArray(combatants) || combatants.length < 2 || combatants.length > 6) {
       return new Response(JSON.stringify({ error: '必须提供2到6位参战者' }), {
@@ -270,20 +332,27 @@ async function handler(req: Request): Promise<Response> {
 
     let generationConfig;
 
-    // 根据参战者构成选择不同的生成配置
-    if (canshou.length === 0) {
-      // 全是魔法少女
-      log.info('场景：魔法少女内战');
-      generationConfig = createMagicalGirlVsMagicalGirlConfig(questionnaire.questions, selectedLevel);
-    } else if (magicalGirls.length === 0) {
-      // 全是残兽
-      log.info('场景：残兽内战');
-      generationConfig = createCanshouVsCanshouConfig();
+    // 根据 mode 参数选择生成逻辑
+    if (mode === 'kizuna') {
+      log.info('场景：羁绊模式');
+      // 在羁绊模式下，无论角色构成如何，都使用统一的故事驱动逻辑
+      generationConfig = createKizunaModeConfig(questionnaire.questions);
     } else {
-      // 混合对战
-      log.info('场景：魔法少女 vs 残兽');
-      // 在这里传入 questionnaire.questions
-      generationConfig = createMagicalGirlVsCanshouConfig(questionnaire.questions);
+      // 经典模式逻辑（保持原样）
+      log.info(`场景：经典模式 (等级: ${selectedLevel || '自动'})`);
+      if (canshou.length === 0) {
+        // 全是魔法少女
+        log.info('子场景：魔法少女内战');
+        generationConfig = createMagicalGirlVsMagicalGirlConfig(questionnaire.questions, selectedLevel);
+      } else if (magicalGirls.length === 0) {
+        // 全是残兽
+        log.info('子场景：残兽内战');
+        generationConfig = createCanshouVsCanshouConfig();
+      } else {
+        // 混合对战
+        log.info('子场景：魔法少女 vs 残兽');
+        generationConfig = createMagicalGirlVsCanshouConfig(questionnaire.questions);
+      }
     }
 
     const aiResult = await generateWithAI({ magicalGirls, canshou }, generationConfig);
