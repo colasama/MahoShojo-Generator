@@ -46,6 +46,9 @@ interface Combatant {
     filename: string; // 用于UI显示和去重
 }
 
+// 定义战斗模式类型
+type BattleMode = 'classic' | 'kizuna';
+
 const BattlePage: React.FC = () => {
     const router = useRouter();
     // 统一存储所有参战者
@@ -90,6 +93,9 @@ const BattlePage: React.FC = () => {
     const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
     // 状态：用于显示加载状态
     const [isLoadingStats, setIsLoadingStats] = useState(true);
+    
+    // 新增战斗模式状态
+    const [battleMode, setBattleMode] = useState<BattleMode>('classic');
 
     // 检测移动端并默认展开文本域
     useEffect(() => {
@@ -403,10 +409,15 @@ const BattlePage: React.FC = () => {
             const combatantsData = combatants.map(c => ({ type: c.type, data: c.data }));
             if (await checkSensitiveWords(JSON.stringify(combatantsData))) return;
 
+            // 在请求体中加入 mode 参数
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ combatants: combatantsData, selectedLevel }),
+                body: JSON.stringify({ 
+                    combatants: combatantsData, 
+                    selectedLevel,
+                    mode: battleMode // 将当前选择的战斗模式发送给后端
+                }),
             });
 
             // --- 核心修改：增强错误处理 ---
@@ -521,10 +532,7 @@ const BattlePage: React.FC = () => {
                         </div>
 
                         {renderPresetSelector(magicalGirlPresets, currentMgPresetPage, setCurrentMgPresetPage, '选择预设魔法少女')}
-
-                        {/* --- 新增：预设残兽选择区域 --- */}
                         {renderPresetSelector(canshouPresets, currentCanshouPresetPage, setCurrentCanshouPresetPage, '选择预设残兽')}
-
 
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">上传自己的 .json 设定情报</label>
@@ -579,6 +587,36 @@ const BattlePage: React.FC = () => {
                             </select>
                             <p className="text-xs text-gray-500 mt-1">默认由 AI 根据角色强度自动分配，以保证战斗平衡和观赏性。</p>
                         </div>
+
+                        {/* 战斗模式切换UI */}
+                        <div className="input-group">
+                            <label className="input-label">选择战斗模式</label>
+                            <div className="flex items-center space-x-2 bg-gray-200 p-1 rounded-full">
+                                <button
+                                    onClick={() => setBattleMode('classic')}
+                                    className={`w-1/2 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'classic' ? 'bg-white text-pink-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                >
+                                    经典模式⚔️
+                                </button>
+                                <button
+                                    onClick={() => setBattleMode('kizuna')}
+                                    className={`w-1/2 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'kizuna' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                >
+                                    羁绊模式✨
+                                </button>
+                            </div>
+                            {battleMode === 'kizuna' && (
+                                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                                    <p className="font-bold">你已选择【羁绊模式】！</p>
+                                    <p className="mt-1">在此模式下，战斗将更注重友情！热血！羁绊！角色的背景、信念与羁绊将成为关键，能力强度不再是决定胜负的核心因素。</p>
+                                </div>
+                            )}
+                            {/* 羁绊模式下，等级设定由故事驱动，不再需要用户手动选择 */}
+                            {battleMode === 'classic' && (
+                                <p className="text-xs text-gray-500 mt-1">经典模式：战斗结果主要基于角色的能力设定。</p>
+                            )}
+                        </div>
+
 
                         <button onClick={handleGenerate} disabled={isGenerating || isCooldown || combatants.length < 2} className="generate-button">
                             {isCooldown ? `记者赶稿中...请等待 ${remainingTime} 秒` : isGenerating ? '撰写报道中... (ง •̀_•́)ง' : '生成独家新闻 (๑•̀ㅂ•́)و✧'}

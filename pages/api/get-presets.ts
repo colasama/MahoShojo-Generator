@@ -22,7 +22,7 @@ const PRESET_LIST: Preset[] = [
   // 魔法少女
   {
     name: "翠雀",
-    description: "樊笼下的蓝翠雀：身经百战的前辈，外冷内热的魔法少女。",
+    description: "樊笼下的蓝翠雀：身经百战的前辈，外冷内热的魔法少女。【强度：大杯】",
     filename: "M01_centaurea.json",
     type: "magical-girl"
   },
@@ -46,7 +46,7 @@ const PRESET_LIST: Preset[] = [
   },
   {
     name: "鸢",
-    description: "爪痕兽心：只相信自身技艺的武痴，行走于阴影中的反权威者。",
+    description: "爪痕兽心：只相信自身技艺的武痴，行走于阴影中的反权威者。超大杯守门员。【强度：超大杯】",
     filename: "M05_kite.json",
     type: "magical-girl"
   },
@@ -88,20 +88,26 @@ const PRESET_LIST: Preset[] = [
   },
   {
     name: "雪绒",
-    description: "大道至简：专打机制怪和说书人，大概是鸢师傅Alter",
+    description: "大道至简：专打机制怪和说书人。超大杯质检员。【强度：超大杯】",
     filename: "M12_greatness_in_simplicity.json",
     type: "magical-girl"
   },
   {
     name: "千日红",
-    description: "大道至繁：星穹的魔女，大道至简的对立面，头脑简单的莽夫之大敌。",
+    description: "大道至繁：星穹的魔女，大道至简的对立面，头脑简单的莽夫之大敌。【强度：超大杯】",
     filename: "M13_greatness_in_complexity.json",
     type: "magical-girl"
   },
   {
-    name: "白百合",
-    description: "测试用角色：神圣典雅的圣女型魔法少女。",
-    filename: "M00_white_lily.json",
+    name: "翠雀（心魔雀）",
+    description: "爪痕领袖：将爪痕作为己身复仇工具的可能性。【强度：中杯】",
+    filename: "M14_centaurea_claw_marks.json",
+    type: "magical-girl"
+  },
+  {
+    name: "翠雀（心中雀）",
+    description: "宝石权杖：并未拒绝蓝宝石权杖之位的可能性。【强度：超大杯】",
+    filename: "M15_centaurea_in_heart.json",
     type: "magical-girl"
   },
   // 如果有更多预设，可以像下面这样继续添加：
