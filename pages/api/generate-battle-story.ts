@@ -144,6 +144,7 @@ const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel
     * 强度限制：所使用的繁开能力必须是【有代价、可被理解和应对的】，绝不能是无法破解的必胜技能。严禁使用干涉命运、时间、世界等过于强大的繁开能力，持有此类繁开的魔法少女基本无法觉醒至花级。
 
 请严格遵守以上战斗规则进行推演，构建一场等级合理、有来有回、充满战术博弈的精彩战斗，而不是一场单纯的能力碾压。
+注意，正义并不是必然战胜邪恶。反派有时候也能胜过正派。而且，正义与邪恶之间互有胜负才能创造出更精彩的故事。
 `,
   temperature: 0.9,
   promptBuilder: (input: { magicalGirls: any[]; canshou: any[] }) => {
