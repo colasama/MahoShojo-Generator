@@ -75,7 +75,11 @@ const sensitiveWordsConfig = {
         "VlBO",
         "56eR5a2m5LiK572R",
         "5oyC5qKv5a2Q",
-        "R0ZX"
+        "R0ZX",
+        // 新增违禁词
+        "5LiL5L2T6auY5r2u",
+        "54ix5ray",
+        "56eB5aSE"
     ],
     encoding: "base64",
     original_count: 71
