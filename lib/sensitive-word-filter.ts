@@ -107,7 +107,7 @@ const sensitiveWordsConfig = {
         "5aiH5ZCf",
         "5r2u5ZC5",
         "5Liw6IW0",
-        "5Y+R5oOF",
+        //"5Y+R5oOF", 暂时取消该词，以免因为突发情况等误封
         "5oCn5b+r5oSf",
         // 现实相关违禁词
         "5Lit5Zu9",
