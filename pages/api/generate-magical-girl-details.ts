@@ -121,7 +121,7 @@ async function handler(
     });
   }
 
-  // 验证每个答案不超过80字
+  // 验证每个答案不超过120字
   for (const answer of answers) {
     if (typeof answer !== 'string' || answer.trim().length === 0) {
       return new Response(JSON.stringify({ error: 'All answers must be non-empty strings' }), {
@@ -129,8 +129,8 @@ async function handler(
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    if (answer.length > 80) {
-      return new Response(JSON.stringify({ error: 'Each answer must not exceed 80 characters' }), {
+    if (answer.length > 120) {
+      return new Response(JSON.stringify({ error: 'Each answer must not exceed 120 characters' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
