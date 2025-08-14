@@ -100,7 +100,11 @@ const sensitiveWordsConfig = {
         "5b+r5oSf",
         "5oOF5qyy",
         "5oG25aCV",
-        "5oi/5Lit5pyv"
+        "5oi/5Lit5pyv",
+        "5oCn6auY5r2u",
+        "54ix5oqa",
+        "5aiH5ZCf",
+        "5r2u5ZC5"
     ],
     encoding: "base64",
     original_count: 71
