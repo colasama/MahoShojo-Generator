@@ -69,6 +69,8 @@ const BattlePage: React.FC = () => {
     const [correctedFiles, setCorrectedFiles] = useState<Record<string, boolean>>({});
     // 用于跟踪复制操作的状态
     const [copiedStatus, setCopiedStatus] = useState<Record<string, boolean>>({});
+    // 新增：用于存储用户故事引导输入的状态
+    const [userGuidance, setUserGuidance] = useState('');
 
 
     // 冷却状态钩子，设置为2分钟
@@ -380,7 +382,7 @@ const BattlePage: React.FC = () => {
         });
     };
 
-        const checkSensitiveWords = async (content: string) => {
+    const checkSensitiveWords = async (content: string) => {
         const checkResult = await quickCheck(content);
         if (checkResult.hasSensitiveWords) {
             router.push('/arrested');
@@ -416,15 +418,19 @@ const BattlePage: React.FC = () => {
             // 安全措施：检查上传内容中的敏感词;
             const combatantsData = combatants.map(c => ({ type: c.type, data: c.data }));
             if (await checkSensitiveWords(JSON.stringify(combatantsData))) return;
+            // 新增：检查用户引导文本
+            if (userGuidance && (await checkSensitiveWords(userGuidance))) return;
 
-            // 在请求体中加入 mode 参数
+
+            // 在请求体中加入 mode 和 userGuidance 参数
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     combatants: combatantsData, 
                     selectedLevel,
-                    mode: battleMode // 将当前选择的模式发送给后端
+                    mode: battleMode, // 将当前选择的模式发送给后端
+                    userGuidance: userGuidance, // 将用户引导文本发送给后端
                 }),
             });
 
@@ -437,7 +443,12 @@ const BattlePage: React.FC = () => {
                 try {
                     // 尝试将文本解析为JSON
                     const errorJson = JSON.parse(errorText);
-                    // 如果成功，使用JSON中的详细错误信息
+                    // 如果成功，并且是需要跳转的特定错误，则执行跳转
+                    if (errorJson.shouldRedirect) {
+                        router.push('/arrested');
+                        return; // 终止后续执行
+                    }
+                    // 否则，使用JSON中的详细错误信息
                     errorMessage = errorJson.message || errorJson.error || errorMessage;
                 } catch {
                     // 如果解析失败，说明响应不是JSON格式（可能是HTML错误页）
@@ -606,7 +617,7 @@ const BattlePage: React.FC = () => {
 
                         {/* 战斗模式切换UI */}
                         <div className="input-group">
-                            <label className="input-label">选择战斗模式</label>
+                            <label className="input-label">选择故事模式</label>
                             <div className="flex items-center space-x-1 bg-gray-200 p-1 rounded-full">
                                 <button
                                     onClick={() => setBattleMode('daily')}
@@ -658,6 +669,23 @@ const BattlePage: React.FC = () => {
                             </div>
                         )}
 
+                        {/* 新增：故事方向引导输入框 */}
+                        {appConfig.ENABLE_ARENA_USER_GUIDANCE && (
+                            <div className="input-group">
+                                <label htmlFor="user-guidance" className="input-label">故事方向引导 (可选)</label>
+                                <input
+                                    id="user-guidance"
+                                    type="text"
+                                    value={userGuidance}
+                                    onChange={(e) => setUserGuidance(e.target.value)}
+                                    className="input-field"
+                                    placeholder="输入关键词或一句话 (最多20字)"
+                                    maxLength={20}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">尝试引导AI生成您想看的故事，例如：“在雨中相遇”、“保卫要地”、“猫咖聚会”等。</p>
+                            </div>
+                        )}
+
 
                         <button onClick={handleGenerate} 
                             // --- 根据模式动态判断禁用条件 ---
@@ -677,6 +705,7 @@ const BattlePage: React.FC = () => {
                         <BattleReportCard
                             report={newsReport}
                             onSaveImage={handleSaveImage}
+                            mode={battleMode} // 传递模式
                         />
                     )}
 
@@ -759,7 +788,7 @@ const BattlePage: React.FC = () => {
                                 </button>
                             </div>
                             <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
-                                💫 长按图片保存到相册
+                                � 长按图片保存到相册
                             </p>
                             <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
                                 <img

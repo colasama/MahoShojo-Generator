@@ -92,7 +92,7 @@ const getShowStatData = (): boolean => {
   return true; // 默认显示统计数据
 };
 
-// 新增：获取排行榜模式
+// 获取排行榜模式
 // 如果是在 Cloudflare Pages 上部署，可以直接在项目的 设置 > 环境变量 中添加 LEADERBOARD_MODE 并设置其值。
 const getLeaderboardMode = (): 'all' | 'preset' | 'user' => {
   const mode = process.env.LEADERBOARD_MODE;
@@ -100,6 +100,12 @@ const getLeaderboardMode = (): 'all' | 'preset' | 'user' => {
     return mode;
   }
   return 'all'; // 默认为 'all'
+};
+
+// 获取竞技场用户引导功能开关
+const getEnableArenaUserGuidance = (): boolean => {
+  const enabled = process.env.NEXT_PUBLIC_ENABLE_ARENA_USER_GUIDANCE ?? 'true';
+  return enabled === 'true';
 };
 
 
@@ -110,11 +116,14 @@ export const config = {
   PROVIDERS: getAPIProviders(),
   LOAD_BALANCE_STRATEGY: getLoadBalanceStrategy(),
 
-  // 新增：统计数据显示开关配置
+  // 统计数据显示开关配置
   SHOW_STAT_DATA: getShowStatData(),
 
-  // 新增：排行榜模式配置
+  // 排行榜模式配置
   LEADERBOARD_MODE: getLeaderboardMode(),
+
+  // 竞技场用户引导功能开关
+  ENABLE_ARENA_USER_GUIDANCE: getEnableArenaUserGuidance(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {
