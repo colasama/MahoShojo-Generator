@@ -165,7 +165,8 @@ ${report.userGuidance ? `
                     borderRadius: '9999px',
                     borderWidth: '1px',
                     fontSize: '0.875rem',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    whiteSpace: 'nowrap' // 添加此样式，强制不换行
                 }}>
                     {modeDisplay.text}
                 </span>
