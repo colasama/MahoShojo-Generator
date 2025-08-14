@@ -395,8 +395,16 @@ const BattlePage: React.FC = () => {
             setError(`冷却中，请等待 ${remainingTime} 秒后再生成。`);
             return;
         }
-        if (combatants.length < 2 || combatants.length > 4) {
-            setError('⚠️ 请先提交 2 到 4 位角色');
+
+        // --- 根据模式动态设置最小人数 ---
+        const minParticipants = battleMode === 'daily' ? 1 : 2;
+        const maxParticipants = 4;
+
+        if (combatants.length < minParticipants || combatants.length > maxParticipants) {
+            const errorMessage = battleMode === 'daily'
+                ? `⚠️ 日常模式需要 ${minParticipants} 到 ${maxParticipants} 位角色`
+                : `⚠️ 该模式需要 ${minParticipants} 到 ${maxParticipants} 位角色`;
+            setError(errorMessage);
             return;
         }
 
@@ -651,7 +659,15 @@ const BattlePage: React.FC = () => {
                         )}
 
 
-                        <button onClick={handleGenerate} disabled={isGenerating || isCooldown || combatants.length < 2} className="generate-button">
+                        <button onClick={handleGenerate} 
+                            // --- 根据模式动态判断禁用条件 ---
+                            disabled={
+                                isGenerating || 
+                                isCooldown || 
+                                (battleMode === 'daily' ? combatants.length < 1 : combatants.length < 2)
+                            } 
+                            className="generate-button"
+                        >
                             {getButtonText()}
                         </button>
                         {error && <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${error.startsWith('❌') ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{error}</div>}
