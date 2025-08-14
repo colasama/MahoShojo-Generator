@@ -46,7 +46,7 @@ const MagicalGirlDetailsSchema = z.object({
     predictionBasis: z.string().describe("预测的主要依据和逻辑"),
     // 新增：角色背景故事
     background: z.object({
-        belief: z.string().describe("角色的核心理念、信条或愿望，描述她为何而战，支撑她行动的内在动力。"),
+        belief: z.string().describe("角色的核心理念、信条或愿望，描述角色为何而战，支撑角色行动的内在动力。"),
         bonds: z.string().describe("角色的情感、羁绊，描述角色与他人（特别是在问卷中出现的人）之间的关系，以及这段关系如何影响了角色，羁绊会如何影响其成长的旅途。")
     }).describe("角色的背景故事，用以丰富角色的立体形象与人物弧光，体现角色的信念与感情。")
   })
