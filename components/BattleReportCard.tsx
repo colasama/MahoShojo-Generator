@@ -3,11 +3,10 @@
 import React, { useRef } from 'react';
 import { snapdom } from '@zumer/snapdom';
 
-// 更新接口以匹配新的新闻报道格式
 export interface NewsReport {
   headline: string;
   reporterInfo: {
-    name: string;
+    name:string;
     publication: string;
   };
   article: {
@@ -23,10 +22,27 @@ export interface NewsReport {
 interface BattleReportCardProps {
   report: NewsReport;
   onSaveImage?: (imageUrl: string) => void;
+  // 战斗模式，设为可选以兼容旧功能
+  mode?: 'classic' | 'kizuna' | 'daily';
 }
 
-const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage }) => {
+const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage, mode }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const getModeDisplay = (mode: string) => {
+    switch (mode) {
+      case 'daily':
+        return { text: '日常模式 ☕', style: { color: '#22c55e', borderColor: '#22c55e', background: 'rgba(34, 197, 94, 0.1)' } };
+      case 'kizuna':
+        return { text: '羁绊模式 ✨', style: { color: '#3b82f6', borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)' } };
+      case 'classic':
+        return { text: '经典模式 ⚔️', style: { color: '#ec4899', borderColor: '#ec4899', background: 'rgba(236, 72, 153, 0.1)' } };
+      default:
+        return null;
+    }
+  };
+
+  const modeDisplay = mode ? getModeDisplay(mode) : null;
 
   // 处理保存为图片的功能
   const handleSaveImage = async () => {
@@ -85,7 +101,7 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
     const markdownContent = `
 # ${report.headline}
 **来源：${report.reporterInfo.publication} | 记者：${report.reporterInfo.name}**
-
+${mode ? `**模式：${modeDisplay?.text}**\n` : ''}
 ---
 
 ## 新闻正文
@@ -131,6 +147,23 @@ ${report.article.body}
         <p className="text-sm text-gray-300" style={{ marginBottom: '0.5rem', marginLeft: '0.5rem' }}>
           来源 | {report.reporterInfo.publication}
         </p>
+
+        {/* 显示战斗模式 */}
+        {modeDisplay && (
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0' }}>
+                <span style={{
+                    ...modeDisplay.style,
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '9999px',
+                    borderWidth: '1px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                }}>
+                    {modeDisplay.text}
+                </span>
+            </div>
+        )}
+
         <div className="result-item">
           <div className="result-value">
             <p className="text-sm opacity-90 whitespace-pre-line">{report.article.body}</p>

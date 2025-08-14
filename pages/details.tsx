@@ -45,6 +45,10 @@ interface MagicalGirlDetails {
     abilityReasoning: string;
     coreTraits: string[];
     predictionBasis: string;
+    background: {
+        belief: string;
+        bonds: string;
+    };
   };
 }
 
@@ -166,8 +170,8 @@ const DetailsPage: React.FC = () => {
       return;
     }
 
-    if (currentAnswer.length > 80) {
-      setError('⚠️ 答案不能超过80字');
+    if (currentAnswer.length > 120) {
+      setError('⚠️ 答案不能超过120字');
       return;
     }
 
@@ -437,12 +441,12 @@ const DetailsPage: React.FC = () => {
                   <textarea
                     value={currentAnswer}
                     onChange={(e) => setCurrentAnswer(e.target.value)}
-                    placeholder="请输入您的答案（不超过80字）"
+                    placeholder="请输入您的答案（不超过120字）"
                     className="input-field resize-none h-24"
-                    maxLength={80}
+                    maxLength={120}
                   />
                   <div className="text-right text-sm text-gray-500" style={{ marginTop: '-2rem', marginRight: '0.5rem' }}>
-                    {currentAnswer.length}/80
+                    {currentAnswer.length}/120
                   </div>
                 </div>
 

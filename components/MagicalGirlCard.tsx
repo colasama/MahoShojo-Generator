@@ -34,6 +34,11 @@ interface MagicalGirlCardProps {
       abilityReasoning: string;
       coreTraits: string[];
       predictionBasis: string;
+      // 角色背景，设为可选以兼容旧数据
+      background?: {
+        belief: string;
+        bonds: string;
+      };
     };
   };
   gradientStyle: string;
@@ -162,6 +167,17 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
             <div><strong>预测依据：</strong>{magicalGirl.analysis.predictionBasis}</div>
           </div>
         </div>
+
+        {/* 角色背景 */}
+        {magicalGirl.analysis.background && (
+          <div className="result-item">
+            <div className="result-label">📖 角色背景</div>
+            <div className="result-value">
+              <div><strong>信念：</strong>{magicalGirl.analysis.background.belief}</div>
+              <div style={{ marginTop: '0.5rem' }}><strong>羁绊：</strong>{magicalGirl.analysis.background.bonds}</div>
+            </div>
+          </div>
+        )}
 
         <button onClick={handleSaveImage} className="save-button">
           📱 保存为图片
