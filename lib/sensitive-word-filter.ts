@@ -96,6 +96,7 @@ const sensitiveWordsConfig = {
         "5rer6I2h",
         "6IKb6Zeo",
         "5by65aW4",
+        "552h5aW4",
         "5oCn5L61",
         "5b+r5oSf",
         "5oOF5qyy",
@@ -105,7 +106,23 @@ const sensitiveWordsConfig = {
         "54ix5oqa",
         "5aiH5ZCf",
         "5r2u5ZC5",
-        "5Liw6IW0"
+        "5Liw6IW0",
+        "5oCn5b+r5oSf",
+        // 现实相关违禁词
+        "5Lit5Zu9",
+        "5Lit5Y2O5Lq65rCR5YWx5ZKM5Zu9",
+        "5aSp5a6J6Zeo",
+        "5rue57qz",
+        "5pSv6YKj",
+        // Abuse
+        "6LSx55Wc",
+        "5YK76YC8",
+        "54We56yU",
+        "6ISR55ir",
+        "5byx5pm6",
+        "6Im5",
+        "5pSv55Wc",
+        "6LSx56eN",
     ],
     encoding: "base64",
     original_count: 71
