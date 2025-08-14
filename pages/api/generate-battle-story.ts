@@ -554,6 +554,8 @@ async function handler(req: Request): Promise<Response> {
         name: reporterInfo.name,
         publication: reporterInfo.publication,
       },
+      // 将用户引导信息添加到最终的报告中
+      userGuidance: finalUserGuidance || undefined, 
     };
 
     // 异步更新数据库，不阻塞对用户的响应
