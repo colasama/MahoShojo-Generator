@@ -110,6 +110,12 @@ const PRESET_LIST: Preset[] = [
     filename: "M15_centaurea_in_heart.json",
     type: "magical-girl"
   },
+  {
+    name: "鹅",
+    description: "咕咕嘎嘎：被强烈要求加入的一只鹅，据说已经把魔法少女啄麻了。",
+    filename: "M90_goose.json",
+    type: "magical-girl"
+  },
   // 如果有更多预设，可以像下面这样继续添加：
   // {
   //   name: "另一位魔法少女",
