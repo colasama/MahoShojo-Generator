@@ -46,8 +46,8 @@ interface Combatant {
     filename: string; // 用于UI显示和去重
 }
 
-// 定义战斗模式类型
-type BattleMode = 'classic' | 'kizuna';
+// 定义故事/战斗模式类型
+type BattleMode = 'classic' | 'kizuna' | 'daily';
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
@@ -94,7 +94,7 @@ const BattlePage: React.FC = () => {
     // 状态：用于显示加载状态
     const [isLoadingStats, setIsLoadingStats] = useState(true);
     
-    // 新增战斗模式状态
+    // 模式状态
     const [battleMode, setBattleMode] = useState<BattleMode>('classic');
 
     // 检测移动端并默认展开文本域
@@ -396,7 +396,7 @@ const BattlePage: React.FC = () => {
             return;
         }
         if (combatants.length < 2 || combatants.length > 4) {
-            setError('⚠️ 请先提交 2 到 4 位参战者');
+            setError('⚠️ 请先提交 2 到 4 位角色');
             return;
         }
 
@@ -416,7 +416,7 @@ const BattlePage: React.FC = () => {
                 body: JSON.stringify({ 
                     combatants: combatantsData, 
                     selectedLevel,
-                    mode: battleMode // 将当前选择的战斗模式发送给后端
+                    mode: battleMode // 将当前选择的模式发送给后端
                 }),
             });
 
@@ -451,10 +451,27 @@ const BattlePage: React.FC = () => {
             if (err instanceof Error) {
                 setError(`✨ 魔法失效了！${err.message}`);
             } else {
-                setError('✨ 魔法失效了！推演战斗时发生未知错误，请重试。');
+                setError('✨ 魔法失效了！生成故事时发生未知错误，请重试。');
             }
         } finally {
             setIsGenerating(false);
+        }
+    };
+    
+    // 根据模式决定生成按钮的文本
+    const getButtonText = () => {
+        if (isCooldown) return `记者赶稿中...请等待 ${remainingTime} 秒`;
+        if (isGenerating) {
+            switch(battleMode) {
+                case 'daily': return '撰写日常逸闻中... (｡･ω･｡)ﾉ';
+                case 'kizuna': return '描绘宿命对决中... (ง •̀_•́)ง';
+                case 'classic': return '推演激烈战斗中... (ง •̀_•́)ง';
+            }
+        }
+        switch(battleMode) {
+            case 'daily': return '生成日常故事 (´｡• ᵕ •｡`) ♡';
+            case 'kizuna': return '生成宿命对决 (๑•̀ㅂ•́)و✧';
+            case 'classic': return '生成独家新闻 (๑•̀ㅂ•́)و✧';
         }
     };
 
@@ -511,7 +528,7 @@ const BattlePage: React.FC = () => {
         <>
             <Head>
                 <title>魔法少女竞技场 - MahoShojo Generator</title>
-                <meta name="description" content="上传魔法少女或残兽设定，推演她/它们之间的战斗！" />
+                <meta name="description" content="上传魔法少女或残兽设定，生成她们之间的战斗或日常故事！" />
             </Head>
             <div className="magic-background-white">
                 <div className="container">
@@ -525,9 +542,9 @@ const BattlePage: React.FC = () => {
                             <h3 className="font-bold mb-2">📰 使用须知</h3>
                             <ol className="list-decimal list-inside space-y-1">
                                 <li>前往<Link href="/details" className="footer-link">【奇妙妖精大调查】</Link>或<Link href="/canshou" className="footer-link">【研究院残兽调查】</Link>页面，生成角色并下载其【设定文件】。</li>
-                                <li>收集 2-4 位参战者的设定文件（.json 格式）。</li>
-                                <li>在此处选择预设角色或上传你收集到的设定文件作为“情报”。</li>
-                                <li>接下来，敬请期待在「命运的舞台」之上的战斗吧！</li>
+                                <li>收集 2-4 位角色的设定文件（.json 格式）。</li>
+                                <li>在此处选择预设角色或上传你收集到的设定文件。</li>
+                                <li>选择一个模式，然后敬请期待在「命运的舞台」之上发生的故事吧！</li>
                             </ol>
                         </div>
 
@@ -535,7 +552,7 @@ const BattlePage: React.FC = () => {
                         {renderPresetSelector(canshouPresets, currentCanshouPresetPage, setCurrentCanshouPresetPage, '选择预设残兽')}
 
                         <div className="input-group">
-                            <label htmlFor="file-upload" className="input-label">上传自己的 .json 设定情报</label>
+                            <label htmlFor="file-upload" className="input-label">上传自己的 .json 设定文件</label>
                             <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"/>
                         </div>
 
@@ -579,47 +596,63 @@ const BattlePage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* --- 选择平均等级 --- */}
-                        <div className="input-group">
-                            <label htmlFor="level-select" className="input-label">指定平均等级 (可选):</label>
-                            <select id="level-select" value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="input-field" style={{ cursor: 'pointer' }}>
-                                {battleLevels.map(level => (<option key={level.value} value={level.value}>{level.label}</option>))}
-                            </select>
-                            <p className="text-xs text-gray-500 mt-1">默认由 AI 根据角色强度自动分配，以保证战斗平衡和观赏性。</p>
-                        </div>
-
                         {/* 战斗模式切换UI */}
                         <div className="input-group">
                             <label className="input-label">选择战斗模式</label>
-                            <div className="flex items-center space-x-2 bg-gray-200 p-1 rounded-full">
+                            <div className="flex items-center space-x-1 bg-gray-200 p-1 rounded-full">
                                 <button
-                                    onClick={() => setBattleMode('classic')}
-                                    className={`w-1/2 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'classic' ? 'bg-white text-pink-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    onClick={() => setBattleMode('daily')}
+                                    className={`w-1/3 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'daily' ? 'bg-white text-green-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
                                 >
-                                    经典模式⚔️
+                                    日常模式☕
                                 </button>
                                 <button
                                     onClick={() => setBattleMode('kizuna')}
-                                    className={`w-1/2 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'kizuna' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    className={`w-1/3 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'kizuna' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
                                 >
                                     羁绊模式✨
                                 </button>
+                                <button
+                                    onClick={() => setBattleMode('classic')}
+                                    className={`w-1/3 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'classic' ? 'bg-white text-pink-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                >
+                                    经典模式⚔️
+                                </button>
                             </div>
+                            {battleMode === 'daily' && (
+                                <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                                    <p className="font-bold">你已选择【日常模式】！</p>
+                                    <p className="mt-1">此模式下将聚焦于角色间的互动故事，而非战斗。</p>
+                                </div>
+                            )}
                             {battleMode === 'kizuna' && (
                                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
                                     <p className="font-bold">你已选择【羁绊模式】！</p>
                                     <p className="mt-1">在此模式下，战斗将更注重友情！热血！羁绊！角色的背景、信念与羁绊将成为关键，能力强度不再是决定胜负的核心因素。</p>
                                 </div>
                             )}
-                            {/* 羁绊模式下，等级设定由故事驱动，不再需要用户手动选择 */}
                             {battleMode === 'classic' && (
-                                <p className="text-xs text-gray-500 mt-1">经典模式：战斗结果主要基于角色的能力设定。</p>
+                                <div className="mt-2 p-3 bg-pink-50 border border-pink-200 rounded-lg text-sm text-pink-800">
+                                    <p className="font-bold">你已选择【经典模式】！</p>
+                                    <p className="mt-1">经典模式：战斗结果主要基于角色的能力设定和战斗推演规则。</p>
+                                </div>
                             )}
                         </div>
 
+                        {/* --- 在非日常模式下显示等级选择 --- */}
+                        {battleMode !== 'daily' && (
+                           <div className="input-group">
+                                <label htmlFor="level-select" className="input-label">指定平均等级 (可选):</label>
+                                <select id="level-select" value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="input-field" style={{ cursor: 'pointer' }}>
+                                    {battleLevels.map(level => (<option key={level.value} value={level.value}>{level.label}</option>))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">默认由 AI 根据角色强度自动分配，以保证战斗平衡和观赏性。</p>
+                            </div>
+                        )}
+
 
                         <button onClick={handleGenerate} disabled={isGenerating || isCooldown || combatants.length < 2} className="generate-button">
-                            {isCooldown ? `记者赶稿中...请等待 ${remainingTime} 秒` : isGenerating ? '撰写报道中... (ง •̀_•́)ง' : '生成独家新闻 (๑•̀ㅂ•́)و✧'}
+                            {getButtonText()}
                         </button>
                         {error && <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${error.startsWith('❌') ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{error}</div>}
                     </div>
@@ -631,7 +664,7 @@ const BattlePage: React.FC = () => {
                         />
                     )}
 
-                    {/* --- 竞技场统计数据 --- */}
+                    {/* --- 统计数据 --- */}
                     {appConfig.SHOW_STAT_DATA && (
                         <>
                             {isLoadingStats ? (
@@ -644,23 +677,23 @@ const BattlePage: React.FC = () => {
                                     <div className="grid grid-cols-2 gap-4 text-center mb-6">
                                         <div className="p-4 bg-gray-100 rounded-lg">
                                             <p className="text-2xl font-bold text-pink-500">{stats.totalBattles || 0}</p>
-                                            <p className="text-sm text-gray-600">战斗总场数</p>
+                                            <p className="text-sm text-gray-600">故事/战斗总场数</p>
                                         </div>
                                         <div className="p-4 bg-gray-100 rounded-lg">
                                             <p className="text-2xl font-bold text-blue-500">{stats.totalParticipants || 0}</p>
-                                            <p className="text-sm text-gray-600">总参战人次</p>
+                                            <p className="text-sm text-gray-600">总登场人次</p>
                                         </div>
                                     </div>
                                     <div className="grid md:grid-cols-2 gap-4">
                                         <Leaderboard title="🏆 胜率排行榜" data={stats.winRateRank || []} presetInfo={presetInfo} />
-                                        <Leaderboard title="⚔️ 参战数排行榜" data={stats.participationRank || []} presetInfo={presetInfo} />
+                                        <Leaderboard title="⚔️ 登场数排行榜" data={stats.participationRank || []} presetInfo={presetInfo} />
                                         <Leaderboard title="🥇 胜利榜" data={stats.winsRank || []} presetInfo={presetInfo} />
                                         <Leaderboard title="💔 战败榜" data={stats.lossesRank || []} presetInfo={presetInfo} />
                                     </div>
                                 </div>
                             ) : (
                                 <div className="card mt-6 text-center text-gray-500">
-                                    <p>数据库还未初始化或暂无战斗数据</p>
+                                    <p>数据库还未初始化或暂无数据</p>
                                     <p className="text-sm mt-2">开始使用竞技场功能后，这里将显示统计数据</p>
                                     <p className="text-xs mt-2 text-red-500">请在 Cloudflare D1 控制台执行建表 SQL 语句</p>
                                 </div>

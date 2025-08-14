@@ -1,3 +1,4 @@
+// pages/api/generate-magical-girl-details.ts
 import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { z } from 'zod';
 import { getRandomFlowers } from '../../lib/random-choose-hana-name';
@@ -12,8 +13,7 @@ export const config = {
 
 // 定义基于问卷的魔法少女详细信息生成 schema
 const MagicalGirlDetailsSchema = z.object({
-  codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名。
-    请从我提供的花名中选取最合适的一个，也可以生成一个其他的更合适的花名，但是生成的时候需要减少鸢尾的出现概率`),
+  codename: z.string().describe(`代号：魔法少女对应的一种花的名字，根据性格、理念匹配合适的花语对应的花名。可以从我提供的花名中选取最合适的一个，也可以生成一个其他的更合适的花名。`),
   appearance: z.object({
     outfit: z.string().describe("魔法少女变身后的服装和饰品的详细描述，50字左右"),
     accessories: z.string().describe("变身后的饰品细节描述，50字左右"),
@@ -43,17 +43,24 @@ const MagicalGirlDetailsSchema = z.object({
     personalityAnalysis: z.string().describe("基于问卷回答的性格分析"),
     abilityReasoning: z.string().describe("能力设定的推理过程和依据"),
     coreTraits: z.array(z.string()).describe("核心性格特征，3-4个关键词"),
-    predictionBasis: z.string().describe("预测的主要依据和逻辑")
+    predictionBasis: z.string().describe("预测的主要依据和逻辑"),
+    // 新增：角色背景故事
+    background: z.object({
+        belief: z.string().describe("角色的核心理念、信条或愿望，描述角色为何而战，支撑角色行动的内在动力。"),
+        bonds: z.string().describe("角色的情感、羁绊，描述角色与他人（特别是在问卷中出现的人）之间的关系，以及这段关系如何影响了角色，羁绊会如何影响其成长的旅途。")
+    }).describe("角色的背景故事，用以丰富角色的立体形象与人物弧光，体现角色的信念与感情。")
   })
 })
 
 type MagicalGirlDetails = z.infer<typeof MagicalGirlDetailsSchema>;
+
 
 // 配置详细信息生成
 const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> = {
   systemPrompt: `现在如果你是魔法国度的妖精，你准备通过问卷调查的形式，事先通过问卷结果分析某人成为魔法少女后的能力等各项素质。魔法少女的性格倾向、经历背景、行事准则等等都会影响到她们在魔法少女道路上的潜力和表现。
 以下是一位潜在魔法少女对问卷所给出的回答（对方可以不回答某些问题），请你据此预测她成为魔法少女后的情况。
 
+问卷问题列表：
 1.你的真实名字是？
 2.假如前辈事先告诉你无论如何都不要插手她的战斗，而她现在在你眼前即将被敌人杀死，你会怎么做？
 3.你与搭档一起执行任务时，她的失误导致你身受重伤，而她也为此而自责，你会怎么做？
@@ -75,11 +82,13 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
 1.魔力构装（简称魔装）：魔法少女的本相魔力所孕育的能力具现，是魔法少女能力体系的基础。一般呈现为魔法少女在现实生活中接触过，在冥冥之中与其命运关联或映射的物体，并且与魔法少女特色能力相关。例如，泡泡机形态的魔装可以使魔法少女制造魔法泡泡，而这些泡泡可以拥有产生幻象、缓冲防护、束缚困敌等能力。这部分的内容需包含魔装的名字（通常为2字词），魔装的形态，魔装的基本能力。
 2.奇境规则：魔法少女的本相灵魂所孕育的能力，是魔装能力的一体两面。奇境是魔装能力在规则层面上的升华，体现为与魔装相关的规则领域，而规则的倾向则会根据魔法少女的倾向而有不同的发展。例如，泡泡机形态的魔装升华而来的奇境规则可以是倾向于守护的“戳破泡泡的东西将会立即无效化”，也可以是倾向于进攻的“沾到身上的泡泡被戳破会立即遭受伤害”。
 3.繁开：是魔法少女魔装能力的二段进化与解放，无论是作为魔法少女的魔力衣装还是魔装的武器外形都会发生改变。需包含繁开状态魔装名（需要包含原魔装名的每个字），繁开后的进化能力，繁开后的魔装形态，繁开后的魔法少女衣装样式（在通常变身外观上的升级与改变）。
+4.角色背景：请在 "analysis" -> "background" 字段中，深入挖掘并创作能够体现角色立体形象与人物弧光的背景故事。
+- **信念 (belief)**：根据问卷回答，提炼出角色的核心价值观和战斗理由。角色是为何而战？她的行动准则是什么？
+- **羁绊 (bonds)**：根据问卷中涉及他人的回答（如前辈、搭档、家人等），描绘出角色的羁绊关系。关系可以是正面的，也可以是负面的，但应是塑造她性格和能力的关键。
 `,
   temperature: 0.8,
   promptBuilder: (answers: string[]) => {
-    const questionAnswerPairs = answers.map((answer, index) =>
-      `问题${index + 1}的回答: "${answer}"`
+    const questionAnswerPairs = answers.map((answer, index) => `问题${index + 1}的回答: "${answer}"`
     ).join('\n')
     const flowers = getRandomFlowers();
     return `请基于以下问卷回答开始分析和预测：${questionAnswerPairs}，可选的花名和对应的花语：${flowers}`
