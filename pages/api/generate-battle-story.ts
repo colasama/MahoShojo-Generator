@@ -387,8 +387,18 @@ async function handler(req: Request): Promise<Response> {
   try {
     const { combatants, selectedLevel, mode } = await req.json();
 
-    if (!Array.isArray(combatants) || combatants.length < 2 || combatants.length > 6) {
-      return new Response(JSON.stringify({ error: '必须提供2到6位参战者' }), {
+    // --- 根据模式动态调整人数限制 ---
+    const minParticipants = mode === 'daily' ? 1 : 2;
+    // 将最大人数与前端的4人限制对齐
+    const maxParticipants = 4; 
+
+    if (!Array.isArray(combatants) || combatants.length < minParticipants || combatants.length > maxParticipants) {
+      // 动态生成更清晰的错误信息
+      const errorMessage = mode === 'daily'
+        ? `日常模式需要 ${minParticipants} 到 ${maxParticipants} 位角色`
+        : `该模式需要 ${minParticipants} 到 ${maxParticipants} 位角色`;
+        
+      return new Response(JSON.stringify({ error: errorMessage }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
