@@ -70,7 +70,6 @@ const sensitiveWordsConfig = {
         "6KO45L2T",
         "5bCP56m0",
         "5rer6I2h",
-        "5oCn54ix",
         "57+75aKZ",
         "VlBO",
         "56eR5a2m5LiK572R",
@@ -79,7 +78,29 @@ const sensitiveWordsConfig = {
         // 新增违禁词
         "5LiL5L2T6auY5r2u",
         "54ix5ray",
-        "56eB5aSE"
+        "56eB5aSE",
+        // 慈爱眷者相关违禁词
+        "5LiL5L2T",
+        "5amK",
+        "5aaT5aWz",
+        "57K+5ray",
+        "5bCP56m0",
+        "5Lmz5oi/",
+        "572p5p2v",
+        "5aiH5ZaY",
+        "6IO45Zu0",
+        "56eB5aSE",
+        "5oCn5qyy",
+        "5aW06Zq2",
+        "5rer5Lmx",
+        "5rer6I2h",
+        "6IKb6Zeo",
+        "5by65aW4",
+        "5oCn5L61",
+        "5b+r5oSf",
+        "5oOF5qyy",
+        "5oG25aCV",
+        "5oi/5Lit5pyv"
     ],
     encoding: "base64",
     original_count: 71
