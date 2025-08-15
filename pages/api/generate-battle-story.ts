@@ -122,7 +122,7 @@ const createDailyModeConfig = (questions: string[], userGuidance?: string, world
             finalPrompt += `\n\n【故事引导】\n请创作这样的故事： "${userGuidance}"`;
         }
         if (worldviewWarning) {
-            finalPrompt += `\n\n【重要提醒】\n用户提供的引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
+            finalPrompt += `\n\n【重要提醒】\n故事引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
         }
         return finalPrompt;
     },
@@ -194,7 +194,7 @@ const createKizunaModeConfig = (questions: string[], userGuidance?: string, worl
             finalPrompt += `\n\n【故事引导】\n请创作这样的故事： "${userGuidance}"`;
         }
         if (worldviewWarning) {
-            finalPrompt += `\n\n【重要提醒】\n用户提供的引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
+            finalPrompt += `\n\n【重要提醒】\n故事引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
         }
         return finalPrompt;
     },
@@ -275,7 +275,7 @@ const createMagicalGirlVsMagicalGirlConfig = (questions: string[], selectedLevel
         finalPrompt += `\n\n【故事引导】\n请创作这样的故事： "${userGuidance}"`;
     }
     if (worldviewWarning) {
-        finalPrompt += `\n\n【重要提醒】\n用户提供的引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
+        finalPrompt += `\n\n【重要提醒】\n故事引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
     }
 
     return finalPrompt;
@@ -328,7 +328,7 @@ const createMagicalGirlVsCanshouConfig = (questions: string[], userGuidance?: st
         finalPrompt += `\n\n【故事引导】\n请创作这样的故事： "${userGuidance}"`;
     }
     if (worldviewWarning) {
-        finalPrompt += `\n\n【重要提醒】\n用户提供的引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
+        finalPrompt += `\n\n【重要提醒】\n故事引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
     }
     
     return finalPrompt;
@@ -365,7 +365,7 @@ const createCanshouVsCanshouConfig = (userGuidance?: string, worldviewWarning?: 
             finalPrompt += `\n\n【故事引导】\n请创作这样的故事： "${userGuidance}"`;
         }
         if (worldviewWarning) {
-            finalPrompt += `\n\n【重要提醒】\n用户提供的引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
+            finalPrompt += `\n\n【重要提醒】\n故事引导可能不完全符合世界观，请你在创作时，务必确保最终生成的故事符合魔法少女的世界观，修正或忽略不恰当的元素。`;
         }
         
         return finalPrompt;
@@ -486,8 +486,8 @@ async function handler(req: Request): Promise<Response> {
           finalUserGuidance = ''; 
       }
 
-      // 2. 世界观检查 (仅在安全检查通过后进行)
-      if (finalUserGuidance) {
+      // 2. 世界观检查 (仅在安全检查通过后且在设置中开启此功能的情况下进行)
+      if (appConfig.ENABLE_WORLDVIEW_CHECK && finalUserGuidance) {
           try {
               const worldviewResult = await generateWithAI(finalUserGuidance, {
                   systemPrompt: "你是一个魔法少女世界观的专家。请判断用户输入的内容是否与该世界观兼容。你的回答必须严格遵守JSON格式。",

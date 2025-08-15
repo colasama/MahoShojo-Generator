@@ -93,7 +93,6 @@ const getShowStatData = (): boolean => {
 };
 
 // 获取排行榜模式
-// 如果是在 Cloudflare Pages 上部署，可以直接在项目的 设置 > 环境变量 中添加 LEADERBOARD_MODE 并设置其值。
 const getLeaderboardMode = (): 'all' | 'preset' | 'user' => {
   const mode = process.env.LEADERBOARD_MODE;
   if (mode === 'preset' || mode === 'user') {
@@ -108,6 +107,12 @@ const getEnableArenaUserGuidance = (): boolean => {
   return enabled === 'true';
 };
 
+// 新增：获取世界观检查功能开关的函数
+const getEnableWorldviewCheck = (): boolean => {
+  const enabled = process.env.NEXT_PUBLIC_ENABLE_WORLDVIEW_CHECK ?? 'false';
+  // 默认关闭，只有当环境变量明确设置为 'true' 时才开启
+  return enabled === 'true';
+};
 
 export const config = {
   // Vercel AI 配置
@@ -124,6 +129,9 @@ export const config = {
 
   // 竞技场用户引导功能开关
   ENABLE_ARENA_USER_GUIDANCE: getEnableArenaUserGuidance(),
+
+  // 新增：世界观检查功能开关
+  ENABLE_WORLDVIEW_CHECK: getEnableWorldviewCheck(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {
