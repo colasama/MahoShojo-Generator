@@ -17,8 +17,6 @@ export interface NewsReport {
     winner: string;
     impact: string;
   };
-  // 新增：可选的用户引导信息字段
-  userGuidance?: string;
 }
 
 interface BattleReportCardProps {
@@ -100,7 +98,6 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
 
   // 处理保存为Markdown文件
   const handleSaveMarkdown = () => {
-    // 新增：在Markdown中加入用户引导信息
     const markdownContent = `
 # ${report.headline}
 **来源：${report.reporterInfo.publication} | 记者：${report.reporterInfo.name}**
@@ -120,11 +117,6 @@ ${report.article.body}
 ## 官方通报
 - **胜利者**: ${report.officialReport.winner}
 - **最终影响**: ${report.officialReport.impact}
-${report.userGuidance ? `
----
-
-## 故事引导
-> ${report.userGuidance}` : ''}
     `.trim();
 
     // 创建Blob对象并触发下载
@@ -165,8 +157,7 @@ ${report.userGuidance ? `
                     borderRadius: '9999px',
                     borderWidth: '1px',
                     fontSize: '0.875rem',
-                    fontWeight: '600',
-                    whiteSpace: 'nowrap' // 添加此样式，强制不换行
+                    fontWeight: '600'
                 }}>
                     {modeDisplay.text}
                 </span>
@@ -194,16 +185,6 @@ ${report.userGuidance ? `
             <p className="text-sm opacity-90" style={{ marginBottom: '0.5rem' }}>{report.officialReport.impact}</p>
           </div>
         </div>
-
-        {/* 新增：如果用户提供了引导信息，则显示此区域 */}
-        {report.userGuidance && (
-          <div className="result-item" style={{ borderLeft: '4px solid #a78bfa', background: 'rgba(0,0,0,0.2)' }}>
-            <div className="result-label">📖 故事引导</div>
-            <div className="result-value">
-              <p className="text-sm opacity-90 italic">“{report.userGuidance}”</p>
-            </div>
-          </div>
-        )}
 
         {/* 按钮容器 */}
         <div className="buttons-container flex gap-2 justify-center mt-4" style={{ alignItems: 'stretch' }}>
