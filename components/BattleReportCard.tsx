@@ -34,11 +34,11 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
   const getModeDisplay = (mode: string) => {
     switch (mode) {
       case 'daily':
-        return { text: '日常模式 ☕', style: { color: '#22c55e', borderColor: '#22c55e', background: 'rgba(34, 197, 94, 0.1)' } };
+        return { text: '日常模式 ☕', logo: '/daily-mode.svg' };
       case 'kizuna':
-        return { text: '羁绊模式 ✨', style: { color: '#3b82f6', borderColor: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)' } };
+        return { text: '羁绊模式 ✨', logo: '/kizuna-mode.svg' };
       case 'classic':
-        return { text: '经典模式 ⚔️', style: { color: '#ec4899', borderColor: '#ec4899', background: 'rgba(236, 72, 153, 0.1)' } };
+        return { text: '经典模式 ⚔️', logo: '/classic-mode.svg' };
       default:
         return null;
     }
@@ -149,29 +149,31 @@ ${report.userGuidance ? `
       <div className="result-content">
         <img src="/arena-white.svg" style={{ marginBottom: '1rem', marginTop: '1rem' }} width={320} height={90} alt="魔法少女竞技场" className="feature-title-svg" />
         <h2 className="text-xl font-bold mb-2" style={{ marginLeft: '0.5rem' }}>{report.headline}</h2>
-        <p className="text-sm text-gray-300" style={{ marginLeft: '0.5rem' }}>
-          记者 | {report.reporterInfo.name}
-        </p>
-        <p className="text-sm text-gray-300" style={{ marginBottom: '0.5rem', marginLeft: '0.5rem' }}>
-          来源 | {report.reporterInfo.publication}
-        </p>
-
-        {/* 显示战斗模式 */}
-        {modeDisplay && (
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0' }}>
-                <span style={{
-                    ...modeDisplay.style,
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '9999px',
-                    borderWidth: '1px',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    whiteSpace: 'nowrap' // 添加此样式，强制不换行
-                }}>
-                    {modeDisplay.text}
-                </span>
-            </div>
-        )}
+        <div style={{ position: 'relative', marginLeft: '0.5rem', minHeight: '60px' }}>
+          <div>
+            <p className="text-sm text-gray-300">
+              记者 | {report.reporterInfo.name}
+            </p>
+            <p className="text-sm text-gray-300">
+              来源 | {report.reporterInfo.publication}
+            </p>
+          </div>
+          {/* 显示战斗模式 */}
+          {modeDisplay && (
+            <img
+              src={modeDisplay.logo}
+              alt={modeDisplay.text}
+              style={{ 
+                position: 'absolute',
+                top: '-0.5rem',
+                right: '0rem',
+                width: '120px', 
+                height: '60px' 
+              }} 
+            />
+          )}  
+        </div>
+        
 
         <div className="result-item">
           <div className="result-value">
