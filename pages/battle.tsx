@@ -69,8 +69,10 @@ const BattlePage: React.FC = () => {
     const [correctedFiles, setCorrectedFiles] = useState<Record<string, boolean>>({});
     // 用于跟踪复制操作的状态
     const [copiedStatus, setCopiedStatus] = useState<Record<string, boolean>>({});
-    // 新增：用于存储用户故事引导输入的状态
+    // 用于存储用户故事引导输入的状态
     const [userGuidance, setUserGuidance] = useState('');
+    // 用于锁定正在加载的预设按钮的状态
+    const [loadingPreset, setLoadingPreset] = useState<string | null>(null);
 
 
     // 冷却状态钩子，设置为2分钟
@@ -226,14 +228,21 @@ const BattlePage: React.FC = () => {
     };
 
     // 处理选择预设
-    const handleSelectPreset = async (preset: Preset) => {
-        if (combatants.some(c => c.filename === preset.filename)) {
-            setCombatants(prev => prev.filter(c => c.filename !== preset.filename));
-            setError(null);
-            return;
-        }
+    const handleRemoveCombatant = (filename: string) => {
+        setCombatants(prev => prev.filter(c => c.filename !== filename));
+    };
 
+    const handleSelectPreset = async (preset: Preset) => {
+        // 修改：在操作开始时就锁定按钮，防止重复点击
+        setLoadingPreset(preset.filename);
+    
         try {
+            if (combatants.some(c => c.filename === preset.filename)) {
+                handleRemoveCombatant(preset.filename);
+                setError(null);
+                return;
+            }
+    
             const response = await fetch(`/presets/${preset.filename}`);
             if (!response.ok) throw new Error(`无法加载 ${preset.name} 的设定文件。`);
             const presetData = await response.json();
@@ -252,6 +261,9 @@ const BattlePage: React.FC = () => {
 
         } catch (err) {
             if (err instanceof Error) setError(err.message);
+        } finally {
+            // 操作结束后解除按钮锁定
+            setLoadingPreset(null);
         }
     };
 
@@ -511,7 +523,10 @@ const BattlePage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {presets.slice((currentPage - 1) * presetsPerPage, currentPage * presetsPerPage).map(preset => {
                             const isSelected = combatants.some(c => c.filename === preset.filename);
-                            const isDisabled = !isSelected && combatants.length >= 4;
+                            // 修改：增加 loadingPreset 的判断
+                            const isLoadingThis = loadingPreset === preset.filename;
+                            const isDisabled = isLoadingThis || (!isSelected && combatants.length >= 4);
+
                             const bgColor = preset.type === 'canshou'
                                 ? (isSelected ? 'bg-red-200 border-red-400 hover:bg-red-300' : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50')
                                 : (isSelected ? 'bg-pink-200 border-pink-400 hover:bg-pink-300' : 'bg-white border-gray-300 hover:border-pink-400 hover:bg-pink-50');
@@ -525,7 +540,8 @@ const BattlePage: React.FC = () => {
                                     onClick={() => !isDisabled && handleSelectPreset(preset)}
                                     className={`p-3 border rounded-lg transition-all duration-200 ${isDisabled ? 'bg-gray-200 border-gray-300 text-gray-500 cursor-not-allowed' : `${bgColor} cursor-pointer`}`}
                                 >
-                                    <p className={`font-semibold ${textColor}`}>{preset.name}</p>
+                                    {/* 修改：根据加载状态显示不同文本 */}
+                                    <p className={`font-semibold ${textColor}`}>{isLoadingThis ? '加载中...' : preset.name}</p>
                                     <p className={`text-xs mt-1 ${isSelected ? (preset.type === 'canshou' ? 'text-red-800' : 'text-pink-800') : 'text-gray-600'}`}>{preset.description}</p>
                                 </div>
                             );
@@ -600,14 +616,30 @@ const BattlePage: React.FC = () => {
                                         const typeDisplay = c.type === 'magical-girl' ? '(魔法少女)' : '(残兽)';
                                         const isCorrected = correctedFiles[name];
                                         return (
-                                            <li key={name} className="flex justify-between items-center">
-                                                <span>{name} <span className="text-xs text-gray-500">{typeDisplay}</span> {c.data.isPreset && ' (预设)'} {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}</span>
-                                                {isCorrected && (
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => handleDownloadCorrectedJson(name)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">下载</button>
-                                                        <button onClick={() => handleCopyCorrectedJson(name)} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">{copiedStatus[name] ? '已复制!' : '复制'}</button>
-                                                    </div>
-                                                )}
+                                            // 修改：为 li 增加 flex 布局，并在后方增加删除按钮
+                                            <li key={c.filename} className="flex justify-between items-center group">
+                                                <span className="truncate" title={name}>
+                                                    {name}
+                                                    <span className="text-xs text-gray-500 ml-1">{typeDisplay}</span>
+                                                    {c.data.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
+                                                    {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
+                                                </span>
+                                                <div className="flex items-center">
+                                                    {isCorrected && (
+                                                        <div className="flex gap-2 mr-2">
+                                                            <button onClick={() => handleDownloadCorrectedJson(name)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">下载</button>
+                                                            <button onClick={() => handleCopyCorrectedJson(name)} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">{copiedStatus[name] ? '已复制!' : '复制'}</button>
+                                                        </div>
+                                                    )}
+                                                    {/* 新增：单个删除按钮 */}
+                                                    <button
+                                                        onClick={() => handleRemoveCombatant(c.filename)}
+                                                        className="w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-300"
+                                                        aria-label={`移除 ${name}`}
+                                                    >
+                                                        X
+                                                    </button>
+                                                </div>
                                             </li>
                                         );
                                     })}
