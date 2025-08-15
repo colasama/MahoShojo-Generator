@@ -108,6 +108,16 @@ const sensitiveWordsConfig = {
         "5Liw6IW0",
         //"5Y+R5oOF", 暂时取消该词，以免因为突发情况等误封
         "5oCn5b+r5oSf",
+        // 奥菲利亚相关违禁词
+        "5oCA5a2V",
+        "5a+E55Sf",
+        "5rOo5Y21",
+        "5Y+X5a2V",
+        "5rer6Z2h",
+        "5a2Q5a6r",
+        "6IKJ5aOB",
+        "5YKs5oOF",
+        "5oiQ55i+",
         // 现实相关违禁词
         "5Lit5Zu9",
         "5Lit5Y2O5Lq65rCR5YWx5ZKM5Zu9",
@@ -122,7 +132,7 @@ const sensitiveWordsConfig = {
         "5byx5pm6",
         "6Im5",
         "5pSv55Wc",
-        "6LSx56eN",
+        "6LSx56eN"
     ],
     encoding: "base64",
     original_count: 71
