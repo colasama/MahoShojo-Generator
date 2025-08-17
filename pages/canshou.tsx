@@ -203,6 +203,12 @@ const CanshouPage: React.FC = () => {
     }
   };
 
+  // 新增：重新生成函数
+  const handleRegenerate = () => {
+    // 直接使用已保存的答案再次提交
+    handleSubmit(answers);
+  };
+    
   const handleSaveImage = (imageUrl: string) => {
     setSavedImageUrl(imageUrl);
     setShowImageModal(true);
@@ -297,11 +303,31 @@ const CanshouPage: React.FC = () => {
               <>
                 <CanshouCard canshou={canshouDetails} onSaveImage={handleSaveImage} />
 
-                {/* 新增：保存JSON文件功能 */}
+                {/* 修改：新增的功能区域 */}
                 <div className="card" style={{ marginTop: '1rem' }}>
                   <div className="text-center">
-                    <h3 className="text-lg font-medium text-gray-800" style={{ marginBottom: '1rem' }}>保存残兽档案</h3>
+                    <h3 className="text-lg font-medium text-gray-800" style={{ marginBottom: '1rem' }}>后续操作</h3>
                     <SaveJsonButton canshouDetails={canshouDetails} answers={answers} />
+                    
+                    {/* 新增：重新生成按钮 */}
+                    <button
+                        onClick={handleRegenerate}
+                        disabled={submitting || isCooldown}
+                        className="generate-button"
+                        style={{ marginTop: '0.5rem', backgroundColor: '#a855f7', backgroundImage: 'linear-gradient(to right, #a855f7, #d946ef)' }}
+                    >
+                        {isCooldown ? `冷却中 (${remainingTime}s)` : submitting ? '重新生成中...' : '不满意？再来一次'}
+                    </button>
+
+                    {/* 新增：前往竞技场的入口 */}
+                    <div style={{ marginTop: '0.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+                      <p className="text-sm text-gray-600 mb-2">
+                        保存好你的档案了吗？
+                      </p>
+                      <Link href="/battle" className="footer-link" style={{ color: '#c026d3', fontSize: '1.125rem' }}>
+                        前往竞技场，让它大闹一场！→
+                      </Link>
+                    </div>
                   </div>
                 </div>
 
