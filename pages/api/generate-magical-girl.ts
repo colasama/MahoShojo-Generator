@@ -1,8 +1,10 @@
+// pages/api/generate-magical-girl.ts
 import { z } from "zod";
 import { generateWithAI, GenerationConfig } from "../../lib/ai";
 import { config as appConfig } from "../../lib/config";
 import { MainColor } from "../../lib/main-color";
 import { getLogger } from "../../lib/logger";
+import { generateSignature } from '../../lib/signature'; // 导入签名工具
 
 const log = getLogger('api-gen-girl');
 
@@ -85,10 +87,18 @@ async function handler(
   }
 
   try {
-    // 直接调用AI生成，不再入队
-    const magicalGirl = await generateMagicalGirlWithAI(name.trim());
+    const magicalGirlData = await generateMagicalGirlWithAI(name.trim());
 
-    return new Response(JSON.stringify(magicalGirl), {
+    // 新增：为数据生成签名
+    const signature = await generateSignature(magicalGirlData);
+
+    // 新增：将签名附加到最终结果中
+    const finalResult = {
+        ...magicalGirlData,
+        signature: signature
+    };
+
+    return new Response(JSON.stringify(finalResult), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

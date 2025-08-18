@@ -4,6 +4,7 @@ import { generateWithAI, GenerationConfig } from '../../lib/ai';
 import { getLogger } from '../../lib/logger';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { NextRequest } from 'next/server';
+import { generateSignature } from '../../lib/signature'; // 导入签名工具
 
 const log = getLogger('api-gen-canshou');
 
@@ -122,7 +123,22 @@ async function handler(req: NextRequest): Promise<Response> {
     // 调用通用AI生成函数
     const canshouDetails = await generateWithAI(answers, canshouGenerationConfig);
 
-    return new Response(JSON.stringify(canshouDetails), {
+    // 新增：将用户答案和生成结果合并，为签名做准备
+    const dataToSign = {
+        ...canshouDetails,
+        userAnswers: answers
+    };
+
+    // 新增：为合并后的数据生成签名
+    const signature = await generateSignature(dataToSign);
+
+    // 新增：将签名附加到最终结果中
+    const finalResult = {
+        ...dataToSign,
+        signature: signature
+    };
+
+    return new Response(JSON.stringify(finalResult), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
