@@ -57,7 +57,7 @@ const BattleReportCoreSchema = z.object({
   }),
   officialReport: z.object({
     winner: z.string().describe("胜利者的代号或名称。如果是平局，则返回'平局'。如果是无胜负要素的故事，请列出所有核心角色的名字；如果带有竞争性并分出了胜负（如战斗、辩论、比赛），则只写胜利者的名字。"),
-    impact: z.string().describe("对本次事件的总结点评，描述事件带来的最终影响，包括对参与者和相关者的后续影响。"),
+    conclusion: z.string().describe("对本次事件的总结点评，描述事件带来的最终结果，包括对参与者和相关者的后续影响。"),
   })
 }).describe("生成一份关于魔法少女的新闻报道。如果用户提供了引导，请在创作时参考，但必须确保最终内容符合魔法少女世界观和公序良俗。");
 
