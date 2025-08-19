@@ -15,7 +15,7 @@ export interface NewsReport {
   };
   officialReport: {
     winner: string;
-    impact: string;
+    conclusion: string;
   };
   // 新增：可选的用户引导信息字段
   userGuidance?: string;
@@ -119,7 +119,7 @@ ${report.article.body}
 
 ## 官方通报
 - **胜利者**: ${report.officialReport.winner}
-- **最终影响**: ${report.officialReport.impact}
+- **最终结果**: ${report.officialReport.conclusion}
 ${report.userGuidance ? `
 ---
 
@@ -192,8 +192,8 @@ ${report.userGuidance ? `
           <div className="result-value">
             <h3 className="font-semibold mt-2">胜利者</h3>
             <p className="text-sm opacity-90" style={{ marginBottom: '0.5rem' }}>{report.officialReport.winner}</p>
-            <h3 className="font-semibold mt-2">最终影响</h3>
-            <p className="text-sm opacity-90" style={{ marginBottom: '0.5rem' }}>{report.officialReport.impact}</p>
+            <h3 className="font-semibold mt-2">最终结果</h3>
+            <p className="text-sm opacity-90" style={{ marginBottom: '0.5rem' }}>{report.officialReport.conclusion}</p>
           </div>
         </div>
 
