@@ -208,7 +208,7 @@ const CanshouPage: React.FC = () => {
     // 直接使用已保存的答案再次提交
     handleSubmit(answers);
   };
-    
+
   const handleSaveImage = (imageUrl: string) => {
     setSavedImageUrl(imageUrl);
     setShowImageModal(true);
@@ -269,7 +269,19 @@ const CanshouPage: React.FC = () => {
                       const label = typeof option === 'string' ? option : option.label;
                       const disabled = typeof option !== 'string' && option.disabled;
                       return (
-                        <button key={index} onClick={() => !disabled && handleOptionClick(value)} disabled={disabled} className={`p-3 border rounded-lg text-sm text-center transition-colors ${disabled ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-pink-50 hover:border-pink-300'}`}>
+                        <button
+                          key={index}
+                          onClick={() => !disabled && handleOptionClick(value)}
+                          disabled={disabled}
+                          className={`p-3 border rounded-lg text-sm text-center transition-colors 
+                            ${disabled
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-white text-gray-800 hover:text-pink-500 hover:bg-pink-50 hover:border-pink-300 cursor-pointer'
+                            }`}
+                          style={{
+                            backgroundColor: disabled ? '#f3f4f6' : '#ffffff',
+                          }}
+                        >
                           {label}
                         </button>
                       );
@@ -308,15 +320,15 @@ const CanshouPage: React.FC = () => {
                   <div className="text-center">
                     <h3 className="text-lg font-medium text-gray-800" style={{ marginBottom: '1rem' }}>后续操作</h3>
                     <SaveJsonButton canshouDetails={canshouDetails} answers={answers} />
-                    
+
                     {/* 新增：重新生成按钮 */}
                     <button
-                        onClick={handleRegenerate}
-                        disabled={submitting || isCooldown}
-                        className="generate-button"
-                        style={{ marginTop: '0.5rem', backgroundColor: '#a855f7', backgroundImage: 'linear-gradient(to right, #a855f7, #d946ef)' }}
+                      onClick={handleRegenerate}
+                      disabled={submitting || isCooldown}
+                      className="generate-button"
+                      style={{ marginTop: '0.5rem', backgroundColor: '#a855f7', backgroundImage: 'linear-gradient(to right, #a855f7, #d946ef)' }}
                     >
-                        {isCooldown ? `冷却中 (${remainingTime}s)` : submitting ? '重新生成中...' : '不满意？再来一次'}
+                      {isCooldown ? `冷却中 (${remainingTime}s)` : submitting ? '重新生成中...' : '不满意？再来一次'}
                     </button>
 
                     {/* 新增：前往竞技场的入口 */}
