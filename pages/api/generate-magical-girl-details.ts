@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getRandomFlowers } from '../../lib/random-choose-hana-name';
 // import { saveToD1 } from '../../lib/d1';
 import { getLogger } from '../../lib/logger';
+import { generateSignature } from '../../lib/signature'; // 导入签名工具
 
 const log = getLogger('api-gen-details');
 
@@ -156,7 +157,22 @@ async function handler(
     //   saveToD1(saveData).catch(err => log.error('保存到D1失败（非阻塞）', err));
     // }
 
-    return new Response(JSON.stringify(magicalGirlDetails), {
+    // 新增：将用户答案和生成结果合并，为签名做准备
+    const dataToSign = {
+        ...magicalGirlDetails,
+        userAnswers: answers
+    };
+
+    // 新增：为合并后的数据生成签名
+    const signature = await generateSignature(dataToSign);
+
+    // 新增：将签名附加到最终结果中
+    const finalResult = {
+        ...dataToSign,
+        signature: signature
+    };
+
+    return new Response(JSON.stringify(finalResult), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

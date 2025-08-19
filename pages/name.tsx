@@ -254,6 +254,23 @@ export default function Name() {
     }
   };
 
+  // 新增：处理保存为JSON文件
+  const handleSaveJson = () => {
+    if (!magicalGirl) return;
+
+    // 签名已包含在 magicalGirl 对象中
+    const jsonData = JSON.stringify(magicalGirl, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `魔法少女_${magicalGirl.name}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <Head>
@@ -380,6 +397,10 @@ export default function Name() {
 
                   <button onClick={handleSaveImage} className="save-button">
                     📱 保存为图片
+                  </button>
+
+                  <button onClick={handleSaveJson} className="save-button" style={{marginTop: '0.5rem', background: 'linear-gradient(135deg, #5c7cfa 0%, #748ffc 100%)'}}>
+                    📄 下载设定文件
                   </button>
 
                   <div className="logo-placeholder" style={{ display: 'none', justifyContent: 'center', marginTop: '1rem' }}>

@@ -44,6 +44,7 @@ interface Combatant {
     type: 'magical-girl' | 'canshou';
     data: any;
     filename: string; // 用于UI显示和去重
+    isValid: boolean; // 新增：用于标记是否为原生设定
 }
 
 // 定义故事/战斗模式类型
@@ -257,7 +258,8 @@ const BattlePage: React.FC = () => {
             if (!validationResult.success) return;
 
             presetData.isPreset = true;
-            addCombatant({ type: preset.type, data: presetData, filename: preset.filename });
+            // 预设文件默认视为非原生
+            addCombatant({ type: preset.type, data: presetData, filename: preset.filename, isValid: false });
 
         } catch (err) {
             if (err instanceof Error) setError(err.message);
@@ -268,7 +270,7 @@ const BattlePage: React.FC = () => {
     };
 
     // 统一处理文件上传和粘贴
-    const processJsonData = (jsonData: any[], sourceName: string) => {
+    const processJsonData = async (jsonData: any[], sourceName: string) => {
         if (jsonData.length > (4 - combatants.length)) {
             throw new Error(`队伍将超出4人上限！`);
         }
@@ -303,7 +305,15 @@ const BattlePage: React.FC = () => {
                 newCorrectedFiles[item.codename] = true;
             }
 
-            loadedCombatants.push({ type, data: item, filename: item.codename || item.name });
+            // 新增：调用校验API
+            const verificationResponse = await fetch('/api/verify-origin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item),
+            });
+            const { isValid } = await verificationResponse.json();
+
+            loadedCombatants.push({ type, data: item, filename: item.codename || item.name, isValid });
         }
 
         setCombatants(prev => [...prev, ...loadedCombatants]);
@@ -333,7 +343,7 @@ const BattlePage: React.FC = () => {
         }
     };
 
-    const handleAddFromPaste = () => {
+    const handleAddFromPaste = async () => {
         const text = pastedJson.trim();
         if (!text) return;
         try {
@@ -349,7 +359,7 @@ const BattlePage: React.FC = () => {
                 parsedData = JSON.parse(sanitizedText);
             }
             const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
-            processJsonData(dataArray, '粘贴的内容');
+            await processJsonData(dataArray, '粘贴的内容');
             setPastedJson('');
         } catch (err) {
              if (err instanceof Error) setError(`❌ 文本解析失败: ${err.message}.`);
@@ -622,6 +632,7 @@ const BattlePage: React.FC = () => {
                                                     {name}
                                                     <span className="text-xs text-gray-500 ml-1">{typeDisplay}</span>
                                                     {c.data.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
+                                                    {c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
                                                     {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
                                                 </span>
                                                 <div className="flex items-center">
@@ -631,7 +642,7 @@ const BattlePage: React.FC = () => {
                                                             <button onClick={() => handleCopyCorrectedJson(name)} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">{copiedStatus[name] ? '已复制!' : '复制'}</button>
                                                         </div>
                                                     )}
-                                                    {/* 新增：单个删除按钮 */}
+                                                    {/* 单个删除按钮 */}
                                                     <button
                                                         onClick={() => handleRemoveCombatant(c.filename)}
                                                         className="w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-300"
