@@ -44,7 +44,7 @@ interface Combatant {
     type: 'magical-girl' | 'canshou';
     data: any;
     filename: string; // 用于UI显示和去重
-    isValid: boolean; // 新增：用于标记是否为原生设定
+    isValid?: boolean; // 改为可选，初始状态为未验证
 }
 
 // 定义故事/战斗模式类型
@@ -305,15 +305,8 @@ const BattlePage: React.FC = () => {
                 newCorrectedFiles[item.codename] = true;
             }
 
-            // 新增：调用校验API
-            const verificationResponse = await fetch('/api/verify-origin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(item),
-            });
-            const { isValid } = await verificationResponse.json();
-
-            loadedCombatants.push({ type, data: item, filename: item.codename || item.name, isValid });
+            // 先不进行验证，isValid 状态留空
+            loadedCombatants.push({ type, data: item, filename: item.codename || item.name });
         }
 
         setCombatants(prev => [...prev, ...loadedCombatants]);
@@ -437,26 +430,68 @@ const BattlePage: React.FC = () => {
         setNewsReport(null);
 
         try {
-            // 安全措施：检查上传内容中的敏感词;
+            // --- 1. 批量验证原生性（错误则视为非原生处理）---
+            const combatantsToVerify = combatants.filter(c => !c.data.isPreset); // 只验证非预设角色
+            let verificationResults: { name: string, isValid: boolean }[] = [];
+
+            if (combatantsToVerify.length > 0) {
+                try {
+                    const verificationPayload = combatantsToVerify.map(c => c.data);
+                    const verificationRes = await fetch('/api/bulk-verify-characters', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ characters: verificationPayload }),
+                    });
+
+                    if (verificationRes.ok) {
+                        const data = await verificationRes.json();
+                        verificationResults = data.results || [];
+                    } else {
+                        // 如果API返回错误（如429, 500等），在控制台记录警告，但不中断流程
+                        console.warn('原生性验证服务失败，状态码:', verificationRes.status);
+                        // verificationResults 将保持为空数组
+                    }
+                } catch (err) {
+                    // 如果发生网络错误等，同样在控制台记录，并继续执行
+                    console.error('调用原生性验证服务时出错:', err);
+                    // verificationResults 将保持为空数组
+                }
+            }
+            
+            // 更新战斗人员状态以显示 (原生) 标签
+            const updatedCombatants = combatants.map(c => {
+                // 预设角色始终被认为是原生的
+                if (c.data.isPreset) {
+                    return { ...c, isValid: true };
+                }
+                const name = c.data.codename || c.data.name;
+                const result = verificationResults.find((r) => r.name === name);
+                // 如果找到验证结果，则使用它；否则（包括验证失败时），视为非原生
+                return { ...c, isValid: result ? result.isValid : false };
+            });
+            setCombatants(updatedCombatants);
+
+            // 短暂延迟以确保UI在开始生成前有机会更新
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // --- 2. 敏感词检查 ---
             const combatantsData = combatants.map(c => ({ type: c.type, data: c.data }));
             if (await checkSensitiveWords(JSON.stringify(combatantsData))) return;
-            // 新增：检查用户引导文本
             if (userGuidance && (await checkSensitiveWords(userGuidance))) return;
 
-
-            // 在请求体中加入 mode 和 userGuidance 参数
+            // --- 3. 调用故事生成API ---
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    combatants: combatantsData, 
+                body: JSON.stringify({
+                    combatants: combatantsData,
                     selectedLevel,
                     mode: battleMode, // 将当前选择的模式发送给后端
                     userGuidance: userGuidance, // 将用户引导文本发送给后端
                 }),
             });
 
-            // --- 核心修改：增强错误处理 ---
+            // --- 增强错误处理 ---
             if (!response.ok) {
                 // 首先，尝试将响应体作为文本读取
                 const errorText = await response.text();
