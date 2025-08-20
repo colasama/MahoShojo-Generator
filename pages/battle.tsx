@@ -430,47 +430,50 @@ const BattlePage: React.FC = () => {
         setNewsReport(null);
 
         try {
-            // --- 1. 批量验证原生性（错误则视为非原生处理）---
-            const combatantsToVerify = combatants.filter(c => !c.data.isPreset); // 只验证非预设角色
-            let verificationResults: { name: string, isValid: boolean }[] = [];
+            // --- 1. 根据配置决定是否执行原生性验证 ---
+            if (appConfig.ENABLE_NATIVE_VERIFICATION) {
+                const combatantsToVerify = combatants.filter(c => !c.data.isPreset);
+                let verificationResults: { name: string, isValid: boolean }[] = [];
 
-            if (combatantsToVerify.length > 0) {
-                try {
-                    const verificationPayload = combatantsToVerify.map(c => c.data);
-                    const verificationRes = await fetch('/api/bulk-verify-characters', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ characters: verificationPayload }),
-                    });
+                if (combatantsToVerify.length > 0) {
+                    try {
+                        const verificationPayload = combatantsToVerify.map(c => c.data);
+                        const verificationRes = await fetch('/api/bulk-verify-characters', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ characters: verificationPayload }),
+                        });
 
-                    if (verificationRes.ok) {
-                        const data = await verificationRes.json();
-                        verificationResults = data.results || [];
-                    } else {
-                        // 如果API返回错误（如429, 500等），在控制台记录警告，但不中断流程
-                        console.warn('原生性验证服务失败，状态码:', verificationRes.status);
-                        // verificationResults 将保持为空数组
+                        if (verificationRes.ok) {
+                            const data = await verificationRes.json();
+                            verificationResults = data.results || [];
+                        } else {
+                            // 如果API返回错误（如429, 500等），在控制台记录警告，但不中断流程
+                            console.warn('原生性验证服务失败，状态码:', verificationRes.status, '将所有角色视为非原生处理。');
+                        }
+                    } catch (err) {
+                        // 如果发生网络错误等，同样在控制台记录，并继续执行
+                        console.error('调用原生性验证服务时出错，将所有角色视为非原生处理:', err);
                     }
-                } catch (err) {
-                    // 如果发生网络错误等，同样在控制台记录，并继续执行
-                    console.error('调用原生性验证服务时出错:', err);
-                    // verificationResults 将保持为空数组
                 }
+
+                // 更新战斗人员状态以显示 (原生) 标签
+                const updatedCombatants = combatants.map(c => {
+                    if (c.data.isPreset) return { ...c, isValid: true };
+                    const name = c.data.codename || c.data.name;
+                    const result = verificationResults.find((r) => r.name === name);
+                    return { ...c, isValid: result ? result.isValid : false };
+                });
+                setCombatants(updatedCombatants);
+            } else {
+                // 如果验证被禁用，则将所有非预设角色标记为非原生
+                const updatedCombatants = combatants.map(c => ({
+                    ...c,
+                    isValid: !!c.data.isPreset 
+                }));
+                setCombatants(updatedCombatants);
             }
             
-            // 更新战斗人员状态以显示 (原生) 标签
-            const updatedCombatants = combatants.map(c => {
-                // 预设角色始终被认为是原生的
-                if (c.data.isPreset) {
-                    return { ...c, isValid: true };
-                }
-                const name = c.data.codename || c.data.name;
-                const result = verificationResults.find((r) => r.name === name);
-                // 如果找到验证结果，则使用它；否则（包括验证失败时），视为非原生
-                return { ...c, isValid: result ? result.isValid : false };
-            });
-            setCombatants(updatedCombatants);
-
             // 短暂延迟以确保UI在开始生成前有机会更新
             await new Promise(resolve => setTimeout(resolve, 50));
 

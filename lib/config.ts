@@ -82,7 +82,7 @@ const getLoadBalanceStrategy = (): string => {
   return process.env.AI_LOAD_BALANCE_STRATEGY || 'random';
 };
 
-// 新增：获取统计数据显示开关
+// 获取统计数据显示开关
 const getShowStatData = (): boolean => {
   const showStat = process.env.SHOW_STAT_DATA || 'false';
   // 如果环境变量设置为 'false' 或 '0'，则返回 false，其他情况返回 true
@@ -107,9 +107,16 @@ const getEnableArenaUserGuidance = (): boolean => {
   return enabled === 'true';
 };
 
-// 新增：获取世界观检查功能开关的函数
+// 获取世界观检查功能开关
 const getEnableWorldviewCheck = (): boolean => {
   const enabled = process.env.NEXT_PUBLIC_ENABLE_WORLDVIEW_CHECK ?? 'false';
+  // 默认关闭，只有当环境变量明确设置为 'true' 时才开启
+  return enabled === 'true';
+};
+
+// 获取原生性验证功能开关
+const getEnableNativeVerification = (): boolean => {
+  const enabled = process.env.NEXT_PUBLIC_ENABLE_NATIVE_VERIFICATION ?? 'false';
   // 默认关闭，只有当环境变量明确设置为 'true' 时才开启
   return enabled === 'true';
 };
@@ -130,8 +137,11 @@ export const config = {
   // 竞技场用户引导功能开关
   ENABLE_ARENA_USER_GUIDANCE: getEnableArenaUserGuidance(),
 
-  // 新增：世界观检查功能开关
+  // 世界观检查功能开关
   ENABLE_WORLDVIEW_CHECK: getEnableWorldviewCheck(),
+
+  // 原生性验证功能开关
+  ENABLE_NATIVE_VERIFICATION: getEnableNativeVerification(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {
