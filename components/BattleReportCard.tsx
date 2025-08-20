@@ -17,15 +17,16 @@ export interface NewsReport {
     winner: string;
     conclusion: string;
   };
-  // 新增：可选的用户引导信息字段
+  // 可选的用户引导信息字段
   userGuidance?: string;
+  mode?: 'classic' | 'kizuna' | 'daily' | 'scenario';
 }
 
 interface BattleReportCardProps {
   report: NewsReport;
   onSaveImage?: (imageUrl: string) => void;
   // 战斗模式，设为可选以兼容旧功能
-  mode?: 'classic' | 'kizuna' | 'daily';
+  mode?: 'classic' | 'kizuna' | 'daily' | 'scenario';
 }
 
 const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage, mode }) => {

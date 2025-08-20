@@ -107,10 +107,26 @@ const getEnableArenaUserGuidance = (): boolean => {
   return enabled === 'true';
 };
 
-// 新增：获取世界观检查功能开关的函数
+// 获取世界观检查功能开关的函数
 const getEnableWorldviewCheck = (): boolean => {
   const enabled = process.env.NEXT_PUBLIC_ENABLE_WORLDVIEW_CHECK ?? 'false';
   // 默认关闭，只有当环境变量明确设置为 'true' 时才开启
+  return enabled === 'true';
+};
+
+// 新增：获取内容安全检查相关开关的函数
+const getEnableSensitiveWordFilter = (): boolean => {
+  const enabled = process.env.NEXT_PUBLIC_ENABLE_SENSITIVE_WORD_FILTER ?? 'true';
+  return enabled === 'true';
+};
+
+const getEnableAiSafetyCheck = (): boolean => {
+  const enabled = process.env.NEXT_PUBLIC_ENABLE_AI_SAFETY_CHECK ?? 'true';
+  return enabled === 'true';
+};
+
+const getSkipNativeScenarioCheck = (): boolean => {
+  const enabled = process.env.NEXT_PUBLIC_SKIP_NATIVE_SCENARIO_CHECK ?? 'true';
   return enabled === 'true';
 };
 
@@ -130,8 +146,13 @@ export const config = {
   // 竞技场用户引导功能开关
   ENABLE_ARENA_USER_GUIDANCE: getEnableArenaUserGuidance(),
 
-  // 新增：世界观检查功能开关
+  // 世界观检查功能开关
   ENABLE_WORLDVIEW_CHECK: getEnableWorldviewCheck(),
+
+  // 新增：内容安全与检查机制开关
+  ENABLE_SENSITIVE_WORD_FILTER: getEnableSensitiveWordFilter(),
+  ENABLE_AI_SAFETY_CHECK: getEnableAiSafetyCheck(),
+  SKIP_NATIVE_SCENARIO_CHECK: getSkipNativeScenarioCheck(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {

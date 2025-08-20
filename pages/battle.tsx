@@ -11,6 +11,21 @@ import { Preset } from './api/get-presets'; // 统一使用 Preset 类型
 import { StatsData } from './api/get-stats';
 import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
+import { ArenaHistory } from '../types/arena';
+
+interface UpdatedCombatantData {
+  codename?: string;
+  name?: string;
+  arena_history: ArenaHistory;
+  signature?: string;
+  // 允许包含角色文件的其他所有字段
+  [key: string]: any; 
+}
+
+interface BattleApiResponse {
+  report: NewsReport;
+  updatedCombatants: UpdatedCombatantData[];
+}
 
 // 魔法少女设定核心字段（用于验证）
 const MAGICAL_GIRL_CORE_FIELDS = {
@@ -44,11 +59,12 @@ interface Combatant {
     type: 'magical-girl' | 'canshou';
     data: any;
     filename: string; // 用于UI显示和去重
-    isValid: boolean; // 新增：用于标记是否为原生设定
+    isValid: boolean; // 用于标记是否为原生设定
+    teamId?: number; // 为分队功能添加可选的teamId
 }
 
 // 定义故事/战斗模式类型
-type BattleMode = 'classic' | 'kizuna' | 'daily';
+type BattleMode = 'classic' | 'kizuna' | 'daily' | 'scenario';
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
@@ -101,6 +117,13 @@ const BattlePage: React.FC = () => {
     
     // 模式状态
     const [battleMode, setBattleMode] = useState<BattleMode>('classic');
+
+    // 用于存储情景模式下上传的情景文件内容
+    const [scenarioContent, setScenarioContent] = useState<object | null>(null);
+    const [scenarioFileName, setScenarioFileName] = useState<string | null>(null);
+    
+    // 用于存储从API返回的、更新了历战记录的角色数据
+    const [updatedCombatants, setUpdatedCombatants] = useState<any[]>([]);
 
     // 检测移动端并默认展开文本域
     useEffect(() => {
@@ -404,6 +427,60 @@ const BattlePage: React.FC = () => {
         });
     };
 
+    const handleTeamChange = (filename: string, teamId: number) => {
+        setCombatants(prev => 
+            prev.map(c => 
+                c.filename === filename ? { ...c, teamId: teamId === 0 ? undefined : teamId } : c
+            )
+        );
+    };
+
+    const handleScenarioFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            setScenarioContent(null);
+            setScenarioFileName(null);
+            return;
+        }
+        if (file.type !== 'application/json') {
+            setError('❌ 情景文件必须是 .json 格式。');
+            return;
+        }
+        try {
+            const text = await file.text();
+            const json = JSON.parse(text);
+            // 简单验证一下情景文件结构
+            if (!json.title || !json.elements) {
+                throw new Error('情景文件缺少必需的 title 或 elements 字段。');
+            }
+            setScenarioContent(json);
+            setScenarioFileName(file.name);
+            setError(null);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : '无法解析文件。';
+            setError(`❌ 情景文件读取失败: ${message}`);
+            setScenarioContent(null);
+            setScenarioFileName(null);
+        } finally {
+            event.target.value = ''; // 允许重复上传同一个文件
+        }
+    };
+
+    const downloadUpdatedJson = (characterData: any) => {
+        const name = characterData.codename || characterData.name;
+        const jsonData = JSON.stringify(characterData, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `角色设定_${name}_更新.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+
     const checkSensitiveWords = async (content: string) => {
         const checkResult = await quickCheck(content);
         if (checkResult.hasSensitiveWords) {
@@ -420,39 +497,51 @@ const BattlePage: React.FC = () => {
             return;
         }
 
-        // --- 根据模式动态设置最小人数 ---
-        const minParticipants = battleMode === 'daily' ? 1 : 2;
+        const minParticipants = (battleMode === 'daily' || battleMode === 'scenario') ? 1 : 2;
         const maxParticipants = 4;
+        if (combatants.length < minParticipants || combatants.length > 4) {
+            setError(`⚠️ 该模式需要 ${minParticipants} 到 ${maxParticipants} 位角色。`);
+            return;
+        }
 
-        if (combatants.length < minParticipants || combatants.length > maxParticipants) {
-            const errorMessage = battleMode === 'daily'
-                ? `⚠️ 日常模式需要 ${minParticipants} 到 ${maxParticipants} 位角色`
-                : `⚠️ 该模式需要 ${minParticipants} 到 ${maxParticipants} 位角色`;
-            setError(errorMessage);
+        if (battleMode === 'scenario' && !scenarioContent) {
+            setError('⚠️ 情景模式下，请先上传一个情景文件。');
             return;
         }
 
         setIsGenerating(true);
         setError(null);
         setNewsReport(null);
+        setUpdatedCombatants([]); // 清空上次的结果
 
         try {
-            // 安全措施：检查上传内容中的敏感词;
-            const combatantsData = combatants.map(c => ({ type: c.type, data: c.data }));
-            if (await checkSensitiveWords(JSON.stringify(combatantsData))) return;
-            // 新增：检查用户引导文本
+            // 安全检查
+            const combatantsForCheck = combatants.map(c => c.data);
+            if (await checkSensitiveWords(JSON.stringify(combatantsForCheck))) return;
             if (userGuidance && (await checkSensitiveWords(userGuidance))) return;
+            if (scenarioContent && (await checkSensitiveWords(JSON.stringify(scenarioContent)))) return;
+            
+            // 构造分队信息
+            const teams: { [key: number]: string[] } = {};
+            combatants.forEach(c => {
+                if (c.teamId) {
+                    if (!teams[c.teamId]) {
+                        teams[c.teamId] = [];
+                    }
+                    teams[c.teamId].push(c.data.codename || c.data.name);
+                }
+            });
 
-
-            // 在请求体中加入 mode 和 userGuidance 参数
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    combatants: combatantsData, 
+                body: JSON.stringify({
+                    combatants: combatants.map(c => ({ type: c.type, data: c.data })), // 发送原始数据
                     selectedLevel,
-                    mode: battleMode, // 将当前选择的模式发送给后端
-                    userGuidance: userGuidance, // 将用户引导文本发送给后端
+                    mode: battleMode,
+                    userGuidance: userGuidance,
+                    scenario: scenarioContent, // 新增：发送情景内容
+                    teams: Object.keys(teams).length > 0 ? teams : undefined, // 新增：发送分队信息
                 }),
             });
 
@@ -480,12 +569,27 @@ const BattlePage: React.FC = () => {
                 }
                 throw new Error(errorMessage);
             }
+            
+            // 处理新的API响应结构
+            const result: BattleApiResponse = await response.json();
 
-            const result: NewsReport = await response.json();
             // 加入后置生成敏感词检测
-            if (await checkSensitiveWords(JSON.stringify(result))) return;
+            if (await checkSensitiveWords(JSON.stringify(result.report))) return;
 
-            setNewsReport(result);
+            setNewsReport(result.report);
+            setUpdatedCombatants(result.updatedCombatants);
+
+            // 关键：用返回的最新角色数据更新当前页面的参战者状态 (SRS 3.1.4)
+            setCombatants(prev => 
+                prev.map(oldCombatant => {
+                    const updatedData = result.updatedCombatants.find(
+                        uc => (uc.codename || uc.name) === (oldCombatant.data.codename || oldCombatant.data.name)
+                    );
+                    return updatedData ? { ...oldCombatant, data: updatedData } : oldCombatant;
+                })
+            );
+
+            setNewsReport(result.report);
             startCooldown();
         } catch (err) {
             // 现在的 catch 块可以捕获到更明确的错误信息
@@ -626,15 +730,28 @@ const BattlePage: React.FC = () => {
                                         const typeDisplay = c.type === 'magical-girl' ? '(魔法少女)' : '(残兽)';
                                         const isCorrected = correctedFiles[name];
                                         return (
-                                            // 修改：为 li 增加 flex 布局，并在后方增加删除按钮
                                             <li key={c.filename} className="flex justify-between items-center group">
-                                                <span className="truncate" title={name}>
-                                                    {name}
-                                                    <span className="text-xs text-gray-500 ml-1">{typeDisplay}</span>
-                                                    {c.data.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
-                                                    {c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
-                                                    {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
-                                                </span>
+                                                <div className="flex items-center flex-grow">
+                                                    <span className="truncate mr-2" title={name}>
+                                                        {name}
+                                                        <span className="text-xs text-gray-500 ml-1">{typeDisplay}</span>
+                                                        {c.data.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
+                                                        {c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
+                                                        {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
+                                                    </span>
+                                                    {/* 分队选择器 */}
+                                                    <select
+                                                        value={c.teamId || 0}
+                                                        onChange={(e) => handleTeamChange(c.filename, parseInt(e.target.value))}
+                                                        className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white"
+                                                    >
+                                                        <option value={0}>无分队</option>
+                                                        <option value={1}>队伍 1</option>
+                                                        <option value={2}>队伍 2</option>
+                                                        <option value={3}>队伍 3</option>
+                                                        <option value={4}>队伍 4</option>
+                                                    </select>
+                                                </div>
                                                 <div className="flex items-center">
                                                     {isCorrected && (
                                                         <div className="flex gap-2 mr-2">
@@ -655,6 +772,24 @@ const BattlePage: React.FC = () => {
                                         );
                                     })}
                                 </ul>
+                                {/* --- 历战记录超限提示 --- */}
+                                {combatants.some(c => c.data.arena_history?.entries?.length > 20) && (
+                                    <div className="mt-3 text-xs text-gray-500">
+                                        <p>
+                                            ⚠️ 注意：
+                                            {combatants
+                                                .filter(c => c.data.arena_history?.entries?.length > 20)
+                                                .map(c => `“${c.data.codename || c.data.name}”(${c.data.arena_history.entries.length}条) `)
+                                                .join('、')
+                                            }
+                                            的历战记录已超过20条上限，生成故事时将仅选取最重要的部分。
+                                            <Link href="/sublimation" className="text-blue-600 hover:underline font-semibold">
+                                                考虑前往「成长升华」
+                                            </Link>
+                                            来凝练角色的成长。
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -664,21 +799,27 @@ const BattlePage: React.FC = () => {
                             <div className="flex items-center space-x-1 bg-gray-200 p-1 rounded-full">
                                 <button
                                     onClick={() => setBattleMode('daily')}
-                                    className={`w-1/3 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'daily' ? 'bg-white text-green-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'daily' ? 'bg-white text-green-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
                                 >
                                     日常模式☕
                                 </button>
                                 <button
                                     onClick={() => setBattleMode('kizuna')}
-                                    className={`w-1/3 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'kizuna' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'kizuna' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
                                 >
                                     羁绊模式✨
                                 </button>
                                 <button
                                     onClick={() => setBattleMode('classic')}
-                                    className={`w-1/3 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'classic' ? 'bg-white text-pink-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'classic' ? 'bg-white text-pink-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
                                 >
                                     经典模式⚔️
+                                </button>
+                                <button
+                                    onClick={() => setBattleMode('scenario')}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'scenario' ? 'bg-white text-purple-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                >
+                                    情景模式📜
                                 </button>
                             </div>
                             {battleMode === 'daily' && (
@@ -701,6 +842,27 @@ const BattlePage: React.FC = () => {
                             )}
                         </div>
 
+                            {/* --- 情景模式UI --- */}
+                            {battleMode === 'scenario' && (
+                                <div className="mt-4">
+                                    <label htmlFor="scenario-upload" className="input-label">上传情景文件 (.json)</label>
+                                    <input 
+                                        id="scenario-upload" 
+                                        type="file" 
+                                        accept=".json" 
+                                        onChange={handleScenarioFileChange}
+                                        className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                                    />
+                                    {scenarioFileName && (
+                                        <p className="text-xs text-gray-500 mt-2">已加载情景: {scenarioFileName}</p>
+                                    )}
+                                    <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
+                                        <p className="font-bold">你已选择【情景模式】！</p>
+                                        <p className="mt-1">上传一个情景文件，让角色们在自定义的舞台上展开故事吧！</p>
+                                    </div>
+                                </div>
+                            )}
+
                         {/* --- 在非日常模式下显示等级选择 --- */}
                         {battleMode !== 'daily' && (
                            <div className="input-group">
@@ -712,7 +874,7 @@ const BattlePage: React.FC = () => {
                             </div>
                         )}
 
-                        {/* 新增：故事方向引导输入框 */}
+                        {/* 故事方向引导输入框 */}
                         {appConfig.ENABLE_ARENA_USER_GUIDANCE && (
                             <div className="input-group">
                                 <label htmlFor="user-guidance" className="input-label">故事方向引导 (可选)</label>
@@ -750,6 +912,45 @@ const BattlePage: React.FC = () => {
                             onSaveImage={handleSaveImage}
                             mode={battleMode} // 传递模式
                         />
+                    )}
+
+                    {/* --- 更新后的角色信息展示区域 --- */}
+                    {updatedCombatants.length > 0 && (
+                        <div className="card mt-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-3">历战记录更新</h3>
+                            <div className="space-y-4">
+                                {updatedCombatants.map((charData) => {
+                                    const latestEntry = charData.arena_history?.entries?.[charData.arena_history.entries.length - 1];
+                                    const name = charData.codename || charData.name;
+                                    
+                                    // 查找原始 combatant 以获取类型
+                                    const originalCombatant = combatants.find(c => (c.data.codename || c.data.name) === name);
+                                    const typeDisplay = originalCombatant?.type === 'magical-girl' ? '魔法少女' : '残兽';
+
+                                    if (!latestEntry) return null;
+
+                                    return (
+                                        <div key={name} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="font-semibold text-gray-700">{name} <span className="text-xs text-gray-500">({typeDisplay})</span></p>
+                                                    <p className="text-sm text-gray-600 mt-1">
+                                                        <span className="font-medium">本次事件影响：</span>
+                                                        {latestEntry.impact}
+                                                    </p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => downloadUpdatedJson(charData)}
+                                                    className="ml-4 px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors shrink-0"
+                                                >
+                                                    下载更新设定
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     )}
 
                     {/* --- 统计数据 --- */}
