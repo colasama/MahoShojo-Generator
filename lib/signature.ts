@@ -7,7 +7,6 @@ import { webcrypto } from 'crypto';
 // 优先使用全局的crypto（Edge环境），否则回退到Node.js的webcrypto
 const subtle = typeof crypto !== 'undefined' ? crypto.subtle : webcrypto.subtle;
 const TextEncoder = globalThis.TextEncoder;
-const TextDecoder = globalThis.TextDecoder;
 
 // 使用一个Promise来缓存密钥的导入过程，避免重复导入
 let secretKeyPromise: Promise<CryptoKey | null> | null = null;

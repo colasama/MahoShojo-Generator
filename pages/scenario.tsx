@@ -49,15 +49,15 @@ const ScenarioPage: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errorJson = await response.json().catch(() => ({ message: '服务器响应异常' }));
-        if (errorJson.shouldRedirect) {
-            router.push({
-                pathname: '/arrested',
-                query: { reason: errorJson.reason || '使用危险符文' }
-            );
-            return;
-        }
-        throw new Error(errorJson.message || errorJson.error || '生成失败');
+          const errorJson = await response.json().catch(() => ({ message: '服务器响应异常' }));
+          if (errorJson.shouldRedirect) {
+              router.push({
+                  pathname: '/arrested',
+                  query: { reason: errorJson.reason || '使用危险符文' }
+              });
+              return;
+          }
+          throw new Error(errorJson.message || errorJson.error || '生成失败');
       }
 
       const result = await response.json();
