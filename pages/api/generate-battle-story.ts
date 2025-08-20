@@ -358,6 +358,7 @@ const createPromptBuilder = (
     const isPureBattle = !userGuidance;
 
     const profiles = allCombatants.map((c, index) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { userAnswers, isPreset: _, ...restOfProfile } = c.data;
         const characterName = c.data.codename || c.data.name;
         const otherNames = allNames.filter(name => name !== characterName);
@@ -433,7 +434,7 @@ async function handler(req: NextRequest): Promise<Response> {
 
           if (safetyResult.isUnsafe) {
               log.warn('检测到不安全的用户引导内容，请求被拒绝', { guidance: finalUserGuidance });
-              return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true }), {
+              return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true, reason: safetyResult.reason }), {
                   status: 400, headers: { 'Content-Type': 'application/json' }
               });
           }

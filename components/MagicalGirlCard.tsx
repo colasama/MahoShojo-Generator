@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { snapdom } from '@zumer/snapdom';
+import { ArenaHistory, ArenaHistoryEntry } from '@/types/arena';
 
 interface MagicalGirlCardProps {
   magicalGirl: {
@@ -40,6 +41,7 @@ interface MagicalGirlCardProps {
         bonds: string;
       };
     };
+  arena_history?: ArenaHistory;
   };
   gradientStyle: string;
   onSaveImage?: (imageUrl: string) => void;
@@ -51,6 +53,7 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
   onSaveImage
 }) => {
   const resultRef = useRef<HTMLDivElement>(null);
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
   const handleSaveImage = async () => {
     if (!resultRef.current) return;
@@ -176,6 +179,26 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
               <div><strong>信念：</strong>{magicalGirl.analysis.background.belief}</div>
               <div style={{ marginTop: '0.5rem' }}><strong>羁绊：</strong>{magicalGirl.analysis.background.bonds}</div>
             </div>
+          </div>
+        )}
+
+        {/* --- 历战记录展示区 --- */}
+        {magicalGirl.arena_history && magicalGirl.arena_history.entries.length > 0 && (
+          <div className="result-item">
+            <button onClick={() => setIsHistoryVisible(!isHistoryVisible)} className="result-label w-full text-left bg-transparent border-none cursor-pointer">
+              {isHistoryVisible ? '▼' : '▶'} 📜 历战记录
+            </button>
+            {isHistoryVisible && (
+              <div className="result-value mt-2 space-y-2 text-xs">
+                {magicalGirl.arena_history.entries.slice().reverse().map((entry: ArenaHistoryEntry) => (
+                  <div key={entry.id} className="p-2 bg-black bg-opacity-10 rounded">
+                    <p><strong>{entry.title}</strong></p>
+                    <p><strong>类型:</strong> {entry.type} | <strong>胜利者:</strong> {entry.winner}</p>
+                    <p><strong>影响:</strong> {entry.impact}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

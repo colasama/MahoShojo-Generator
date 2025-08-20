@@ -556,7 +556,10 @@ const BattlePage: React.FC = () => {
                     const errorJson = JSON.parse(errorText);
                     // 如果成功，并且是需要跳转的特定错误，则执行跳转
                     if (errorJson.shouldRedirect) {
-                        router.push('/arrested');
+                        router.push({
+                            pathname: '/arrested',
+                            query: { reason: errorJson.reason || '使用危险符文' }
+                        });
                         return; // 终止后续执行
                     }
                     // 否则，使用JSON中的详细错误信息

@@ -1,12 +1,22 @@
+// pages/arrested.tsx
+
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 
 export default function ArrestedPage() {
+    const router = useRouter();
     const [inspectorId, setInspectorId] = useState('');
     const [caseNumber, setCaseNumber] = useState('');
     const [magicalTimestamp, setMagicalTimestamp] = useState('');
+    const [reason, setReason] = useState('使用危险符文'); // 默认理由
 
     useEffect(() => {
+        // 从 URL query 获取理由
+        if (router.isReady && router.query.reason) {
+            setReason(router.query.reason as string);
+        }
+
         // 生成巡查使编号
         const generateInspectorId = () => {
             const random = Math.random();
@@ -25,20 +35,19 @@ export default function ArrestedPage() {
             return `MG-${randomLetter}${randomNumber}`;
         };
         
-        // 生成一个日期
+        // 生成一个日期 (SRS 5.2.4)
         const generateMagicalTimestamp = () => {
             const date = new Date();
             const year = date.getFullYear();
-            const seasons = ['春季', '夏季', '秋季', '冬季'];
-            const season = seasons[Math.floor(date.getMonth() / 3)];
+            const month = date.getMonth() + 1;
             const day = date.getDate();
-            return `女王历 ${year} 年 ${season} 第 ${day} 日`;
+            return `女王历 ${year} 年 ${month} 月 ${day} 日`;
         };
 
         setInspectorId(generateInspectorId());
         setCaseNumber(generateCaseNumber());
         setMagicalTimestamp(generateMagicalTimestamp());
-    }, []); // 空依赖数组确保只在组件加载时执行一次
+    }, [router.isReady, router.query.reason]);
 
     return (
         <>
@@ -107,6 +116,7 @@ export default function ArrestedPage() {
                             <div className="text-left text-purple-200 text-sm mx-auto max-w-sm space-y-3 mb-10">
                                 <p><strong>案件编号：</strong> {caseNumber}</p>
                                 <p><strong>签发时间：</strong> {magicalTimestamp}</p>
+                                <p><strong>事由：</strong> {reason}</p>
                                 <p><strong>巡查使 花牌认证编号：</strong> {inspectorId}</p>
                             </div>
 

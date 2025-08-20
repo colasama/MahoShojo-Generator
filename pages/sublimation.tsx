@@ -62,7 +62,10 @@ const SublimationPage: React.FC = () => {
 
     try {
       if (await quickCheck(JSON.stringify(characterData))) {
-          router.push('/arrested');
+          router.push({
+              pathname: '/arrested',
+              query: { reason: '上传的角色档案包含危险符文' }
+          });
           return;
       }
 
@@ -75,8 +78,11 @@ const SublimationPage: React.FC = () => {
       if (!response.ok) {
         const errorJson = await response.json().catch(() => ({ message: '服务器响应异常' }));
         if (errorJson.shouldRedirect) {
-          router.push('/arrested');
-          return;
+            router.push({
+                pathname: '/arrested',
+                query: { reason: errorJson.reason || '使用危险符文' }
+            );
+            return;
         }
         throw new Error(errorJson.message || errorJson.error || '升华失败');
       }
