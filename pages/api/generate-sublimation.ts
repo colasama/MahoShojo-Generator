@@ -6,10 +6,8 @@ import { getLogger } from '../../lib/logger';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
-// 导入魔法少女问卷，用于提供上下文
 import magicalGirlQuestionnaire from '../../public/questionnaire.json';
-// 导入残兽问卷，为残兽升华提供上下文
-import canshouQuestionnaire from '../../public/canshou_questionnaire.json';
+
 
 const log = getLogger('api-gen-sublimation');
 
@@ -63,8 +61,6 @@ const CanshouSublimationPayloadSchema = z.object({
   origin: z.string(),
   birthEnvironment: z.string(),
   researcherNotes: z.string().describe("研究员对这次升华的补充笔记。"),
-  // 将 userAnswers 的类型从数组修正为键值对记录，以匹配实际数据结构
-  userAnswers: z.record(z.string()).optional().describe("根据残兽的成长，对问卷问题的全新回答，格式为 { questionId: answerText }。"),
 });
 
 // AI需要返回的完整结果的Schema
@@ -85,7 +81,6 @@ const createGenerationConfig = (characterData: any): GenerationConfig<z.infer<ty
   const isMagicalGirl = !!characterData.codename;
   const characterType = isMagicalGirl ? '魔法少女' : '残兽';
   const nameField = isMagicalGirl ? 'codename' : 'name';
-  const questions = isMagicalGirl ? magicalGirlQuestionnaire.questions : canshouQuestionnaire.questions.map(q => q.question);
 
   // 明确定义不可变字段，增强AI指令的约束力
   const immutableFields = isMagicalGirl
@@ -101,14 +96,14 @@ const createGenerationConfig = (characterData: any): GenerationConfig<z.infer<ty
       .map((entry: any) => `- 事件“${entry.title}”：胜利者是${entry.winner}，对我的影响是“${entry.impact}”`)
       .join('\n') || "无";
     
-    // [修正] 根据角色类型，正确处理 userAnswers 的格式
-    let userAnswersText = "无问卷回答记录。";
-    if (dataForPrompt.userAnswers) {
-        if (isMagicalGirl && Array.isArray(dataForPrompt.userAnswers)) {
-            userAnswersText = dataForPrompt.userAnswers.map((answer: string, i: number) => `Q: ${questions[i] || `问题 ${i+1}`}\nA: ${answer}`).join('\n');
-        } else if (!isMagicalGirl && typeof dataForPrompt.userAnswers === 'object') {
-            userAnswersText = canshouQuestionnaire.questions.map(q => `Q: ${q.question}\nA: ${dataForPrompt.userAnswers[q.id] || '(未回答)'}`).join('\n');
-        }
+    // [核心修正] 仅当角色是魔法少女时，才处理和展示问卷回答
+    let userAnswersReviewSection = "";
+    if (isMagicalGirl) {
+        const questions = magicalGirlQuestionnaire.questions;
+        const userAnswersText = (dataForPrompt.userAnswers && Array.isArray(dataForPrompt.userAnswers)) 
+            ? dataForPrompt.userAnswers.map((answer: string, i: number) => `Q: ${questions[i] || `问题 ${i+1}`}\nA: ${answer}`).join('\n')
+            : "无问卷回答记录。";
+        userAnswersReviewSection = `## 问卷回答回顾 (用于理解角色深层性格)\n${userAnswersText}`;
     }
 
     return `
@@ -125,8 +120,7 @@ ${JSON.stringify(dataForPrompt, null, 2)}
 ## 历战记录回顾
 ${historyText}
 
-## 问卷回答回顾 (用于理解角色深层性格)
-${userAnswersText}
+${userAnswersReviewSection}
 
 ## 升华规则
 你必须严格遵守以下规则来更新角色设定：
@@ -136,7 +130,7 @@ ${userAnswersText}
     * **半可变字段**: \`${nameField}\` 字段。该字段的结构为 \`{代号/名称}\` 或 \`{代号/名称}「{称号}」\`。你 **不可** 修改 \`{代号/名称}\` 部分，但 **必须** 为其生成或更新一个4个字左右（1~8个字）的 \`{称号}\`，并以「」包裹，以体现其新状态。
 
 2.  **体现成长**:
-    * **可变字段**: 除了上述字段外，其他所有字段（如 \`appearance\`, \`magicConstruct\` (除name外), \`analysis\`, \`userAnswers\` 等）都可以被你重写，以反映角色从历战记录中的成长、感悟和变化。
+    * **可变字段**: 除了上述字段外，其他所有字段都可以被你重写，以反映角色从历战记录中的成长、感悟和变化。
     * 请确保更新后的设定在逻辑上与角色的经历自洽。
 
 3.  **生成升华事件**:
@@ -202,6 +196,7 @@ function findUnchangedFields(original: any, updated: any, path: string = ''): st
     }
     
     for (const key in original) {
+        if (key === 'userAnswers') continue; // 不比较 userAnswers
         if (!isObject(original[key]) || !(key in updated) || JSON.stringify(original[key]) === JSON.stringify(updated[key])) {
             // 如果字段不是对象，或者AI的返回中没有这个字段，或者字段内容完全相同，则视为未更新
             continue;
@@ -351,6 +346,11 @@ async function handler(req: NextRequest): Promise<Response> {
       delete sublimatedData.signature;
     }
 
+    // 如果角色是残兽，确保最终数据中不包含 userAnswers，以防万一
+    if (!isMagicalGirl) {
+        delete (updatedDataFromAI as any).userAnswers;
+    }
+
     // 8. 构造新的API响应体
     const finalResponse = {
         sublimatedData,
@@ -377,6 +377,7 @@ const extractTextForCheck = (data: any): string => {
         });
     } else if (typeof data === 'object' && data !== null) {
         for (const key in data) {
+            // 排除签名和答案存档，这些不是用户生成内容，避免误判
             if (key !== 'signature' && key !== 'userAnswers') {
                 textContent += extractTextForCheck(data[key]);
             }
