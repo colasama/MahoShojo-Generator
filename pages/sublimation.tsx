@@ -8,6 +8,29 @@ import MagicalGirlCard from '../components/MagicalGirlCard';
 import CanshouCard from '../components/CanshouCard';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 
+// 颜色处理方案，用于修复背景色问题
+const MainColor = {
+    Red: '红色',
+    Orange: '橙色',
+    Cyan: '青色',
+    Blue: '蓝色',
+    Purple: '紫色',
+    Pink: '粉色',
+    Yellow: '黄色',
+    Green: '绿色'
+} as const;
+
+const gradientColors: Record<string, { first: string; second: string }> = {
+  [MainColor.Red]: { first: '#ff6b6b', second: '#ee5a6f' },
+  [MainColor.Orange]: { first: '#ff922b', second: '#ffa94d' },
+  [MainColor.Cyan]: { first: '#22b8cf', second: '#66d9e8' },
+  [MainColor.Blue]: { first: '#5c7cfa', second: '#748ffc' },
+  [MainColor.Purple]: { first: '#9775fa', second: '#b197fc' },
+  [MainColor.Pink]: { first: '#ff9a9e', second: '#fecfef' },
+  [MainColor.Yellow]: { first: '#f59f00', second: '#fcc419' },
+  [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
+};
+
 // 递归提取对象中所有字符串值的函数，用于敏感词检查
 const extractTextForCheck = (data: any): string => {
     let textContent = '';
@@ -28,7 +51,7 @@ const extractTextForCheck = (data: any): string => {
     return textContent;
 };
 
-// [新增] 定义API响应和结果状态的类型
+// API响应和结果状态的类型
 interface SublimationResponse {
     sublimatedData: any;
     unchangedFields: string[];
@@ -40,7 +63,6 @@ const SublimationPage: React.FC = () => {
     const [fileName, setFileName] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // [修改] resultData 的类型现在是 SublimationResponse
     const [resultData, setResultData] = useState<SublimationResponse | null>(null);
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     const [showImageModal, setShowImageModal] = useState(false);
@@ -151,7 +173,6 @@ const SublimationPage: React.FC = () => {
         setShowImageModal(true);
     };
     
-    // [修改] 现在从 resultData.sublimatedData 获取数据
     const downloadJson = (data: any) => {
         const name = data.codename || data.name;
         const jsonData = JSON.stringify(data, null, 2);
@@ -172,8 +193,9 @@ const SublimationPage: React.FC = () => {
 
         if (data.codename) { // 魔法少女
             const colorScheme = data.appearance.colorScheme || "粉色、白色";
-            const mainColor = colorScheme.split('、')[0];
-            const gradientStyle = `linear-gradient(135deg, hsl(var(--${mainColor}-400)), hsl(var(--${mainColor}-600)))`;
+            const mainColorName = Object.values(MainColor).find(color => colorScheme.includes(color)) || MainColor.Pink;
+            const colors = gradientColors[mainColorName] || gradientColors[MainColor.Pink];
+            const gradientStyle = `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
             return <MagicalGirlCard magicalGirl={data} gradientStyle={gradientStyle} onSaveImage={handleSaveImage} />;
         } else if (data.name) { // 残兽
             return <CanshouCard canshou={data} onSaveImage={handleSaveImage} />;
@@ -239,11 +261,10 @@ const SublimationPage: React.FC = () => {
                     
                     {resultData && (
                         <>
-                            {/* [新增] 升华结果反馈信息 */}
-                            {resultData.unchangedFields.length > 0 && (
+                            {resultData.unchangedFields && resultData.unchangedFields.length > 0 && (
                                 <div className="card mt-6 bg-blue-50 border border-blue-200">
                                     <h4 className="font-bold text-blue-800 mb-2">升华报告</h4>
-                                    <p className="text-sm text-blue-700">AI 已根据角色经历更新了大部分设定，但以下字段因其不认为需要改变而保留了原始设定：</p>
+                                    <p className="text-sm text-blue-700">AI 已根据角色经历更新了大部分设定，但以下字段保留原始设定：</p>
                                     <ul className="list-disc list-inside text-xs text-blue-600 mt-2 pl-2">
                                         {resultData.unchangedFields.map(field => <li key={field}>{field}</li>)}
                                     </ul>
