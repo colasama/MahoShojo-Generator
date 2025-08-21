@@ -14,27 +14,25 @@ let secretKeyPromise: Promise<CryptoKey | null> | null = null;
 /**
  * [修改] 异步获取用于HMAC签名的密钥。
  * 密钥从环境变量 SIGNATURE_SECRET_KEY 中读取。
- * 如果环境变量未设置，将直接抛出错误，强制要求配置。
- * @returns {Promise<CryptoKey>} 返回一个Promise，解析为CryptoKey。
- * @throws {Error} 如果 SIGNATURE_SECRET_KEY 未设置。
+ * 如果环境变量未设置，将打印警告并返回 null，而不是抛出错误。
+ * @returns {Promise<CryptoKey | null>} 返回一个Promise，解析为CryptoKey或null。
  */
-const getSecretKey = (): Promise<CryptoKey> => {
+const getSecretKey = (): Promise<CryptoKey | null> => {
     // 如果已经有正在进行的Promise，直接返回它
     if (secretKeyPromise) {
-        // 我们需要确保即使Promise解析为null（旧逻辑），这里也能处理
-        return secretKeyPromise.then(key => {
-            if (!key) throw new Error('SIGNATURE_SECRET_KEY 环境变量未配置，无法执行签名操作。');
-            return key;
-        });
+        return secretKeyPromise;
     }
 
     // 否则，创建一个新的Promise来导入密钥
     secretKeyPromise = (async () => {
         const secret = process.env.SIGNATURE_SECRET_KEY;
+
+        // [核心修改] 如果密钥不存在，则打印警告并返回null
         if (!secret) {
-            // 直接抛出错误，而不是静默返回 null
-            throw new Error('SIGNATURE_SECRET_KEY 环境变量未配置，无法执行签名操作。');
+            console.warn('⚠️ 警告: SIGNATURE_SECRET_KEY 环境变量未配置。数据签名功能已禁用，所有生成的数据将不包含原生签名。');
+            return null;
         }
+
         const encoder = new TextEncoder();
         try {
             return await subtle.importKey(
@@ -46,10 +44,12 @@ const getSecretKey = (): Promise<CryptoKey> => {
             );
         } catch (e) {
             console.error("导入HMAC密钥失败:", e);
+            // 失败时也返回null
             return null;
         }
     })();
-    return secretKeyPromise as Promise<CryptoKey>;
+    
+    return secretKeyPromise;
 };
 
 /**
