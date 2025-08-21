@@ -60,6 +60,7 @@ interface Combatant {
     data: any;
     filename: string; // 用于UI显示和去重
     isValid: boolean; // 用于标记是否为原生设定
+    isPreset: boolean; // 标记是否为预设角色
     teamId?: number; // 为分队功能添加可选的teamId
 }
 
@@ -286,7 +287,13 @@ const BattlePage: React.FC = () => {
 
             presetData.isPreset = true;
             // 预设文件默认视为原生
-            addCombatant({ type: preset.type, data: presetData, filename: preset.filename, isValid: true });
+            addCombatant({ 
+                type: preset.type, 
+                data: presetData, 
+                filename: preset.filename, 
+                isValid: true, // 预设始终是原生的
+                isPreset: true // 在 Combatant 对象层面标记为预设
+            });
 
         } catch (err) {
             if (err instanceof Error) setError(err.message);
@@ -319,20 +326,13 @@ const BattlePage: React.FC = () => {
 
             if (type === 'magical-girl') {
                 validationResult = validateMagicalGirlData(item, item.codename || sourceName);
-            } else { // type === 'canshou'
+            } else {
                 validationResult = validateCanshouData(item, item.name || sourceName);
             }
+            if (!validationResult.success) return;
+            if (validationResult.wasCorrected) newCorrectedFiles[item.codename] = true;
 
-            if (!validationResult.success) {
-                // 验证函数内部已经设置了错误信息
-                return; // 中断处理
-            }
-
-            if (validationResult.wasCorrected) {
-                newCorrectedFiles[item.codename] = true;
-            }
-
-            // 新增：调用校验API
+            // 调用校验API
             const verificationResponse = await fetch('/api/verify-origin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -340,7 +340,13 @@ const BattlePage: React.FC = () => {
             });
             const { isValid } = await verificationResponse.json();
 
-            loadedCombatants.push({ type, data: item, filename: item.codename || item.name, isValid });
+            loadedCombatants.push({ 
+                type, 
+                data: item, 
+                filename: item.codename || item.name, 
+                isValid, 
+                isPreset: false // 用户上传的文件不是预设
+            });
         }
 
         setCombatants(prev => [...prev, ...loadedCombatants]);
@@ -487,7 +493,7 @@ const BattlePage: React.FC = () => {
             setScenarioContent(null);
             setScenarioFileName(null);
         } finally {
-            event.target.value = ''; // 允许重复上传同一个文件
+            if(event.target) event.target.value = ''; // 允许重复上传同一个文件
         }
     };
 
@@ -564,8 +570,9 @@ const BattlePage: React.FC = () => {
                     combatants: combatants.map(c => ({ 
                         type: c.type, 
                         data: c.data,
-                        isNative: c.isValid // 将前端的 isValid 状态作为 isNative 发送
-                    })), 
+                        isNative: c.isValid,
+                        isPreset: c.isPreset
+                    })),
                     selectedLevel,
                     mode: battleMode,
                     userGuidance: userGuidance,
@@ -784,7 +791,7 @@ const BattlePage: React.FC = () => {
                                                     <span className="truncate mr-2" title={name}>
                                                         {name}
                                                         <span className="text-xs text-gray-500 ml-1">{typeDisplay}</span>
-                                                        {c.data.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
+                                                        {c.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
                                                         {c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
                                                         {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
                                                     </span>
@@ -1081,7 +1088,7 @@ const BattlePage: React.FC = () => {
                                 </button>
                             </div>
                             <p className="text-center text-sm text-gray-600" style={{ marginTop: '0.5rem' }}>
-                                � 长按图片保存到相册
+                                📱 长按图片保存到相册
                             </p>
                             <div className="items-center flex flex-col" style={{ padding: '0.5rem' }}>
                                 <img
