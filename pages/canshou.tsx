@@ -23,7 +23,7 @@ interface CanshouQuestionnaire {
   questions: Question[];
 }
 
-// 新增：用于保存JSON的按钮组件
+// 用于保存JSON的按钮组件
 const SaveJsonButton: React.FC<{ canshouDetails: CanshouDetails; answers: Record<string, string> }> = ({ canshouDetails, answers }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [showJsonText, setShowJsonText] = useState(false);
@@ -97,6 +97,7 @@ const SaveJsonButton: React.FC<{ canshouDetails: CanshouDetails; answers: Record
   );
 };
 
+const LOCAL_STORAGE_KEY = 'canshouAnswersDraft'; // 定义本地存储的键
 
 const CanshouPage: React.FC = () => {
   const router = useRouter();
@@ -114,6 +115,7 @@ const CanshouPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showLore, setShowLore] = useState(false);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateCanshouCooldown', 60000);
+  const [bulkAnswers, setBulkAnswers] = useState(''); // 用于“一键填充”的textarea
 
   // 加载问卷文件
   useEffect(() => {
@@ -124,7 +126,24 @@ const CanshouPage: React.FC = () => {
         if (!questionnaireRes.ok) throw new Error('加载问卷文件失败');
         const questionnaireData: CanshouQuestionnaire = await questionnaireRes.json();
         setQuestionnaire(questionnaireData);
-        setAnswers({});
+        
+        // 初始化答案对象
+        const initialAnswers = questionnaireData.questions.reduce((acc, q) => ({ ...acc, [q.id]: '' }), {});
+
+        // 从localStorage加载存档
+        const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (savedDraft) {
+            const parsedAnswers = JSON.parse(savedDraft);
+            // 合并存档和初始答案，以防问卷更新
+            const mergedAnswers = { ...initialAnswers, ...parsedAnswers };
+            setAnswers(mergedAnswers);
+            // 关键修正：确保在currentQuestionIndex变化时，也能正确加载当前问题的答案
+            if(questionnaireData.questions[currentQuestionIndex]) {
+                setCurrentAnswer(mergedAnswers[questionnaireData.questions[currentQuestionIndex].id] || '');
+            }
+        } else {
+            setAnswers(initialAnswers);
+        }
 
       } catch (error) {
         console.error('加载页面数据失败:', error);
@@ -134,23 +153,36 @@ const CanshouPage: React.FC = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [currentQuestionIndex]); // 依赖为空，只在初次加载时执行
+
+  // 答案变化时，自动保存到 localStorage
+  useEffect(() => {
+      try {
+          if(Object.values(answers).some(answer => answer.trim() !== '')) {
+              const dataToSave = JSON.stringify(answers);
+              localStorage.setItem(LOCAL_STORAGE_KEY, dataToSave);
+          }
+      } catch (e) {
+          console.error("Failed to save answers to localStorage", e);
+      }
+  }, [answers]);
+
 
   const proceedToNext = (answer: string) => {
     const currentQuestion = questionnaire!.questions[currentQuestionIndex];
-    setAnswers(prev => ({ ...prev, [currentQuestion.id]: answer }));
+    const newAnswers = { ...answers, [currentQuestion.id]: answer };
+    setAnswers(newAnswers);
 
     if (currentQuestionIndex < questionnaire!.questions.length - 1) {
       setIsTransitioning(true);
       setTimeout(() => {
         const nextIndex = currentQuestionIndex + 1;
         setCurrentQuestionIndex(nextIndex);
-        setCurrentAnswer(answers[questionnaire!.questions[nextIndex].id] || '');
+        setCurrentAnswer(newAnswers[questionnaire!.questions[nextIndex].id] || '');
         setIsTransitioning(false);
       }, 250);
     } else {
-      const finalAnswers = { ...answers, [currentQuestion.id]: answer };
-      handleSubmit(finalAnswers);
+      handleSubmit(newAnswers);
     }
   };
 
@@ -165,7 +197,6 @@ const CanshouPage: React.FC = () => {
 
   const handleOptionClick = (option: string) => {
     setCurrentAnswer(option);
-    // 自动进入下一题
     setTimeout(() => proceedToNext(option), 100);
   };
 
@@ -203,15 +234,43 @@ const CanshouPage: React.FC = () => {
     }
   };
 
-  // 新增：重新生成函数
   const handleRegenerate = () => {
-    // 直接使用已保存的答案再次提交
     handleSubmit(answers);
   };
 
   const handleSaveImage = (imageUrl: string) => {
     setSavedImageUrl(imageUrl);
     setShowImageModal(true);
+  };
+
+  const handleClearDraft = () => {
+    if (window.confirm('确定要清空所有已保存的问卷答案吗？此操作不可撤销。')) {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        const emptyAnswers = questionnaire!.questions.reduce((acc, q) => ({ ...acc, [q.id]: '' }), {});
+        setAnswers(emptyAnswers);
+        setCurrentAnswer('');
+        alert('存档已清空！');
+    }
+  };
+
+  const handleBulkFill = () => {
+      const lines = bulkAnswers.split('\n');
+      if (lines.length > questionnaire!.questions.length) {
+          setError(`⚠️ 粘贴的答案有 ${lines.length} 行，超过了问卷问题总数 ${questionnaire!.questions.length}！`);
+          return;
+      }
+      const newAnswers = { ...answers };
+      lines.forEach((line, index) => {
+          if (index < questionnaire!.questions.length) {
+              const questionId = questionnaire!.questions[index].id;
+              newAnswers[questionId] = line.slice(0, 100); // 限制单行长度
+          }
+      });
+      setAnswers(newAnswers);
+      setCurrentAnswer(newAnswers[questionnaire!.questions[currentQuestionIndex].id] || '');
+      setError(null);
+      alert(`成功填充了 ${lines.length} 个答案！`);
+      setBulkAnswers('');
   };
 
   if (loading || !questionnaire) {
@@ -256,8 +315,8 @@ const CanshouPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mb-4 min-h-[60px] flex items-center justify-center">
-                  <h3 className={`text-xl font-medium text-center text-gray-800 transition-all duration-200 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+                <div className={`mb-4 min-h-[60px] flex items-center justify-center transition-opacity duration-200 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+                  <h3 className="text-xl font-medium text-center text-gray-800">
                     {currentQuestion.question}
                   </h3>
                 </div>
@@ -278,9 +337,6 @@ const CanshouPage: React.FC = () => {
                               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                               : 'bg-white text-gray-800 hover:text-pink-500 hover:bg-pink-50 hover:border-pink-300 cursor-pointer'
                             }`}
-                          style={{
-                            backgroundColor: disabled ? '#f3f4f6' : '#ffffff',
-                          }}
                         >
                           {label}
                         </button>
@@ -301,6 +357,22 @@ const CanshouPage: React.FC = () => {
                   </div>
                 )}
 
+                <div className="my-4 p-4 bg-gray-100 rounded-lg">
+                    <label htmlFor="bulk-answers" className="block text-sm font-medium text-gray-700 mb-2">一键填充答案</label>
+                    <textarea
+                        id="bulk-answers"
+                        value={bulkAnswers}
+                        onChange={(e) => setBulkAnswers(e.target.value)}
+                        placeholder="在此处粘贴所有答案，每行一个。"
+                        className="input-field h-20"
+                        rows={4}
+                    />
+                    <div className="flex justify-between items-center mt-2">
+                        <button onClick={handleBulkFill} className="text-sm text-blue-600 hover:underline">填充</button>
+                        <button onClick={handleClearDraft} className="text-sm text-red-600 hover:underline">清空存档</button>
+                    </div>
+                </div>
+
                 <button onClick={handleNext} disabled={submitting || isCooldown || !currentAnswer.trim()} className="generate-button">
                   {isCooldown ? `冷却中 (${remainingTime}s)` : submitting ? '生成中...' : isLastQuestion ? '生成档案' : '下一题'}
                 </button>
@@ -314,14 +386,10 @@ const CanshouPage: React.FC = () => {
             ) : (
               <>
                 <CanshouCard canshou={canshouDetails} onSaveImage={handleSaveImage} />
-
-                {/* 修改：新增的功能区域 */}
                 <div className="card" style={{ marginTop: '1rem' }}>
                   <div className="text-center">
                     <h3 className="text-lg font-medium text-gray-800" style={{ marginBottom: '1rem' }}>后续操作</h3>
                     <SaveJsonButton canshouDetails={canshouDetails} answers={answers} />
-
-                    {/* 新增：重新生成按钮 */}
                     <button
                       onClick={handleRegenerate}
                       disabled={submitting || isCooldown}
@@ -330,8 +398,6 @@ const CanshouPage: React.FC = () => {
                     >
                       {isCooldown ? `冷却中 (${remainingTime}s)` : submitting ? '重新生成中...' : '不满意？再来一次'}
                     </button>
-
-                    {/* 新增：前往竞技场的入口 */}
                     <div style={{ marginTop: '0.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
                       <p className="text-sm text-gray-600 mb-2">
                         保存好你的档案了吗？
@@ -342,8 +408,6 @@ const CanshouPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* 设定说明 */}
                 <div className="card">
                   <button onClick={() => setShowLore(!showLore)} className="text-lg font-medium text-gray-800 w-full text-left">
                     {showLore ? '▼ ' : '▶ '}残兽设定说明

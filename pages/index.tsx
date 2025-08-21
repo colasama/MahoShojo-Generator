@@ -106,6 +106,22 @@ export default function Home() {
                 </div>
               </Link>
 
+              {/* 情景生成器按钮 */}
+              <Link href="/scenario" className="feature-button scenario-generator">
+                <div className="gradient-overlay"></div>
+                <div className="feature-button-content">
+                  <div className="feature-title-container">
+                    <img
+                      src="/logo-white.svg"
+                      width={280}
+                      height={40}
+                      alt="自定义情景生成"
+                      className="feature-title-svg"
+                    />
+                  </div>
+                </div>
+              </Link>
+
               {/* 魔法少女竞技场按钮 */}
               <Link href="/battle" className="feature-button battle-arena">
                 <div className="gradient-overlay"></div>
@@ -116,6 +132,38 @@ export default function Home() {
                       width={280}
                       height={80}
                       alt="魔法少女竞技场"
+                      className="feature-title-svg"
+                    />
+                  </div>
+                </div>
+              </Link>
+
+              {/* 成长升华按钮 */}
+              <Link href="/sublimation" className="feature-button sublimation">
+                <div className="gradient-overlay"></div>
+                <div className="feature-button-content">
+                  <div className="feature-title-container">
+                    <img
+                      src="/logo-white.svg"
+                      width={280}
+                      height={40}
+                      alt="角色成长升华"
+                      className="feature-title-svg"
+                    />
+                  </div>
+                </div>
+              </Link>
+
+              {/* 角色数据管理按钮 */}
+              <Link href="/character-manager" className="feature-button character-manager">
+                <div className="gradient-overlay"></div>
+                <div className="feature-button-content">
+                  <div className="feature-title-container">
+                    <img
+                      src="/logo-white.svg"
+                      width={280}
+                      height={40}
+                      alt="角色数据管理"
                       className="feature-title-svg"
                     />
                   </div>
@@ -132,7 +180,7 @@ export default function Home() {
 
           <footer className="footer">
             <p>
-              竞技场、问卷与系统设计 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
+              设计与制作 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
             </p>
             <p>
               <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
