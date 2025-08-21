@@ -269,7 +269,23 @@ async function handler(req: NextRequest): Promise<Response> {
     let finalName: string;
     const isMagicalGirl = 'codename' in originalCharacterData;
 
-    // [修改] 使用 'in' 操作符作为类型守卫，同时检查 originalCharacterData 和 updatedDataFromAI 的类型一致性
+    // ============================================================
+    // BUG 修复：在此处添加对残兽数据的净化处理
+    // 目标：防止AI错误地为残兽的字符串字段返回数组，导致客户端崩溃
+    // ============================================================
+    if (!isMagicalGirl) {
+        // 获取残兽Schema中所有应为字符串的字段键
+        const canshouStringKeys = Object.keys(CanshouSublimationPayloadSchema.shape);
+        for (const key of canshouStringKeys) {
+            // 检查合并后的数据中，这些字段是否被错误地变成了数组
+            if (Array.isArray(sublimatedData[key])) {
+                log.warn(`AI为残兽字段'${key}'返回了数组，强制转换为字符串。`, { originalValue: sublimatedData[key] });
+                // 将数组用逗号连接成一个字符串，以修复数据类型
+                sublimatedData[key] = sublimatedData[key].join(', ');
+            }
+        }
+    }
+    
     if (isMagicalGirl && 'codename' in updatedDataFromAI) {
         // 强制执行不可变字段规则 (SRS 3.2.3)
         sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
@@ -279,7 +295,7 @@ async function handler(req: NextRequest): Promise<Response> {
         // [增强] 处理半可变字段：称号 (SRS 3.2.2)
         const originalFullName = originalCharacterData.codename as string;
         const originalBaseName = originalFullName.split('「')[0];
-        const newNameFromAI = updatedDataFromAI.codename as string; // 此处现在是类型安全的
+        const newNameFromAI = updatedDataFromAI.codename as string;
         
         const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
         if (newTitleMatch && newTitleMatch[1]) {
@@ -297,7 +313,7 @@ async function handler(req: NextRequest): Promise<Response> {
     } else if (!isMagicalGirl && 'name' in updatedDataFromAI) { // 是残兽
         const originalFullName = originalCharacterData.name as string;
         const originalBaseName = originalFullName.split('「')[0];
-        const newNameFromAI = updatedDataFromAI.name as string; // 此处现在是类型安全的
+        const newNameFromAI = updatedDataFromAI.name as string;
 
         const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
         if (newTitleMatch && newTitleMatch[1]) {
@@ -344,11 +360,6 @@ async function handler(req: NextRequest): Promise<Response> {
       sublimatedData.signature = await generateSignature(sublimatedData);
     } else {
       delete sublimatedData.signature;
-    }
-
-    // 如果角色是残兽，确保最终数据中不包含 userAnswers，以防万一
-    if (!isMagicalGirl) {
-        delete (updatedDataFromAI as any).userAnswers;
     }
 
     // 8. 构造新的API响应体
