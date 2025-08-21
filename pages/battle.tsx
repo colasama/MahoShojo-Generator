@@ -79,9 +79,12 @@ const BattlePage: React.FC = () => {
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     // 是否显示图片模态框
     const [showImageModal, setShowImageModal] = useState(false);
-    // 用于复制粘贴设定文本
+    // 用于复制粘贴角色设定文本
     const [pastedJson, setPastedJson] = useState<string>('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+    // 新增：用于复制粘贴情景设定文本
+    const [pastedScenarioJson, setPastedScenarioJson] = useState('');
+    const [isScenarioPasteAreaVisible, setIsScenarioPasteAreaVisible] = useState(false);
     // 用于跟踪哪些文件被自动修正过
     const [correctedFiles, setCorrectedFiles] = useState<Record<string, boolean>>({});
     // 用于跟踪复制操作的状态
@@ -130,6 +133,7 @@ const BattlePage: React.FC = () => {
         const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
         if (isMobileDevice) {
             setIsPasteAreaVisible(true);
+            setIsScenarioPasteAreaVisible(true); // 同样默认展开情景粘贴区
         }
     }, []);
 
@@ -389,6 +393,27 @@ const BattlePage: React.FC = () => {
         }
     };
 
+    const handlePasteAndLoadScenario = () => {
+        const text = pastedScenarioJson.trim();
+        if (!text) return;
+        try {
+            const json = JSON.parse(text);
+            // 简单验证
+            if (!json.title || !json.elements) {
+                throw new Error('情景文件缺少必需的 title 或 elements 字段。');
+            }
+            setScenarioContent(json);
+            setScenarioFileName(json.title || '粘贴的情景');
+            setError(null);
+            setPastedScenarioJson('');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : '无法解析文本。';
+            setError(`❌ 情景解析失败: ${message}`);
+            setScenarioContent(null);
+            setScenarioFileName(null);
+        }
+    };
+
 
     const handleClearRoster = () => {
         setCombatants([]);
@@ -606,7 +631,7 @@ const BattlePage: React.FC = () => {
         }
     };
     
-    // 根据模式决定生成按钮的文本
+    // 修复：为情景模式添加按钮文本
     const getButtonText = () => {
         if (isCooldown) return `记者赶稿中...请等待 ${remainingTime} 秒`;
         if (isGenerating) {
@@ -614,12 +639,14 @@ const BattlePage: React.FC = () => {
                 case 'daily': return '撰写日常逸闻中... (｡･ω･｡)ﾉ';
                 case 'kizuna': return '描绘宿命对决中... (ง •̀_•́)ง';
                 case 'classic': return '推演激烈战斗中... (ง •̀_•́)ง';
+                case 'scenario': return '演绎指定剧本中... (｡･ω･｡)ﾉ';
             }
         }
         switch(battleMode) {
             case 'daily': return '生成日常故事 (´｡• ᵕ •｡`) ♡';
             case 'kizuna': return '生成宿命对决 (๑•̀ㅂ•́)و✧';
             case 'classic': return '生成独家新闻 (๑•̀ㅂ•́)و✧';
+            case 'scenario': return '开始演绎情景 (´｡• ᵕ •｡`)';
         }
     };
 
@@ -710,7 +737,7 @@ const BattlePage: React.FC = () => {
 
                         <div className="mb-6">
                             <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-pink-700 hover:underline cursor-pointer mb-2 font-semibold">
-                                {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
+                                {isPasteAreaVisible ? '▼ 折叠角色粘贴区域' : '▶ 展开角色粘贴区域 (手机端推荐)'}
                             </button>
                             {isPasteAreaVisible && (
                                 <div className="input-group mt-2">
@@ -719,6 +746,21 @@ const BattlePage: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                        
+                        {/* 新增：情景粘贴区 */}
+                        {battleMode === 'scenario' && (
+                            <div className="mb-6">
+                                <button onClick={() => setIsScenarioPasteAreaVisible(!isScenarioPasteAreaVisible)} className="text-purple-700 hover:underline cursor-pointer mb-2 font-semibold">
+                                    {isScenarioPasteAreaVisible ? '▼ 折叠情景粘贴区域' : '▶ 展开情景粘贴区域 (手机端推荐)'}
+                                </button>
+                                {isScenarioPasteAreaVisible && (
+                                    <div className="input-group mt-2">
+                                        <textarea value={pastedScenarioJson} onChange={(e) => setPastedScenarioJson(e.target.value)} placeholder="在此处粘贴一个情景的设定文件(.json)内容..." className="input-field resize-y h-24"/>
+                                        <button onClick={handlePasteAndLoadScenario} disabled={!pastedScenarioJson.trim() || isGenerating} className="generate-button mt-2 mb-0" style={{ backgroundColor: '#8b5cf6', backgroundImage: 'linear-gradient(to right, #8b5cf6, #a78bfa)' }}>从文本加载情景</button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* --- 已选角色列表 --- */}
                         {combatants.length > 0 && (
@@ -900,7 +942,7 @@ const BattlePage: React.FC = () => {
                             disabled={
                                 isGenerating || 
                                 isCooldown || 
-                                (battleMode === 'daily' ? combatants.length < 1 : combatants.length < 2)
+                                (battleMode === 'daily' || battleMode === 'scenario' ? combatants.length < 1 : combatants.length < 2)
                             } 
                             className="generate-button"
                         >
