@@ -191,39 +191,51 @@ function safeDeepMerge(target: any, source: any): any {
 }
 
 /**
- * [新增] 递归比较两个对象，找出在 source 对象中未被改变的字段路径。
+ * 递归比较两个对象，找出在 source 对象中未被改变的字段路径。
  * @param original - 原始对象。
  * @param updated - AI返回的更新对象。
- * @param path - 当前递归路径（内部使用）。
  * @returns {string[]} 返回一个包含未改变字段路径的字符串数组。
  */
-function findUnchangedFields(original: any, updated: any, path: string = ''): string[] {
-    let unchanged: string[] = [];
-    if (!isObject(updated)) {
-        return [];
+function findUnchangedFields(original: any, updated: any): string[] {
+    const unchangedPaths: string[] = [];
+
+    function recurse(originalNode: any, updatedNode: any, currentPath: string) {
+        // 如果原始节点不是对象，或者更新后的节点中不存在，则无法比较
+        if (!isObject(originalNode) || !isObject(updatedNode)) {
+            return;
+        }
+
+        // 遍历原始对象的所有键
+        for (const key in originalNode) {
+            // 忽略特殊字段
+            if (key === 'signature' || key === 'userAnswers' || key === 'arena_history' || key === 'isPreset') {
+                continue;
+            }
+
+            const newPath = currentPath ? `${currentPath} -> ${key}` : key;
+            const originalValue = originalNode[key];
+            const updatedValue = updatedNode[key];
+
+            // 检查更新后的值是否存在
+            if (updatedValue === undefined) {
+                // 如果AI的响应中没有这个键，我们视为“未改变”（因为它将保留原样）
+                unchangedPaths.push(newPath);
+                continue;
+            }
+
+            // 如果值是对象，则递归深入
+            if (isObject(originalValue) && isObject(updatedValue)) {
+                recurse(originalValue, updatedValue, newPath);
+            }
+            // 如果值不是对象（或一个是对象一个不是），直接比较
+            else if (JSON.stringify(originalValue) === JSON.stringify(updatedValue)) {
+                unchangedPaths.push(newPath);
+            }
+        }
     }
     
-    for (const key in original) {
-        if (key === 'userAnswers') continue; // 不比较 userAnswers
-        if (!isObject(original[key]) || !(key in updated) || JSON.stringify(original[key]) === JSON.stringify(updated[key])) {
-            // 如果字段不是对象，或者AI的返回中没有这个字段，或者字段内容完全相同，则视为未更新
-            continue;
-        }
-        
-        const newPath = path ? `${path} -> ${key}` : key;
-        const subUnchanged = findUnchangedFields(original[key], updated[key], newPath);
-        
-        if (subUnchanged.length === 0 && JSON.stringify(original[key]) !== JSON.stringify(updated[key])) {
-            // 如果所有子字段都变了，那么父字段本身就算是被更新了
-        } else if (subUnchanged.length === Object.keys(original[key]).length) {
-            // 如果所有子字段都没变，那么父字段就算没变
-            unchanged.push(newPath);
-        } else {
-            // 如果部分子字段变了，那么只记录那些没变的子字段
-            unchanged = unchanged.concat(subUnchanged);
-        }
-    }
-    return unchanged;
+    recurse(original, updated, '');
+    return unchangedPaths;
 }
 
 
@@ -239,7 +251,7 @@ async function handler(req: NextRequest): Promise<Response> {
   try {
     const originalCharacterData = await req.json();
 
-    // 安全检查
+    // 安全检查：检查用户上传的原始数据
     const textToCheck = extractTextForCheck(originalCharacterData);
     if ((await quickCheck(textToCheck)).hasSensitiveWords) {
         return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true, reason: '上传的角色档案包含危险符文' }), { status: 400 });
@@ -257,52 +269,48 @@ async function handler(req: NextRequest): Promise<Response> {
     const updatedDataFromAI = aiResult.updatedCharacterData;
 
     // --- 数据整合与安全处理 (SRS 3.2.3, 3.2.4, 3.2.5, 4.1) ---
-    // 1. 创建一个原始数据的深拷贝作为基础
+    // 1. 创建一个原始数据的深拷贝作为最终结果的基础
     const sublimatedData: any = JSON.parse(JSON.stringify(originalCharacterData));
 
-    // 2. [新增] 找出未被AI更新的字段，用于前端提示
+    // 2. 找出未被AI更新的字段，用于前端提示
     const unchangedFields = findUnchangedFields(originalCharacterData, updatedDataFromAI);
 
-    // 3. 安全地合并AI返回的更新
-    for (const key in updatedDataFromAI) {
-        if (key in sublimatedData) {
-            // 使用类型断言来解决TypeScript的索引签名问题
-            sublimatedData[key] = safeDeepMerge(sublimatedData[key], (updatedDataFromAI as any)[key]);
-        } else {
-            sublimatedData[key] = (updatedDataFromAI as any)[key];
-        }
-    }
-
-    // 4. 使用类型守卫来区分角色类型并安全地操作
-    let finalName: string;
+    // 3. 【核心修正】数据净化与类型矫正，防止AI返回错误数据结构
     const isMagicalGirl = 'codename' in originalCharacterData;
 
-    // ============================================================
-    // BUG 修复：在此处添加对残兽数据的净化处理
-    // 目标：防止AI错误地为残兽的字符串字段返回数组，导致客户端崩溃
-    // ============================================================
     if (!isMagicalGirl) {
-        // 获取残兽Schema中所有应为字符串的字段键
+        // 残兽数据净化：处理AI可能返回的错误字段名和类型
+        if (updatedDataFromAI.codename && !updatedDataFromAI.name) {
+            log.warn("AI为残兽返回了 'codename' 而非 'name'，已自动转换。", { codename: updatedDataFromAI.codename });
+            updatedDataFromAI.name = updatedDataFromAI.codename;
+            delete updatedDataFromAI.codename;
+        }
+
         const canshouStringKeys = Object.keys(CanshouSublimationPayloadSchema.shape);
         for (const key of canshouStringKeys) {
-            // 检查合并后的数据中，这些字段是否被错误地变成了数组
-            if (Array.isArray(sublimatedData[key])) {
-                log.warn(`AI为残兽字段'${key}'返回了数组，强制转换为字符串。`, { originalValue: sublimatedData[key] });
-                // 将数组用逗号连接成一个字符串，以修复数据类型
-                sublimatedData[key] = sublimatedData[key].join(', ');
+            if (Array.isArray(updatedDataFromAI[key])) {
+                log.warn(`AI为残兽字段'${key}'返回了数组，强制转换为字符串。`, { originalValue: updatedDataFromAI[key] });
+                updatedDataFromAI[key] = (updatedDataFromAI[key] as any[]).join(', ');
             }
         }
     }
-    
+
+    // 4. 安全地合并AI返回的更新
+    Object.assign(sublimatedData, safeDeepMerge(sublimatedData, updatedDataFromAI));
+
+    // 5. 应用不可变字段规则和称号生成逻辑
+    let finalName: string;
     if (isMagicalGirl) {
-      if (!('codename' in updatedDataFromAI)) throw new Error("AI返回的角色类型与原始角色类型不匹配。");
+      // 确保核心字段不被AI意外修改
       sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
       sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
       sublimatedData.blooming = originalCharacterData.blooming;
+      
       const originalFullName = originalCharacterData.codename as string;
       const originalBaseName = originalFullName.split('「')[0];
       const newNameFromAI = updatedDataFromAI.codename as string;
-      const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
+      const newTitleMatch = newNameFromAI ? newNameFromAI.match(/「(.{1,8})」/) : null;
+
       if (newTitleMatch && newTitleMatch[1]) {
         sublimatedData.codename = `${originalBaseName}「${newTitleMatch[1]}」`;
       } else {
@@ -310,14 +318,24 @@ async function handler(req: NextRequest): Promise<Response> {
         log.warn('AI未能为魔法少女生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
       }
       finalName = sublimatedData.codename;
-    } else {
-        // 增加一个错误处理，防止AI返回了错误类型的角色数据
-        log.error("AI返回的角色类型与原始角色类型不匹配", { isMagicalGirl, aiResponse: updatedDataFromAI });
-        throw new Error("AI返回的角色类型与原始角色类型不匹配。");
+    } else { // 残兽的逻辑
+      const originalFullName = originalCharacterData.name as string;
+      const originalBaseName = originalFullName.split('「')[0];
+      const newNameFromAI = updatedDataFromAI.name as string;
+      const newTitleMatch = newNameFromAI ? newNameFromAI.match(/「(.{1,8})」/) : null;
+
+      if (newTitleMatch && newTitleMatch[1]) {
+        sublimatedData.name = `${originalBaseName}「${newTitleMatch[1]}」`;
+      } else {
+        sublimatedData.name = originalFullName.includes('「') ? originalFullName : `${originalBaseName}「百战」`;
+        log.warn('AI未能为残兽生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
+      }
+      finalName = sublimatedData.name;
     }
 
-    // 5. 更新历战记录 (SRS 3.2.4)
+    // 6. 更新历战记录 (SRS 3.2.4)
     const oldEntries = originalCharacterData.arena_history.entries || [];
+    // 保留并过滤出之前的升华记录
     const sublimationEntries = oldEntries.filter((entry: any) => entry.type === 'sublimation');
     const lastEntryId = oldEntries.length > 0 ? Math.max(...oldEntries.map((e: any) => e.id)) : 0;
 
@@ -332,26 +350,26 @@ async function handler(req: NextRequest): Promise<Response> {
     });
     sublimatedData.arena_history.entries = sublimationEntries;
 
-    // 6. 更新历战记录属性 (SRS 3.2.5)
+    // 7. 更新历战记录属性 (SRS 3.2.5)
     const nowISO = new Date().toISOString();
     sublimatedData.arena_history.attributes.sublimation_count = (originalCharacterData.arena_history.attributes.sublimation_count || 0) + 1;
     sublimatedData.arena_history.attributes.updated_at = nowISO;
     sublimatedData.arena_history.attributes.last_sublimation_at = nowISO;
 
-    // 7. 签名处理 (SRS 4.1)
+    // 8. 签名处理 (SRS 4.1)
     if (isNative) {
       sublimatedData.signature = await generateSignature(sublimatedData);
     } else {
       delete sublimatedData.signature;
     }
 
-    // 8. 构造新的API响应体
+    // 9. 构造最终的API响应体
     const finalResponse = {
         sublimatedData,
         unchangedFields
     };
 
-    return new Response(JSON.stringify(finalResponse), { status: 200 });
+    return new Response(JSON.stringify(finalResponse), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   } catch (error) {
     log.error('成长升华失败', { error });
@@ -360,7 +378,11 @@ async function handler(req: NextRequest): Promise<Response> {
   }
 }
 
-// 递归提取对象中所有字符串值的函数，用于敏感词检查
+/**
+ * 递归提取对象中所有字符串值的函数，用于敏感词检查。
+ * @param data 要提取文本的对象。
+ * @returns 连接所有字符串值的单个字符串。
+ */
 const extractTextForCheck = (data: any): string => {
     let textContent = '';
     if (typeof data === 'string') {
