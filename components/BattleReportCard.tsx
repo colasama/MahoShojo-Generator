@@ -19,7 +19,7 @@ export interface NewsReport {
   };
   // 可选的用户引导信息字段
   userGuidance?: string;
-  mode?: 'classic' | 'kizuna' | 'daily' | 'scenario';
+  mode: 'classic' | 'kizuna' | 'daily' | 'scenario';
   // SRS 3.1.2 新增：情景标题
   scenario_title?: string | null;
 }

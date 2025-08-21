@@ -114,7 +114,7 @@ const getEnableWorldviewCheck = (): boolean => {
   return enabled === 'true';
 };
 
-// 新增：获取内容安全检查相关开关的函数
+// 获取内容安全检查相关开关的函数 (SRS 3.5.1)
 const getEnableSensitiveWordFilter = (): boolean => {
   const enabled = process.env.NEXT_PUBLIC_ENABLE_SENSITIVE_WORD_FILTER ?? 'true';
   return enabled === 'true';
@@ -149,7 +149,7 @@ export const config = {
   // 世界观检查功能开关
   ENABLE_WORLDVIEW_CHECK: getEnableWorldviewCheck(),
 
-  // 新增：内容安全与检查机制开关
+  // 内容安全与检查机制开关 (SRS 3.5.1)
   ENABLE_SENSITIVE_WORD_FILTER: getEnableSensitiveWordFilter(),
   ENABLE_AI_SAFETY_CHECK: getEnableAiSafetyCheck(),
   SKIP_NATIVE_SCENARIO_CHECK: getSkipNativeScenarioCheck(),

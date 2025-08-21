@@ -130,7 +130,7 @@ const BattlePage: React.FC = () => {
     const [isScenarioNative, setIsScenarioNative] = useState<boolean>(false);
 
     // 用于存储从API返回的、更新了历战记录的角色数据
-    const [updatedCombatants, setUpdatedCombatants] = useState<any[]>([]);
+    const [updatedCombatants, setUpdatedCombatants] = useState<UpdatedCombatantData[]>([]);
 
     // 切换模式时清理情景数据，防止旧数据污染新的生成请求。
     useEffect(() => {
@@ -530,21 +530,6 @@ const BattlePage: React.FC = () => {
             if(event.target) event.target.value = ''; // 允许重复上传同一个文件
         }
     };
-
-    const downloadUpdatedJson = (characterData: any) => {
-        const name = characterData.codename || characterData.name;
-        const jsonData = JSON.stringify(characterData, null, 2);
-        const blob = new Blob([jsonData], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `角色设定_${name}_更新.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
-
 
     const checkSensitiveWords = async (content: string) => {
         const checkResult = await quickCheck(content);
@@ -1003,47 +988,8 @@ const BattlePage: React.FC = () => {
                         <BattleReportCard
                             report={newsReport}
                             onSaveImage={handleSaveImage}
-                            mode={battleMode} // 传递模式
+                            updatedCombatants={updatedCombatants}
                         />
-                    )}
-
-                    {/* --- 更新后的角色信息展示区域 --- */}
-                    {updatedCombatants.length > 0 && (
-                        <div className="card mt-6">
-                            <h3 className="text-lg font-bold text-gray-800 mb-3">历战记录更新</h3>
-                            <div className="space-y-4">
-                                {updatedCombatants.map((charData) => {
-                                    const latestEntry = charData.arena_history?.entries?.[charData.arena_history.entries.length - 1];
-                                    const name = charData.codename || charData.name;
-                                    
-                                    // 查找原始 combatant 以获取类型
-                                    const originalCombatant = combatants.find(c => (c.data.codename || c.data.name) === name);
-                                    const typeDisplay = originalCombatant?.type === 'magical-girl' ? '魔法少女' : '残兽';
-
-                                    if (!latestEntry) return null;
-
-                                    return (
-                                        <div key={name} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="font-semibold text-gray-700">{name} <span className="text-xs text-gray-500">({typeDisplay})</span></p>
-                                                    <p className="text-sm text-gray-600 mt-1">
-                                                        <span className="font-medium">本次事件影响：</span>
-                                                        {latestEntry.impact}
-                                                    </p>
-                                                </div>
-                                                <button 
-                                                    onClick={() => downloadUpdatedJson(charData)}
-                                                    className="ml-4 px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors shrink-0"
-                                                >
-                                                    下载更新设定
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
                     )}
 
                     {/* --- 统计数据 --- */}
