@@ -244,7 +244,7 @@ async function handler(req: NextRequest): Promise<Response> {
 
     // --- 数据整合与安全处理 (SRS 3.2.3, 3.2.4, 3.2.5, 4.1) ---
     // 1. 创建一个原始数据的深拷贝作为基础
-    const sublimatedData = JSON.parse(JSON.stringify(originalCharacterData));
+    const sublimatedData: any = JSON.parse(JSON.stringify(originalCharacterData));
 
     // 2. [新增] 找出未被AI更新的字段，用于前端提示
     const unchangedFields = findUnchangedFields(originalCharacterData, updatedDataFromAI);
@@ -253,72 +253,93 @@ async function handler(req: NextRequest): Promise<Response> {
     for (const key in updatedDataFromAI) {
         if (key in sublimatedData) {
             // 使用类型断言来解决TypeScript的索引签名问题
-            (sublimatedData as any)[key] = safeDeepMerge((sublimatedData as any)[key], (updatedDataFromAI as any)[key]);
+            sublimatedData[key] = safeDeepMerge(sublimatedData[key], (updatedDataFromAI as any)[key]);
         } else {
-            (sublimatedData as any)[key] = (updatedDataFromAI as any)[key];
+            sublimatedData[key] = (updatedDataFromAI as any)[key];
         }
     }
 
+    // 4. 使用类型守卫来区分角色类型并安全地操作
+    let finalName: string;
     const isMagicalGirl = 'codename' in originalCharacterData;
 
-    // 4. 强制执行不可变字段规则，防止AI意外修改
-    if (isMagicalGirl) {
+    // [修改] 使用 'in' 操作符作为类型守卫，同时检查 originalCharacterData 和 updatedDataFromAI 的类型一致性
+    if (isMagicalGirl && 'codename' in updatedDataFromAI) {
+        // 强制执行不可变字段规则 (SRS 3.2.3)
         sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
         sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
         sublimatedData.blooming = originalCharacterData.blooming;
-    }
 
-    // 5. [增强] 处理半可变字段：称号
-    const nameField = isMagicalGirl ? 'codename' : 'name';
-    const originalFullName = originalCharacterData[nameField] as string;
-    const originalBaseName = originalFullName.split('「')[0];
-    const newNameFromAI = updatedDataFromAI[nameField] as string;
-    
-    const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
-    if (newTitleMatch && newTitleMatch[1]) {
-      sublimatedData[nameField] = `${originalBaseName}「${newTitleMatch[1]}」`;
+        // [增强] 处理半可变字段：称号 (SRS 3.2.2)
+        const originalFullName = originalCharacterData.codename as string;
+        const originalBaseName = originalFullName.split('「')[0];
+        const newNameFromAI = updatedDataFromAI.codename as string; // 此处现在是类型安全的
+        
+        const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
+        if (newTitleMatch && newTitleMatch[1]) {
+          sublimatedData.codename = `${originalBaseName}「${newTitleMatch[1]}」`;
+        } else {
+          if (!originalFullName.includes('「')) {
+            sublimatedData.codename = `${originalBaseName}「历战」`;
+          } else {
+            sublimatedData.codename = originalFullName;
+          }
+          log.warn('AI未能为魔法少女生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
+        }
+        finalName = sublimatedData.codename;
+
+    } else if (!isMagicalGirl && 'name' in updatedDataFromAI) { // 是残兽
+        const originalFullName = originalCharacterData.name as string;
+        const originalBaseName = originalFullName.split('「')[0];
+        const newNameFromAI = updatedDataFromAI.name as string; // 此处现在是类型安全的
+
+        const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
+        if (newTitleMatch && newTitleMatch[1]) {
+            sublimatedData.name = `${originalBaseName}「${newTitleMatch[1]}」`;
+        } else {
+            if (!originalFullName.includes('「')) {
+                sublimatedData.name = `${originalBaseName}「历战」`;
+            } else {
+                sublimatedData.name = originalFullName;
+            }
+            log.warn('AI未能为残兽生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
+        }
+        finalName = sublimatedData.name;
     } else {
-      // 如果AI没有按要求格式返回，执行回退逻辑
-      if (!originalFullName.includes('「')) {
-        // 原名没有称号，添加默认称号
-        sublimatedData[nameField] = `${originalBaseName}「历战」`;
-      } else {
-        // 原名有称号，保持不变
-        sublimatedData[nameField] = originalFullName;
-      }
-      log.warn('AI未能为角色生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
+        // 增加一个错误处理，防止AI返回了错误类型的角色数据
+        throw new Error("AI返回的角色类型与原始角色类型不匹配。");
     }
 
-    // 6. 更新历战记录 (SRS 3.2.4)
+    // 5. 更新历战记录 (SRS 3.2.4)
     const oldEntries = originalCharacterData.arena_history.entries || [];
     const sublimationEntries = oldEntries.filter((entry: any) => entry.type === 'sublimation');
     const lastEntryId = oldEntries.length > 0 ? Math.max(...oldEntries.map((e: any) => e.id)) : 0;
-    
+
     sublimationEntries.push({
       id: lastEntryId + 1,
       type: 'sublimation',
       title: aiResult.sublimationEvent.title,
-      participants: [sublimatedData[nameField]],
-      winner: sublimatedData[nameField],
+      participants: [finalName],
+      winner: finalName,
       impact: aiResult.sublimationEvent.impact,
       metadata: { user_guidance: null, scenario_title: null, non_native_data_involved: !isNative }
     });
     sublimatedData.arena_history.entries = sublimationEntries;
 
-    // 7. 更新历战记录属性 (SRS 3.2.5)
+    // 6. 更新历战记录属性 (SRS 3.2.5)
     const nowISO = new Date().toISOString();
     sublimatedData.arena_history.attributes.sublimation_count = (originalCharacterData.arena_history.attributes.sublimation_count || 0) + 1;
     sublimatedData.arena_history.attributes.updated_at = nowISO;
     sublimatedData.arena_history.attributes.last_sublimation_at = nowISO;
-    
-    // 8. 签名处理 (SRS 4.1)
+
+    // 7. 签名处理 (SRS 4.1)
     if (isNative) {
       sublimatedData.signature = await generateSignature(sublimatedData);
     } else {
       delete sublimatedData.signature;
     }
 
-    // 9. [新增] 构造新的API响应体
+    // 8. 构造新的API响应体
     const finalResponse = {
         sublimatedData,
         unchangedFields

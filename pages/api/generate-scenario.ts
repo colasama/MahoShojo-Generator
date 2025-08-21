@@ -140,17 +140,27 @@ async function handler(req: NextRequest): Promise<Response> {
     const generationConfig = createGenerationConfig(answers);
     const scenarioData = await generateWithAI(null, generationConfig);
 
-    // 附加元数据和签名 (SRS 3.3.3 & 4.1)
-    const finalScenario = {
+    // [修改] 修正签名逻辑 (SRS 3.3.3 & 4.1)
+    // 1. 先构建不含签名的完整数据载荷
+    const payloadToSign = {
       ...scenarioData,
       metadata: {
         created_at: new Date().toISOString(),
-        signature: '', // 占位
       }
     };
 
-    const signature = await generateSignature(finalScenario);
-    finalScenario.metadata.signature = signature || '';
+    // 2. 基于此载荷生成签名
+    const signature = await generateSignature(payloadToSign);
+
+    // 3. 将签名附加到最终返回的对象中
+    const finalScenario = {
+      ...payloadToSign,
+      metadata: {
+        ...payloadToSign.metadata,
+        signature: signature || '', // 如果密钥未设置，签名将为空字符串
+      }
+    };
+
 
     return new Response(JSON.stringify(finalScenario), { status: 200 });
 
