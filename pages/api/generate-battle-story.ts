@@ -127,11 +127,11 @@ const filterAndFormatHistory = (
 
 /**
  * 根据战斗结果更新所有参战者的历战记录 (SRS 3.1.2, 3.1.4)
- * @param combatants 原始参战者数据列表
+ * @param combatants 原始参战者数据列表（包含 isNative 标志）
  * @param report 生成的战斗报告
  * @param impacts AI为每个角色生成的impact
  * @param userGuidance 用户提供的故事指引
- * @param scenarioTitle 情景模式下的情景标题
+ * @param scenario 情景模式下的情景文件
  * @returns 更新后的参战者数据列表
  */
 const updateCombatantsWithHistory = async (
@@ -149,9 +149,9 @@ const updateCombatantsWithHistory = async (
     const isScenarioNative = scenario ? await verifySignature(scenario) : true;
     const isAnyNonNative = combatants.some(c => !c.isNative) || (report.mode === 'scenario' && !isScenarioNative);
 
-
     for (const combatant of combatants) {
-        const characterData = JSON.parse(JSON.stringify(combatant.data)); // 深拷贝以避免副作用
+        // 深拷贝以避免副作用
+        const characterData = JSON.parse(JSON.stringify(combatant.data)); 
         const characterName = characterData.codename || characterData.name;
 
         // 【SRS 3.1.1】如果角色没有历战记录，则初始化
@@ -190,17 +190,16 @@ const updateCombatantsWithHistory = async (
             metadata: {
                 user_guidance: userGuidance,
                 scenario_title: scenario?.title || null,
-                // **【错误修复】**
-                // 确保 non_native_data_involved 始终为布尔值
-                non_native_data_involved: !!isAnyNonNative,
+                non_native_data_involved: isAnyNonNative,
             },
         };
 
         characterData.arena_history.entries.push(newEntry);
 
-        // 【SRS 4.1】处理数据签名
+        // 【SRS 4.1 & 错误修复】处理数据签名
+        // 关键修复：现在我们有了从前端传递来的 isNative 标志
         if (combatant.isNative) {
-            // 如果原始数据是原生的，则为更新后的数据重新生成签名
+            // 如果原始数据是原生的（包括预设），则为更新后的数据重新生成签名
             characterData.signature = await generateSignature(characterData);
         } else {
             // 如果原始数据是衍生的，则确保新数据不包含签名
@@ -478,10 +477,10 @@ async function handler(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const { combatants: rawCombatants, selectedLevel, mode = 'classic', userGuidance, scenario, teams } = await req.json();
+    const { combatants, selectedLevel, mode = 'classic', userGuidance, scenario, teams } = await req.json();
 
     const minParticipants = (mode === 'daily' || mode === 'scenario') ? 1 : 2;
-    if (!Array.isArray(rawCombatants) || rawCombatants.length < minParticipants || rawCombatants.length > 4) {
+    if (!Array.isArray(combatants) || combatants.length < minParticipants || combatants.length > 4) {
       const errorMessage = `该模式需要 ${minParticipants} 到 4 位角色`;
       return new Response(JSON.stringify({ error: errorMessage }), { status: 400 });
     }
@@ -547,16 +546,9 @@ async function handler(req: NextRequest): Promise<Response> {
       }
     }
     
-    // 【SRS 4.1】对每个参战者进行原生性验证
-    const combatants = await Promise.all(
-        rawCombatants.map(async (c: any) => ({
-            ...c,
-            isNative: await verifySignature(c.data)
-        }))
-    );
-
-    const magicalGirls = combatants.filter(c => c.type === 'magical-girl');
-    const canshou = combatants.filter(c => c.type === 'canshou');
+    // 确保后端接收到了 isNative 标志
+    const magicalGirls = combatants.filter((c: any) => c.type === 'magical-girl');
+    const canshou = combatants.filter((c: any) => c.type === 'canshou');
     
     // 根据模式和角色类型选择正确的系统提示词
     let systemPrompt: string;
@@ -564,7 +556,7 @@ async function handler(req: NextRequest): Promise<Response> {
         systemPrompt = dailyModeSystemPrompt;
     } else if (mode === 'kizuna') {
         systemPrompt = kizunaModeSystemPrompt;
-    } else if (mode === 'scenario') { // 新增分支
+    } else if (mode === 'scenario') { 
         systemPrompt = scenarioModeSystemPrompt;
     } else { // classic mode
         if (canshou.length === 0) {

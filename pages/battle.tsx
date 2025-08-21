@@ -561,7 +561,11 @@ const BattlePage: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    combatants: combatants.map(c => ({ type: c.type, data: c.data })), // 发送原始数据
+                    combatants: combatants.map(c => ({ 
+                        type: c.type, 
+                        data: c.data,
+                        isNative: c.isValid // 将前端的 isValid 状态作为 isNative 发送
+                    })), 
                     selectedLevel,
                     mode: battleMode,
                     userGuidance: userGuidance,

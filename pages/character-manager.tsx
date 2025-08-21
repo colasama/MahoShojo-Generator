@@ -11,7 +11,7 @@ import { webcrypto } from 'crypto';
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
 
 
-// 定义允许保持原生性的可编辑字段 (顶级键)
+// 定义允许保持原生性的可编辑字段 (顶级键) (SRS 3.7.3)
 const NATIVE_PRESERVING_FIELDS = new Set(['codename', 'name']);
 
 const CharacterManagerPage: React.FC = () => {
@@ -30,56 +30,71 @@ const CharacterManagerPage: React.FC = () => {
     useEffect(() => {
         if (!originalData || !characterData || !isNative) return;
 
-        // 深比较函数，用于比较两个对象是否相等
+        // 一旦丧失原生性，状态不再改变
+        if (hasLostNativeness) return;
+
         const deepEqual = (obj1: any, obj2: any): boolean => {
             return JSON.stringify(obj1) === JSON.stringify(obj2);
         };
         
         let hasBreakingChange = false;
         
-        // 遍历原始数据的所有键
+        // 1. 检查除特许字段和历战记录外的所有字段
         for (const key in originalData) {
-            // 忽略签名本身的比较
-            if (key === 'signature') continue;
-
-            // 检查非特许字段是否被修改
-            if (!NATIVE_PRESERVING_FIELDS.has(key) && key !== 'arena_history') {
-                if (!deepEqual(originalData[key], characterData[key])) {
-                    hasBreakingChange = true;
-                    break;
-                }
+            if (key === 'signature' || key === 'arena_history' || NATIVE_PRESERVING_FIELDS.has(key)) {
+                continue;
+            }
+            if (!deepEqual(originalData[key], characterData[key])) {
+                console.log(`原生性丧失：字段 '${key}' 被修改。`);
+                hasBreakingChange = true;
+                break;
             }
         }
         
-        // 单独检查 arena_history 的复杂修改规则
+        // 2. 单独检查 arena_history 的复杂修改规则 (SRS 3.7.3)
         if (!hasBreakingChange && originalData.arena_history && characterData.arena_history) {
-            // 允许属性重置和记录清除，但属性本身不能被随意修改
-            if (originalData.arena_history.attributes.sublimation_count !== characterData.arena_history.attributes.sublimation_count ||
-                originalData.arena_history.attributes.last_sublimation_at !== characterData.arena_history.attributes.last_sublimation_at) {
+            const originalAttrs = originalData.arena_history.attributes || {};
+            const currentAttrs = characterData.arena_history.attributes || {};
+            const originalEntries = originalData.arena_history.entries || [];
+            const currentEntries = characterData.arena_history.entries || [];
+
+            // 允许 `world_line_id` 和 `created_at` 被重置，但其他属性不允许修改
+            if (originalAttrs.sublimation_count !== currentAttrs.sublimation_count ||
+                originalAttrs.last_sublimation_at !== currentAttrs.last_sublimation_at) {
+                console.log('原生性丧失：arena_history.attributes 的核心属性被修改。');
                 hasBreakingChange = true;
             } else {
-                 // 只允许删除条目，不允许修改或新增
-                const originalEntries = originalData.arena_history.entries || [];
-                const currentEntries = characterData.arena_history.entries || [];
+                // 只允许删除条目，不允许修改或新增
+                const originalEntryIds = new Set(originalEntries.map((e: any) => e.id));
+
                 if (currentEntries.length > originalEntries.length) {
+                    console.log('原生性丧失：arena_history.entries 新增了条目。');
                     hasBreakingChange = true; // 不允许新增
                 } else {
-                    const originalEntryIds = new Set(originalEntries.map((e: any) => e.id));
-                    const hasModifiedOrAdded = currentEntries.some((currentEntry: any) => {
-                        if (!originalEntryIds.has(currentEntry.id)) return true; // 新增了ID
+                    // 检查剩余的条目是否都是原始条目且未被修改
+                    for (const currentEntry of currentEntries) {
+                        if (!originalEntryIds.has(currentEntry.id)) {
+                            console.log(`原生性丧失：arena_history.entries 出现了新的ID ${currentEntry.id}。`);
+                            hasBreakingChange = true; // 出现了新的ID，说明不是删除操作
+                            break;
+                        }
                         const originalEntry = originalEntries.find((e: any) => e.id === currentEntry.id);
-                        return !deepEqual(originalEntry, currentEntry); // 内容被修改
-                    });
-                    if(hasModifiedOrAdded) hasBreakingChange = true;
+                        if (!deepEqual(originalEntry, currentEntry)) {
+                            console.log(`原生性丧失：arena_history.entries ID ${currentEntry.id} 的内容被修改。`);
+                            hasBreakingChange = true; // 内容被修改
+                            break;
+                        }
+                    }
                 }
             }
         }
         
         if (hasBreakingChange) {
             setHasLostNativeness(true);
+            setMessage({ type: 'info', text: '注意：您已修改角色的核心数据，该角色将变为“衍生数据”，保存时会移除原生签名。' });
         }
 
-    }, [characterData, originalData, isNative]);
+    }, [characterData, originalData, isNative, hasLostNativeness]);
     
     // 加载和处理JSON数据
     const processJsonData = async (jsonText: string) => {
@@ -172,7 +187,7 @@ const CharacterManagerPage: React.FC = () => {
 
         return sortedKeys.map(key => {
             const currentPath = path ? `${path}.${key}` : key;
-            if (key === 'signature') return null;
+            if (key === 'signature' || key === 'isPreset') return null;
             if (key === 'arena_history') return null; // 历战记录单独渲染
 
             const value = data[key];
