@@ -126,6 +126,9 @@ const BattlePage: React.FC = () => {
     const [scenarioContent, setScenarioContent] = useState<object | null>(null);
     const [scenarioFileName, setScenarioFileName] = useState<string | null>(null);
     
+    // 用于追踪情景文件的原生性
+    const [isScenarioNative, setIsScenarioNative] = useState<boolean>(false);
+
     // 用于存储从API返回的、更新了历战记录的角色数据
     const [updatedCombatants, setUpdatedCombatants] = useState<any[]>([]);
 
@@ -399,15 +402,24 @@ const BattlePage: React.FC = () => {
         }
     };
 
-    const handlePasteAndLoadScenario = () => {
+    const handlePasteAndLoadScenario = async () => {
         const text = pastedScenarioJson.trim();
         if (!text) return;
         try {
             const json = JSON.parse(text);
-            // 简单验证
             if (!json.title || !json.elements) {
                 throw new Error('情景文件缺少必需的 title 或 elements 字段。');
             }
+
+            // --- 新增：验证情景文件的原生性 ---
+            const verificationResponse = await fetch('/api/verify-origin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(json),
+            });
+            const { isValid } = await verificationResponse.json();
+            setIsScenarioNative(isValid);
+
             setScenarioContent(json);
             setScenarioFileName(json.title || '粘贴的情景');
             setError(null);
@@ -417,6 +429,7 @@ const BattlePage: React.FC = () => {
             setError(`❌ 情景解析失败: ${message}`);
             setScenarioContent(null);
             setScenarioFileName(null);
+            setIsScenarioNative(false); // 出错时重置
         }
     };
 
@@ -471,6 +484,7 @@ const BattlePage: React.FC = () => {
         if (!file) {
             setScenarioContent(null);
             setScenarioFileName(null);
+            setIsScenarioNative(false); // 重置状态
             return;
         }
         if (file.type !== 'application/json') {
@@ -484,6 +498,16 @@ const BattlePage: React.FC = () => {
             if (!json.title || !json.elements) {
                 throw new Error('情景文件缺少必需的 title 或 elements 字段。');
             }
+
+            // --- 验证情景文件的原生性 ---
+            const verificationResponse = await fetch('/api/verify-origin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(json),
+            });
+            const { isValid } = await verificationResponse.json();
+            setIsScenarioNative(isValid);
+
             setScenarioContent(json);
             setScenarioFileName(file.name);
             setError(null);
@@ -492,6 +516,7 @@ const BattlePage: React.FC = () => {
             setError(`❌ 情景文件读取失败: ${message}`);
             setScenarioContent(null);
             setScenarioFileName(null);
+            setIsScenarioNative(false); // 出错时重置
         } finally {
             if(event.target) event.target.value = ''; // 允许重复上传同一个文件
         }
@@ -910,7 +935,10 @@ const BattlePage: React.FC = () => {
                                         className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
                                     />
                                     {scenarioFileName && (
-                                        <p className="text-xs text-gray-500 mt-2">已加载情景: {scenarioFileName}</p>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            已加载情景: {scenarioFileName}
+                                            {isScenarioNative && <span className="text-xs text-green-600 ml-1 font-semibold">(原生)</span>}
+                                        </p>
                                     )}
                                     <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
                                         <p className="font-bold">你已选择【情景模式】！</p>
