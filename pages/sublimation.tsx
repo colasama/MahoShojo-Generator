@@ -8,7 +8,7 @@ import MagicalGirlCard from '../components/MagicalGirlCard';
 import CanshouCard from '../components/CanshouCard';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 
-// 新增：递归提取对象中所有字符串值的函数，用于敏感词检查
+// 递归提取对象中所有字符串值的函数，用于敏感词检查
 const extractTextForCheck = (data: any): string => {
     let textContent = '';
     if (typeof data === 'string') {
@@ -28,20 +28,25 @@ const extractTextForCheck = (data: any): string => {
     return textContent;
 };
 
+// [新增] 定义API响应和结果状态的类型
+interface SublimationResponse {
+    sublimatedData: any;
+    unchangedFields: string[];
+}
+
 const SublimationPage: React.FC = () => {
     const router = useRouter();
     const [characterData, setCharacterData] = useState<any>(null);
     const [fileName, setFileName] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [resultData, setResultData] = useState<any | null>(null);
+    // [修改] resultData 的类型现在是 SublimationResponse
+    const [resultData, setResultData] = useState<SublimationResponse | null>(null);
     const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
     const [showImageModal, setShowImageModal] = useState(false);
-    // 新增：用于粘贴的 state
     const [pastedJson, setPastedJson] = useState('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
 
-    // 新增：在移动端默认展开粘贴区
     useEffect(() => {
         const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
         if (isMobileDevice) {
@@ -71,11 +76,7 @@ const SublimationPage: React.FC = () => {
 
     const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file) {
-            setCharacterData(null);
-            setFileName(null);
-            return;
-        }
+        if (!file) return;
         if (file.type !== 'application/json') {
             setError('❌ 文件必须是 .json 格式。');
             return;
@@ -87,14 +88,13 @@ const SublimationPage: React.FC = () => {
         event.target.value = '';
     };
 
-    // 新增：处理粘贴加载
     const handlePasteAndLoad = () => {
         if (!pastedJson.trim()) {
             setError('⚠️ 文本框内容为空。');
             return;
         }
         if (processJsonData(pastedJson)) {
-            setPastedJson(''); // 成功后清空
+            setPastedJson('');
         }
     };
 
@@ -103,13 +103,11 @@ const SublimationPage: React.FC = () => {
             setError('⚠️ 请先上传一个角色设定文件。');
             return;
         }
-
         setIsGenerating(true);
         setError(null);
         setResultData(null);
 
         try {
-            // 修复：只检查文本内容，而不是整个JSON对象
             const textToCheck = extractTextForCheck(characterData);
             if ((await quickCheck(textToCheck)).hasSensitiveWords) {
                 router.push({
@@ -137,7 +135,7 @@ const SublimationPage: React.FC = () => {
                 throw new Error(errorJson.message || errorJson.error || '升华失败');
             }
 
-            const result = await response.json();
+            const result: SublimationResponse = await response.json();
             setResultData(result);
 
         } catch (err) {
@@ -153,6 +151,7 @@ const SublimationPage: React.FC = () => {
         setShowImageModal(true);
     };
     
+    // [修改] 现在从 resultData.sublimatedData 获取数据
     const downloadJson = (data: any) => {
         const name = data.codename || data.name;
         const jsonData = JSON.stringify(data, null, 2);
@@ -168,14 +167,16 @@ const SublimationPage: React.FC = () => {
     };
     
     const renderResultCard = () => {
-        if (!resultData) return null;
-        if (resultData.codename) {
-            const colorScheme = resultData.appearance.colorScheme || "粉色、白色";
+        if (!resultData?.sublimatedData) return null;
+        const data = resultData.sublimatedData;
+
+        if (data.codename) { // 魔法少女
+            const colorScheme = data.appearance.colorScheme || "粉色、白色";
             const mainColor = colorScheme.split('、')[0];
             const gradientStyle = `linear-gradient(135deg, hsl(var(--${mainColor}-400)), hsl(var(--${mainColor}-600)))`;
-            return <MagicalGirlCard magicalGirl={resultData} gradientStyle={gradientStyle} onSaveImage={handleSaveImage} />;
-        } else if (resultData.name) {
-            return <CanshouCard canshou={resultData} onSaveImage={handleSaveImage} />;
+            return <MagicalGirlCard magicalGirl={data} gradientStyle={gradientStyle} onSaveImage={handleSaveImage} />;
+        } else if (data.name) { // 残兽
+            return <CanshouCard canshou={data} onSaveImage={handleSaveImage} />;
         }
         return <div className="error-message">无法识别的角色类型</div>;
     };
@@ -215,7 +216,6 @@ const SublimationPage: React.FC = () => {
                             )}
                         </div>
                         
-                        {/* 新增：粘贴区域 */}
                         <div className="mb-6">
                             <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-purple-700 hover:underline cursor-pointer mb-2 font-semibold">
                                 {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
@@ -239,14 +239,25 @@ const SublimationPage: React.FC = () => {
                     
                     {resultData && (
                         <>
+                            {/* [新增] 升华结果反馈信息 */}
+                            {resultData.unchangedFields.length > 0 && (
+                                <div className="card mt-6 bg-blue-50 border border-blue-200">
+                                    <h4 className="font-bold text-blue-800 mb-2">升华报告</h4>
+                                    <p className="text-sm text-blue-700">AI 已根据角色经历更新了大部分设定，但以下字段因其不认为需要改变而保留了原始设定：</p>
+                                    <ul className="list-disc list-inside text-xs text-blue-600 mt-2 pl-2">
+                                        {resultData.unchangedFields.map(field => <li key={field}>{field}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+
                             {renderResultCard()}
                             <div className="card mt-6 text-center">
                                 <h3 className="text-lg font-bold text-gray-800 mb-3">操作</h3>
                                 <div className="flex flex-col md:flex-row gap-4 justify-center">
-                                    <button onClick={() => downloadJson(resultData)} className="generate-button flex-1">
+                                    <button onClick={() => downloadJson(resultData.sublimatedData)} className="generate-button flex-1">
                                         下载新设定
                                     </button>
-                                    <Link href="/battle" className="generate-button flex-1" style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)' }}>
+                                    <Link href="/battle" className="generate-button flex-1" style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)', textDecoration: 'none' }}>
                                         前往竞技场
                                     </Link>
                                 </div>

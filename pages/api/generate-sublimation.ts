@@ -7,10 +7,6 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
 import questionnaire from '../../public/questionnaire.json';
-import { webcrypto } from 'crypto';
-
-// 兼容 Edge 和 Node.js 环境的 crypto API
-const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
 
 const log = getLogger('api-gen-sublimation');
 
@@ -152,12 +148,20 @@ ${userAnswersText}
 // =================================================================
 // 3. 辅助函数
 // =================================================================
+/**
+ * 检查一个值是否为可以遍历的对象（非数组、非null）。
+ * @param item - 要检查的值。
+ * @returns {boolean} 如果是对象则返回true，否则返回false。
+ */
+function isObject(item: any): boolean {
+    return (item && typeof item === 'object' && !Array.isArray(item));
+}
 
 /**
  * 安全地深度合并两个对象。源对象的属性会覆盖目标对象的属性。
- * @param target 目标对象
- * @param source 源对象 (AI返回的更新)
- * @returns 合并后的新对象
+ * @param target - 目标对象，将被覆盖。
+ * @param source - 源对象，提供更新数据。
+ * @returns {any} 返回一个合并后的新对象。
  */
 function safeDeepMerge(target: any, source: any): any {
     const output = { ...target };
@@ -173,8 +177,39 @@ function safeDeepMerge(target: any, source: any): any {
     return output;
 }
 
-function isObject(item: any): boolean {
-    return (item && typeof item === 'object' && !Array.isArray(item));
+/**
+ * [新增] 递归比较两个对象，找出在 source 对象中未被改变的字段路径。
+ * @param original - 原始对象。
+ * @param updated - AI返回的更新对象。
+ * @param path - 当前递归路径（内部使用）。
+ * @returns {string[]} 返回一个包含未改变字段路径的字符串数组。
+ */
+function findUnchangedFields(original: any, updated: any, path: string = ''): string[] {
+    let unchanged: string[] = [];
+    if (!isObject(updated)) {
+        return [];
+    }
+    
+    for (const key in original) {
+        if (!isObject(original[key]) || !(key in updated) || JSON.stringify(original[key]) === JSON.stringify(updated[key])) {
+            // 如果字段不是对象，或者AI的返回中没有这个字段，或者字段内容完全相同，则视为未更新
+            continue;
+        }
+        
+        const newPath = path ? `${path} -> ${key}` : key;
+        const subUnchanged = findUnchangedFields(original[key], updated[key], newPath);
+        
+        if (subUnchanged.length === 0 && JSON.stringify(original[key]) !== JSON.stringify(updated[key])) {
+            // 如果所有子字段都变了，那么父字段本身就算是被更新了
+        } else if (subUnchanged.length === Object.keys(original[key]).length) {
+            // 如果所有子字段都没变，那么父字段就算没变
+            unchanged.push(newPath);
+        } else {
+            // 如果部分子字段变了，那么只记录那些没变的子字段
+            unchanged = unchanged.concat(subUnchanged);
+        }
+    }
+    return unchanged;
 }
 
 
@@ -211,40 +246,50 @@ async function handler(req: NextRequest): Promise<Response> {
     // 1. 创建一个原始数据的深拷贝作为基础
     const sublimatedData = JSON.parse(JSON.stringify(originalCharacterData));
 
-    // 2. 安全地合并AI返回的更新
+    // 2. [新增] 找出未被AI更新的字段，用于前端提示
+    const unchangedFields = findUnchangedFields(originalCharacterData, updatedDataFromAI);
+
+    // 3. 安全地合并AI返回的更新
     for (const key in updatedDataFromAI) {
         if (key in sublimatedData) {
-            sublimatedData[key] = safeDeepMerge(sublimatedData[key], updatedDataFromAI[key]);
+            // 使用类型断言来解决TypeScript的索引签名问题
+            (sublimatedData as any)[key] = safeDeepMerge((sublimatedData as any)[key], (updatedDataFromAI as any)[key]);
         } else {
-            sublimatedData[key] = updatedDataFromAI[key];
+            (sublimatedData as any)[key] = (updatedDataFromAI as any)[key];
         }
     }
 
-    const isMagicalGirl = !!originalCharacterData.codename;
-    const characterType = isMagicalGirl ? '魔法少女' : '残兽';
+    const isMagicalGirl = 'codename' in originalCharacterData;
 
-    // 3. 强制执行不可变字段规则，防止AI意外修改
+    // 4. 强制执行不可变字段规则，防止AI意外修改
     if (isMagicalGirl) {
         sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
         sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
         sublimatedData.blooming = originalCharacterData.blooming;
     }
 
-    // 4. 处理半可变字段：称号
+    // 5. [增强] 处理半可变字段：称号
     const nameField = isMagicalGirl ? 'codename' : 'name';
-    const originalName = (originalCharacterData[nameField] as string).split('「')[0];
+    const originalFullName = originalCharacterData[nameField] as string;
+    const originalBaseName = originalFullName.split('「')[0];
     const newNameFromAI = updatedDataFromAI[nameField] as string;
     
-    let newTitle = newNameFromAI.match(/「(.{1,8})」/)?.[1];
-    if (newTitle) {
-      sublimatedData[nameField] = `${originalName}「${newTitle}」`;
+    const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
+    if (newTitleMatch && newTitleMatch[1]) {
+      sublimatedData[nameField] = `${originalBaseName}「${newTitleMatch[1]}」`;
     } else {
-      // 如果AI没有按要求格式返回，则保留原始名称，并记录一个警告
-      sublimatedData[nameField] = originalCharacterData[nameField];
-      log.warn('AI未能为角色生成新称号，已保留原名。', { nameField, newNameFromAI });
+      // 如果AI没有按要求格式返回，执行回退逻辑
+      if (!originalFullName.includes('「')) {
+        // 原名没有称号，添加默认称号
+        sublimatedData[nameField] = `${originalBaseName}「历战」`;
+      } else {
+        // 原名有称号，保持不变
+        sublimatedData[nameField] = originalFullName;
+      }
+      log.warn('AI未能为角色生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
     }
 
-    // 5. 更新历战记录 (SRS 3.2.4)
+    // 6. 更新历战记录 (SRS 3.2.4)
     const oldEntries = originalCharacterData.arena_history.entries || [];
     const sublimationEntries = oldEntries.filter((entry: any) => entry.type === 'sublimation');
     const lastEntryId = oldEntries.length > 0 ? Math.max(...oldEntries.map((e: any) => e.id)) : 0;
@@ -260,20 +305,26 @@ async function handler(req: NextRequest): Promise<Response> {
     });
     sublimatedData.arena_history.entries = sublimationEntries;
 
-    // 6. 更新历战记录属性 (SRS 3.2.5)
+    // 7. 更新历战记录属性 (SRS 3.2.5)
     const nowISO = new Date().toISOString();
     sublimatedData.arena_history.attributes.sublimation_count = (originalCharacterData.arena_history.attributes.sublimation_count || 0) + 1;
     sublimatedData.arena_history.attributes.updated_at = nowISO;
     sublimatedData.arena_history.attributes.last_sublimation_at = nowISO;
     
-    // 7. 签名处理 (SRS 4.1)
+    // 8. 签名处理 (SRS 4.1)
     if (isNative) {
       sublimatedData.signature = await generateSignature(sublimatedData);
     } else {
       delete sublimatedData.signature;
     }
 
-    return new Response(JSON.stringify(sublimatedData), { status: 200 });
+    // 9. [新增] 构造新的API响应体
+    const finalResponse = {
+        sublimatedData,
+        unchangedFields
+    };
+
+    return new Response(JSON.stringify(finalResponse), { status: 200 });
 
   } catch (error) {
     log.error('成长升华失败', { error });
