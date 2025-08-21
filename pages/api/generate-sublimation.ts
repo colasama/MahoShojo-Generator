@@ -6,7 +6,10 @@ import { getLogger } from '../../lib/logger';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
-import questionnaire from '../../public/questionnaire.json';
+// 导入魔法少女问卷，用于提供上下文
+import magicalGirlQuestionnaire from '../../public/questionnaire.json';
+// 导入残兽问卷，为残兽升华提供上下文
+import canshouQuestionnaire from '../../public/canshou_questionnaire.json';
 
 const log = getLogger('api-gen-sublimation');
 
@@ -60,7 +63,8 @@ const CanshouSublimationPayloadSchema = z.object({
   origin: z.string(),
   birthEnvironment: z.string(),
   researcherNotes: z.string().describe("研究员对这次升华的补充笔记。"),
-  userAnswers: z.array(z.string()).optional().describe("根据残兽的成长，对问卷问题的全新回答。"),
+  // 将 userAnswers 的类型从数组修正为键值对记录，以匹配实际数据结构
+  userAnswers: z.record(z.string()).optional().describe("根据残兽的成长，对问卷问题的全新回答，格式为 { questionId: answerText }。"),
 });
 
 // AI需要返回的完整结果的Schema
@@ -77,10 +81,11 @@ const SublimationResultSchema = z.object({
 // =================================================================
 // 2. AI Prompt 配置 (SRS 3.2.2)
 // =================================================================
-const createGenerationConfig = (characterData: any, questions: string[]): GenerationConfig<z.infer<typeof SublimationResultSchema>, any> => {
+const createGenerationConfig = (characterData: any): GenerationConfig<z.infer<typeof SublimationResultSchema>, any> => {
   const isMagicalGirl = !!characterData.codename;
   const characterType = isMagicalGirl ? '魔法少女' : '残兽';
   const nameField = isMagicalGirl ? 'codename' : 'name';
+  const questions = isMagicalGirl ? magicalGirlQuestionnaire.questions : canshouQuestionnaire.questions.map(q => q.question);
 
   // 明确定义不可变字段，增强AI指令的约束力
   const immutableFields = isMagicalGirl
@@ -96,9 +101,15 @@ const createGenerationConfig = (characterData: any, questions: string[]): Genera
       .map((entry: any) => `- 事件“${entry.title}”：胜利者是${entry.winner}，对我的影响是“${entry.impact}”`)
       .join('\n') || "无";
     
-    const userAnswersText = (dataForPrompt.userAnswers && Array.isArray(dataForPrompt.userAnswers)) 
-        ? dataForPrompt.userAnswers.map((answer: string, i: number) => `Q: ${questions[i] || `问题 ${i+1}`}\nA: ${answer}`).join('\n')
-        : "无问卷回答记录。";
+    // [修正] 根据角色类型，正确处理 userAnswers 的格式
+    let userAnswersText = "无问卷回答记录。";
+    if (dataForPrompt.userAnswers) {
+        if (isMagicalGirl && Array.isArray(dataForPrompt.userAnswers)) {
+            userAnswersText = dataForPrompt.userAnswers.map((answer: string, i: number) => `Q: ${questions[i] || `问题 ${i+1}`}\nA: ${answer}`).join('\n');
+        } else if (!isMagicalGirl && typeof dataForPrompt.userAnswers === 'object') {
+            userAnswersText = canshouQuestionnaire.questions.map(q => `Q: ${q.question}\nA: ${dataForPrompt.userAnswers[q.id] || '(未回答)'}`).join('\n');
+        }
+    }
 
     return `
 # 角色成长升华任务
@@ -236,7 +247,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     const isNative = await verifySignature(originalCharacterData);
-    const generationConfig = createGenerationConfig(originalCharacterData, questionnaire.questions);
+    const generationConfig = createGenerationConfig(originalCharacterData);
     
     // --- AI 生成 ---
     const aiResult = await generateWithAI(null, generationConfig);
@@ -307,6 +318,7 @@ async function handler(req: NextRequest): Promise<Response> {
         finalName = sublimatedData.name;
     } else {
         // 增加一个错误处理，防止AI返回了错误类型的角色数据
+        log.error("AI返回的角色类型与原始角色类型不匹配", { isMagicalGirl, aiResponse: updatedDataFromAI });
         throw new Error("AI返回的角色类型与原始角色类型不匹配。");
     }
 
