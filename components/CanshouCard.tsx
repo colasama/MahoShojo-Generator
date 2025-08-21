@@ -1,6 +1,7 @@
 // components/CanshouCard.tsx
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { snapdom } from '@zumer/snapdom';
+import { ArenaHistory, ArenaHistoryEntry } from '@/types/arena';
 
 export interface CanshouDetails {
   name: string;
@@ -15,6 +16,7 @@ export interface CanshouDetails {
   origin: string;
   birthEnvironment: string;
   researcherNotes: string;
+  arena_history?: ArenaHistory;
 }
 
 interface CanshouCardProps {
@@ -24,6 +26,8 @@ interface CanshouCardProps {
 
 const CanshouCard: React.FC<CanshouCardProps> = ({ canshou, onSaveImage }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  // 新增：用于控制历战记录可见性的状态
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
   const handleSaveImage = async () => {
     if (!cardRef.current) return;
@@ -117,9 +121,29 @@ const CanshouCard: React.FC<CanshouCardProps> = ({ canshou, onSaveImage }) => {
           <div className="result-label">研究员笔记</div>
           <div className="result-value text-sm italic">{canshou.researcherNotes}</div>
         </div>
+        
+        {/* 新增：历战记录展示区 */}
+        {canshou.arena_history && canshou.arena_history.entries.length > 0 && (
+          <div className="result-item">
+            <button onClick={() => setIsHistoryVisible(!isHistoryVisible)} className="result-label w-full text-left bg-transparent border-none cursor-pointer">
+              {isHistoryVisible ? '▼' : '▶'} 📜 历战记录
+            </button>
+            {isHistoryVisible && (
+              <div className="result-value mt-2 space-y-2 text-xs">
+                {canshou.arena_history.entries.slice().reverse().map((entry: ArenaHistoryEntry) => (
+                  <div key={entry.id} className="p-2 bg-black bg-opacity-10 rounded">
+                    <p><strong>{entry.title}</strong></p>
+                    <p><strong>类型:</strong> {entry.type} | <strong>胜利者:</strong> {entry.winner}</p>
+                    <p><strong>影响:</strong> {entry.impact}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <button onClick={handleSaveImage} className="save-button mt-4">
-          保存档案图片
+          📱 保存为图片
         </button>
       </div>
     </div>
