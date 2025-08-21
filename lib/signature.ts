@@ -12,23 +12,28 @@ const TextEncoder = globalThis.TextEncoder;
 let secretKeyPromise: Promise<CryptoKey | null> | null = null;
 
 /**
- * 异步获取用于HMAC签名的密钥。
+ * [修改] 异步获取用于HMAC签名的密钥。
  * 密钥从环境变量 SIGNATURE_SECRET_KEY 中读取。
- * 如果环境变量未设置，将返回 null，所有签名/验证操作都会失败。
- * @returns {Promise<CryptoKey | null>} 返回一个Promise，解析为CryptoKey或null。
+ * 如果环境变量未设置，将直接抛出错误，强制要求配置。
+ * @returns {Promise<CryptoKey>} 返回一个Promise，解析为CryptoKey。
+ * @throws {Error} 如果 SIGNATURE_SECRET_KEY 未设置。
  */
-const getSecretKey = (): Promise<CryptoKey | null> => {
+const getSecretKey = (): Promise<CryptoKey> => {
     // 如果已经有正在进行的Promise，直接返回它
     if (secretKeyPromise) {
-        return secretKeyPromise;
+        // 我们需要确保即使Promise解析为null（旧逻辑），这里也能处理
+        return secretKeyPromise.then(key => {
+            if (!key) throw new Error('SIGNATURE_SECRET_KEY 环境变量未配置，无法执行签名操作。');
+            return key;
+        });
     }
 
     // 否则，创建一个新的Promise来导入密钥
     secretKeyPromise = (async () => {
         const secret = process.env.SIGNATURE_SECRET_KEY;
         if (!secret) {
-            console.warn('警告：未设置 SIGNATURE_SECRET_KEY 环境变量。签名机制将不安全，所有校验都会失败。');
-            return null;
+            // 直接抛出错误，而不是静默返回 null
+            throw new Error('SIGNATURE_SECRET_KEY 环境变量未配置，无法执行签名操作。');
         }
         const encoder = new TextEncoder();
         try {
@@ -44,7 +49,7 @@ const getSecretKey = (): Promise<CryptoKey | null> => {
             return null;
         }
     })();
-    return secretKeyPromise;
+    return secretKeyPromise as Promise<CryptoKey>;
 };
 
 /**

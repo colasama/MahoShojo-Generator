@@ -157,7 +157,7 @@ async function handler(req: NextRequest): Promise<Response> {
       ...payloadToSign,
       metadata: {
         ...payloadToSign.metadata,
-        signature: signature || '', // 如果密钥未设置，签名将为空字符串
+        signature: signature || '签名丢失，可能未设置密钥', // 如果密钥未设置，签名将进行提示
       }
     };
 
