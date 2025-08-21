@@ -285,8 +285,8 @@ const BattlePage: React.FC = () => {
             if (!validationResult.success) return;
 
             presetData.isPreset = true;
-            // 预设文件默认视为非原生
-            addCombatant({ type: preset.type, data: presetData, filename: preset.filename, isValid: false });
+            // 预设文件默认视为原生
+            addCombatant({ type: preset.type, data: presetData, filename: preset.filename, isValid: true });
 
         } catch (err) {
             if (err instanceof Error) setError(err.message);
