@@ -24,8 +24,8 @@ export const config = {
 const SublimationResultSchema = z.object({
   updatedCharacterData: z.any().describe("一个JSON对象，包含所有被AI更新后的可变字段。例如'appearance', 'analysis', 'magicConstruct'的部分字段等。"),
   sublimationEvent: z.object({
-    title: z.string().describe("描述本次升华事件的标题，例如‘在XX之战后，XX领悟了新的力量’。"),
-    impact: z.string().describe("对本次升华事件的详细描述。可以包含角色是如何从过往经历中获得成长，最终蜕变到新状态的过程。内容可以比竞技场的impact更丰富。")
+    title: z.string().describe("描述本次升华事件的标题。"),
+    impact: z.string().describe("对本次升华事件的详细描述。可以包含角色是如何从过往经历中获得成长，最终蜕变到新状态的过程。")
   }).describe("描述角色如何升华的事件。")
 }).describe("基于角色完整经历生成的升华后设定。");
 
@@ -62,7 +62,7 @@ const createGenerationConfig = (
     const prompt = `
 # 角色成长升华任务
 
-你是一位资深的角色设定师。你的任务是为一个${characterType}进行“成长升华”。
+你是一位资深的角色设定师。你的任务是为一个${characterType}角色进行“成长升华”。
 该角色经历了诸多事件，现在需要你基于其完整的设定和所有“历战记录”，对其进行一次全面的重塑和升级，以体现其成长与蜕变。
 
 ## 原始角色设定
@@ -175,7 +175,7 @@ async function handler(req: NextRequest): Promise<Response> {
         throw new Error("AI未生成有效的角色更新数据对象。");
     }
 
-    // 【错误修复】使用安全的深度合并
+    // 使用安全的深度合并
     const sublimatedData = safeDeepMerge(originalCharacterData, updatedDataFromAI);
 
     const characterType = originalCharacterData.codename ? '魔法少女' : '残兽';
