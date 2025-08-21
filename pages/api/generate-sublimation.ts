@@ -8,7 +8,6 @@ import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
 import magicalGirlQuestionnaire from '../../public/questionnaire.json';
 
-
 const log = getLogger('api-gen-sublimation');
 
 export const config = {
@@ -63,21 +62,28 @@ const CanshouSublimationPayloadSchema = z.object({
   researcherNotes: z.string().describe("研究员对这次升华的补充笔记。"),
 });
 
-// AI需要返回的完整结果的Schema
-const SublimationResultSchema = z.object({
-  updatedCharacterData: z.union([MagicalGirlSublimationPayloadSchema, CanshouSublimationPayloadSchema])
-    .describe("一个JSON对象，包含所有被AI更新后的可变字段。"),
-  sublimationEvent: z.object({
+// 升华事件的通用Schema
+const SublimationEventSchema = z.object({
     title: z.string().describe("描述本次升华事件的标题。"),
     impact: z.string().describe("对本次升华事件的描述，解释角色是如何被过往经历影响，最终蜕变到新状态的。")
-  }).describe("描述角色如何升华的事件。")
+}).describe("描述角色如何升华的事件。");
+
+
+// 为两种角色类型分别创建完整的AI返回结果Schema
+const MagicalGirlSublimationResultSchema = z.object({
+  updatedCharacterData: MagicalGirlSublimationPayloadSchema.describe("一个JSON对象，包含所有被AI更新后的魔法少女可变字段。"),
+  sublimationEvent: SublimationEventSchema
 });
 
+const CanshouSublimationResultSchema = z.object({
+  updatedCharacterData: CanshouSublimationPayloadSchema.describe("一个JSON对象，包含所有被AI更新后的残兽可变字段。"),
+  sublimationEvent: SublimationEventSchema
+});
 
 // =================================================================
 // 2. AI Prompt 配置 (SRS 3.2.2)
 // =================================================================
-const createGenerationConfig = (characterData: any): GenerationConfig<z.infer<typeof SublimationResultSchema>, any> => {
+const createGenerationConfig = (characterData: any): GenerationConfig<any, any> => {
   const isMagicalGirl = !!characterData.codename;
   const characterType = isMagicalGirl ? '魔法少女' : '残兽';
   const nameField = isMagicalGirl ? 'codename' : 'name';
@@ -136,15 +142,17 @@ ${userAnswersReviewSection}
 3.  **生成升华事件**:
     * 你还需要创作一个“升华事件”，简要描述角色是如何从这些经历中收获成长，升华到新状态的。
 
-请严格按照提供的JSON Schema格式返回结果。
-`;
+请严格按照提供的JSON Schema格式返回结果。`;
   };
+
+  // 核心修改：动态选择精确的Schema
+  const schema = isMagicalGirl ? MagicalGirlSublimationResultSchema : CanshouSublimationResultSchema;
 
   return {
     systemPrompt: "你是一位资深的角色设定师，擅长根据角色的经历描绘其成长与蜕变。",
     temperature: 0.7,
     promptBuilder,
-    schema: SublimationResultSchema,
+    schema, // 使用动态选择的Schema
     taskName: "角色成长升华",
     maxTokens: 8192,
   };
@@ -286,47 +294,22 @@ async function handler(req: NextRequest): Promise<Response> {
         }
     }
     
-    if (isMagicalGirl && 'codename' in updatedDataFromAI) {
-        // 强制执行不可变字段规则 (SRS 3.2.3)
-        sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
-        sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
-        sublimatedData.blooming = originalCharacterData.blooming;
-
-        // [增强] 处理半可变字段：称号 (SRS 3.2.2)
-        const originalFullName = originalCharacterData.codename as string;
-        const originalBaseName = originalFullName.split('「')[0];
-        const newNameFromAI = updatedDataFromAI.codename as string;
-        
-        const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
-        if (newTitleMatch && newTitleMatch[1]) {
-          sublimatedData.codename = `${originalBaseName}「${newTitleMatch[1]}」`;
-        } else {
-          if (!originalFullName.includes('「')) {
-            sublimatedData.codename = `${originalBaseName}「历战」`;
-          } else {
-            sublimatedData.codename = originalFullName;
-          }
-          log.warn('AI未能为魔法少女生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
-        }
-        finalName = sublimatedData.codename;
-
-    } else if (!isMagicalGirl && 'name' in updatedDataFromAI) { // 是残兽
-        const originalFullName = originalCharacterData.name as string;
-        const originalBaseName = originalFullName.split('「')[0];
-        const newNameFromAI = updatedDataFromAI.name as string;
-
-        const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
-        if (newTitleMatch && newTitleMatch[1]) {
-            sublimatedData.name = `${originalBaseName}「${newTitleMatch[1]}」`;
-        } else {
-            if (!originalFullName.includes('「')) {
-                sublimatedData.name = `${originalBaseName}「历战」`;
-            } else {
-                sublimatedData.name = originalFullName;
-            }
-            log.warn('AI未能为残兽生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
-        }
-        finalName = sublimatedData.name;
+    if (isMagicalGirl) {
+      if (!('codename' in updatedDataFromAI)) throw new Error("AI返回的角色类型与原始角色类型不匹配。");
+      sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
+      sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
+      sublimatedData.blooming = originalCharacterData.blooming;
+      const originalFullName = originalCharacterData.codename as string;
+      const originalBaseName = originalFullName.split('「')[0];
+      const newNameFromAI = updatedDataFromAI.codename as string;
+      const newTitleMatch = newNameFromAI.match(/「(.{1,8})」/);
+      if (newTitleMatch && newTitleMatch[1]) {
+        sublimatedData.codename = `${originalBaseName}「${newTitleMatch[1]}」`;
+      } else {
+        sublimatedData.codename = originalFullName.includes('「') ? originalFullName : `${originalBaseName}「历战」`;
+        log.warn('AI未能为魔法少女生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
+      }
+      finalName = sublimatedData.codename;
     } else {
         // 增加一个错误处理，防止AI返回了错误类型的角色数据
         log.error("AI返回的角色类型与原始角色类型不匹配", { isMagicalGirl, aiResponse: updatedDataFromAI });
