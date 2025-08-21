@@ -20,6 +20,16 @@ export interface NewsReport {
   // 可选的用户引导信息字段
   userGuidance?: string;
   mode?: 'classic' | 'kizuna' | 'daily' | 'scenario';
+  // SRS 3.1.2 新增：情景标题
+  scenario_title?: string | null;
+}
+
+// 定义更新后的角色数据接口
+interface UpdatedCombatantData {
+  codename?: string;
+  name?: string;
+  arena_history: any; // 简化类型，因为我们只关心最新条目
+  [key: string]: any;
 }
 
 interface BattleReportCardProps {
@@ -27,9 +37,11 @@ interface BattleReportCardProps {
   onSaveImage?: (imageUrl: string) => void;
   // 战斗模式，设为可选以兼容旧功能
   mode?: 'classic' | 'kizuna' | 'daily' | 'scenario';
+  // SRS 3.1.4 新增：传入更新后的角色数据
+  updatedCombatants: UpdatedCombatantData[];
 }
 
-const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage, mode }) => {
+const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage, updatedCombatants }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const getModeDisplay = (mode: string) => {
@@ -40,29 +52,31 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
         return { text: '羁绊模式 ✨', logo: '/kizuna-mode.svg' };
       case 'classic':
         return { text: '经典模式 ⚔️', logo: '/classic-mode.svg' };
+      case 'scenario':
+        return { text: report.scenario_title || '情景模式 📜', logo: '/scenario-mode.svg' };
       default:
         return null;
     }
   };
 
-  const modeDisplay = mode ? getModeDisplay(mode) : null;
+  const modeDisplay = getModeDisplay(report.mode);
 
   // 处理保存为图片的功能
   const handleSaveImage = async () => {
     if (!cardRef.current) return;
 
     try {
-      // 截图前隐藏按钮和显示Logo
-      const buttonsContainer = cardRef.current.querySelector('.buttons-container') as HTMLElement;
+      // 截图前隐藏所有按钮容器
+      const buttons = cardRef.current.querySelectorAll('.buttons-container');
       const logoPlaceholder = cardRef.current.querySelector('.logo-placeholder') as HTMLElement;
 
-      if (buttonsContainer) buttonsContainer.style.display = 'none';
+      buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
       if (logoPlaceholder) logoPlaceholder.style.display = 'flex';
 
       const result = await snapdom(cardRef.current, { scale: 1 });
 
       // 截图后恢复按钮和隐藏Logo
-      if (buttonsContainer) buttonsContainer.style.display = 'flex';
+      buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
       if (logoPlaceholder) logoPlaceholder.style.display = 'none';
 
       const imgElement = await result.toPng();
@@ -91,10 +105,10 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
       alert('生成图片失败，请重试');
       console.error("Image generation failed:", err);
       // 确保在出错时也恢复按钮
-      const buttonsContainer = cardRef.current?.querySelector('.buttons-container') as HTMLElement;
+      const buttons = cardRef.current?.querySelectorAll('.buttons-container');
       const logoPlaceholder = cardRef.current?.querySelector('.logo-placeholder') as HTMLElement;
 
-      if (buttonsContainer) buttonsContainer.style.display = 'flex';
+      buttons?.forEach(btn => (btn as HTMLElement).style.display = 'flex');
       if (logoPlaceholder) logoPlaceholder.style.display = 'none';
     }
   };
@@ -105,7 +119,7 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
     const markdownContent = `
 # ${report.headline}
 **来源：${report.reporterInfo.publication} | 记者：${report.reporterInfo.name}**
-${mode ? `**模式：${modeDisplay?.text}**\n` : ''}
+${report.mode ? `**模式：${modeDisplay?.text}**\n` : ''}
 ---
 
 ## 新闻正文
@@ -135,6 +149,21 @@ ${report.userGuidance ? `
     link.href = url;
     const sanitizedTitle = report.headline.replace(/[^a-z0-9\u4e00-\u9fa5]/gi, '_');
     link.download = `魔法少女速报_${sanitizedTitle}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // SRS 3.1.4 新增：下载更新后的角色设定文件
+  const downloadUpdatedJson = (characterData: UpdatedCombatantData) => {
+    const name = characterData.codename || characterData.name;
+    const jsonData = JSON.stringify(characterData, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `角色档案_${name}_更新.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -204,6 +233,44 @@ ${report.userGuidance ? `
             <div className="result-label">📖 故事引导</div>
             <div className="result-value">
               <p className="text-sm opacity-90 italic">“{report.userGuidance}”</p>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* SRS 3.1.4 新增功能：显示本次事件影响，并提供下载按钮 */}
+        {/* ================================================================= */}
+        {updatedCombatants && updatedCombatants.length > 0 && (
+          <div className="result-item mt-4">
+            <div className="result-label" style={{ marginBottom: '0.5rem' }}>📜 历战记录更新</div>
+            <div className="space-y-3">
+              {updatedCombatants.map((charData) => {
+                const latestEntry = charData.arena_history?.entries?.[charData.arena_history.entries.length - 1];
+                const name = charData.codename || charData.name;
+                if (!latestEntry) return null;
+
+                return (
+                  <div key={name} className="p-3 bg-black bg-opacity-20 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold text-gray-200 text-sm">{name}</p>
+                        <p className="text-xs text-gray-300 mt-1">
+                          <span className="font-medium">本次事件影响：</span>
+                          {latestEntry.impact}
+                        </p>
+                      </div>
+                      <div className="buttons-container flex">
+                        <button 
+                          onClick={() => downloadUpdatedJson(charData)}
+                          className="ml-4 px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-200 rounded-lg hover:bg-blue-300 transition-colors shrink-0"
+                        >
+                          下载更新
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

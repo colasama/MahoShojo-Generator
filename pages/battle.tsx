@@ -132,6 +132,15 @@ const BattlePage: React.FC = () => {
     // 用于存储从API返回的、更新了历战记录的角色数据
     const [updatedCombatants, setUpdatedCombatants] = useState<any[]>([]);
 
+    // 切换模式时清理情景数据，防止旧数据污染新的生成请求。
+    useEffect(() => {
+        if (battleMode !== 'scenario') {
+            setScenarioContent(null);
+            setScenarioFileName(null);
+            setIsScenarioNative(false);
+        }
+    }, [battleMode]);
+
     // 检测移动端并默认展开文本域
     useEffect(() => {
         const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
@@ -555,7 +564,7 @@ const BattlePage: React.FC = () => {
 
         const minParticipants = (battleMode === 'daily' || battleMode === 'scenario') ? 1 : 2;
         const maxParticipants = 4;
-        if (combatants.length < minParticipants || combatants.length > 4) {
+        if (combatants.length < minParticipants || combatants.length > maxParticipants) {
             setError(`⚠️ 该模式需要 ${minParticipants} 到 ${maxParticipants} 位角色。`);
             return;
         }
