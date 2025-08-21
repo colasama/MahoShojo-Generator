@@ -7,6 +7,10 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
 import questionnaire from '../../public/questionnaire.json';
+import { webcrypto } from 'crypto';
+
+// 兼容 Edge 和 Node.js 环境的 crypto API
+const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
 
 const log = getLogger('api-gen-sublimation');
 
@@ -15,51 +19,92 @@ export const config = {
 };
 
 // =================================================================
-// 1. Zod Schema 定义
+// 1. Zod Schema 定义 (SRS 3.2.2)
 // =================================================================
 
-// AI需要返回的升华结果的Schema
-// 注意：这里我们不使用完整的角色Schema，因为AI只需要返回可变字段。
-// 不可变和半可变字段将在后端逻辑中处理，以确保安全。
+// 为 AI 返回的可变字段定义严格的 Schema，不再使用 z.any()
+// Schema for Magical Girl Sublimation
+const MagicalGirlSublimationPayloadSchema = z.object({
+  codename: z.string().describe("角色的新代号，必须包含原始代号并在后面加上一个「称号」。例如，如果原始代号是'代号'，新代号可以是'代号「称号」'。"),
+  appearance: z.object({
+    outfit: z.string(),
+    accessories: z.string(),
+    colorScheme: z.string(),
+    overallLook: z.string(),
+  }).describe("根据角色经历更新后的外观描述。"),
+  magicConstruct: z.object({
+    form: z.string().describe("魔装形态的演变。"),
+    basicAbilities: z.array(z.string()).describe("基础能力的进化或新增。"),
+    description: z.string().describe("对魔装当前状态的全新描述。"),
+  }).describe("魔力构装的更新，但名字（name）不能改变。"),
+  analysis: z.object({
+    personalityAnalysis: z.string().describe("角色经历一系列事件后的性格分析。"),
+    abilityReasoning: z.string().describe("能力进化的内在逻辑和原因。"),
+    coreTraits: z.array(z.string()).describe("更新后的核心性格关键词。"),
+    predictionBasis: z.string().describe("对角色未来发展的预测依据。"),
+    background: z.object({
+      belief: z.string().describe("角色信念的演变或深化。"),
+      bonds: z.string().describe("角色情感羁绊的变化。"),
+    }).describe("角色背景故事的演进。")
+  }).describe("对角色分析的全面更新。"),
+  userAnswers: z.array(z.string()).optional().describe("根据角色的成长，对问卷问题的全新回答。"),
+});
+
+// Schema for Canshou Sublimation
+const CanshouSublimationPayloadSchema = z.object({
+  name: z.string().describe("残兽的新名称，必须包含原始名称并在后面加上一个「称号」。例如，如果原始名称是'名称'，新名称可以是'名称「称号」'。"),
+  coreConcept: z.string(),
+  coreEmotion: z.string(),
+  evolutionStage: z.string(),
+  appearance: z.string(),
+  materialAndSkin: z.string(),
+  featuresAndAppendages: z.string(),
+  attackMethod: z.string(),
+  specialAbility: z.string(),
+  origin: z.string(),
+  birthEnvironment: z.string(),
+  researcherNotes: z.string().describe("研究员对这次升华的补充笔记。"),
+  userAnswers: z.array(z.string()).optional().describe("根据残兽的成长，对问卷问题的全新回答。"),
+});
+
+// AI需要返回的完整结果的Schema
 const SublimationResultSchema = z.object({
-  updatedCharacterData: z.any().describe("一个JSON对象，包含所有被AI更新后的可变字段。例如'appearance', 'analysis', 'magicConstruct'的部分字段等。"),
+  updatedCharacterData: z.union([MagicalGirlSublimationPayloadSchema, CanshouSublimationPayloadSchema])
+    .describe("一个JSON对象，包含所有被AI更新后的可变字段。"),
   sublimationEvent: z.object({
     title: z.string().describe("描述本次升华事件的标题。"),
-    impact: z.string().describe("对本次升华事件的详细描述。可以包含角色是如何从过往经历中获得成长，最终蜕变到新状态的过程。")
+    impact: z.string().describe("对本次升华事件的描述，解释角色是如何被过往经历影响，最终蜕变到新状态的。")
   }).describe("描述角色如何升华的事件。")
-}).describe("基于角色完整经历生成的升华后设定。");
+});
 
 
 // =================================================================
-// 2. AI Prompt 配置
+// 2. AI Prompt 配置 (SRS 3.2.2)
 // =================================================================
+const createGenerationConfig = (characterData: any, questions: string[]): GenerationConfig<z.infer<typeof SublimationResultSchema>, any> => {
+  const isMagicalGirl = !!characterData.codename;
+  const characterType = isMagicalGirl ? '魔法少女' : '残兽';
+  const nameField = isMagicalGirl ? 'codename' : 'name';
 
-const createGenerationConfig = (
-  characterData: any,
-  questions: string[]
-): GenerationConfig<z.infer<typeof SublimationResultSchema>, any> => {
-
-  const characterType = characterData.codename ? '魔法少女' : '残兽';
-  const nameField = characterType === '魔法少女' ? 'codename' : 'name';
-  const immutableFields = characterType === '魔法少女'
+  // 明确定义不可变字段，增强AI指令的约束力
+  const immutableFields = isMagicalGirl
     ? "`magicConstruct.name`, `wonderlandRule`, `blooming`"
     : "无";
 
   const promptBuilder = () => {
+    // 移除签名，避免干扰AI
     const dataForPrompt = { ...characterData };
     delete dataForPrompt.signature;
-    const history = dataForPrompt.arena_history?.entries || [];
 
-    const historyText = history.length > 0
-      ? history.map((entry: any) => `- 事件“${entry.title}”：胜利者是${entry.winner}，对我的影响是“${entry.impact}”`).join('\n')
-      : "无";
+    const historyText = (dataForPrompt.arena_history?.entries || [])
+      .map((entry: any) => `- 事件“${entry.title}”：胜利者是${entry.winner}，对我的影响是“${entry.impact}”`)
+      .join('\n') || "无";
     
-    // 为 AI 提供问卷上下文
     const userAnswersText = (dataForPrompt.userAnswers && Array.isArray(dataForPrompt.userAnswers)) 
         ? dataForPrompt.userAnswers.map((answer: string, i: number) => `Q: ${questions[i] || `问题 ${i+1}`}\nA: ${answer}`).join('\n')
         : "无问卷回答记录。";
 
-    const prompt = `
+    return `
 # 角色成长升华任务
 
 你是一位资深的角色设定师。你的任务是为一个${characterType}角色进行“成长升华”。
@@ -92,7 +137,6 @@ ${userAnswersText}
 
 请严格按照提供的JSON Schema格式返回结果。
 `;
-    return prompt;
   };
 
   return {
@@ -105,24 +149,24 @@ ${userAnswersText}
   };
 };
 
+// =================================================================
+// 3. 辅助函数
+// =================================================================
+
 /**
- * 安全地深度合并两个对象。
+ * 安全地深度合并两个对象。源对象的属性会覆盖目标对象的属性。
  * @param target 目标对象
- * @param source 源对象
+ * @param source 源对象 (AI返回的更新)
  * @returns 合并后的新对象
  */
 function safeDeepMerge(target: any, source: any): any {
     const output = { ...target };
     if (isObject(target) && isObject(source)) {
         Object.keys(source).forEach(key => {
-            if (isObject(source[key])) {
-                if (!(key in target)) {
-                    Object.assign(output, { [key]: source[key] });
-                } else {
-                    output[key] = safeDeepMerge(target[key], source[key]);
-                }
+            if (isObject(source[key]) && key in target && isObject(target[key])) {
+                output[key] = safeDeepMerge(target[key], source[key]);
             } else {
-                Object.assign(output, { [key]: source[key] });
+                output[key] = source[key];
             }
         });
     }
@@ -133,8 +177,9 @@ function isObject(item: any): boolean {
     return (item && typeof item === 'object' && !Array.isArray(item));
 }
 
+
 // =================================================================
-// 3. API Handler
+// 4. API Handler
 // =================================================================
 
 async function handler(req: NextRequest): Promise<Response> {
@@ -145,8 +190,10 @@ async function handler(req: NextRequest): Promise<Response> {
   try {
     const originalCharacterData = await req.json();
 
-    if ((await quickCheck(JSON.stringify(originalCharacterData))).hasSensitiveWords) {
-      return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true }), { status: 400 });
+    // 安全检查
+    const textToCheck = extractTextForCheck(originalCharacterData);
+    if ((await quickCheck(textToCheck)).hasSensitiveWords) {
+        return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true, reason: '上传的角色档案包含危险符文' }), { status: 400 });
     }
 
     if (!originalCharacterData.arena_history) {
@@ -155,93 +202,71 @@ async function handler(req: NextRequest): Promise<Response> {
 
     const isNative = await verifySignature(originalCharacterData);
     const generationConfig = createGenerationConfig(originalCharacterData, questionnaire.questions);
+    
+    // --- AI 生成 ---
     const aiResult = await generateWithAI(null, generationConfig);
+    const updatedDataFromAI = aiResult.updatedCharacterData;
 
-    // --- 数据整合与处理 ---
-    // 【错误修复】确保AI返回的数据是对象格式
-    let updatedDataFromAI;
-    if (typeof aiResult.updatedCharacterData === 'string') {
-        try {
-            updatedDataFromAI = JSON.parse(aiResult.updatedCharacterData);
-        } catch (e) {
-            log.error(`AI返回的updatedCharacterData是字符串但无法解析为JSON：${e}`, { rawString: aiResult.updatedCharacterData });
-            throw new Error("AI返回了格式错误的成长数据。");
-        }
-    } else {
-        updatedDataFromAI = aiResult.updatedCharacterData;
-    }
-    
-    if (!isObject(updatedDataFromAI)) {
-        throw new Error("AI未生成有效的角色更新数据对象。");
-    }
+    // --- 数据整合与安全处理 (SRS 3.2.3, 3.2.4, 3.2.5, 4.1) ---
+    // 1. 创建一个原始数据的深拷贝作为基础
+    const sublimatedData = JSON.parse(JSON.stringify(originalCharacterData));
 
-    // 使用安全的深度合并
-    const sublimatedData = safeDeepMerge(originalCharacterData, updatedDataFromAI);
-
-    const characterType = originalCharacterData.codename ? '魔法少女' : '残兽';
-
-    // 【SRS 3.2.3】强制确保不可变字段不被修改
-    if (characterType === '魔法少女') {
-        if (originalCharacterData.magicConstruct?.name) {
-            sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
-        }
-        if (originalCharacterData.wonderlandRule) {
-            sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
-        }
-        if (originalCharacterData.blooming) {
-            sublimatedData.blooming = originalCharacterData.blooming;
+    // 2. 安全地合并AI返回的更新
+    for (const key in updatedDataFromAI) {
+        if (key in sublimatedData) {
+            sublimatedData[key] = safeDeepMerge(sublimatedData[key], updatedDataFromAI[key]);
+        } else {
+            sublimatedData[key] = updatedDataFromAI[key];
         }
     }
 
-    // 【SRS 3.2.3】处理半可变字段：称号
-    const nameField = characterType === '魔法少女' ? 'codename' : 'name';
+    const isMagicalGirl = !!originalCharacterData.codename;
+    const characterType = isMagicalGirl ? '魔法少女' : '残兽';
+
+    // 3. 强制执行不可变字段规则，防止AI意外修改
+    if (isMagicalGirl) {
+        sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
+        sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
+        sublimatedData.blooming = originalCharacterData.blooming;
+    }
+
+    // 4. 处理半可变字段：称号
+    const nameField = isMagicalGirl ? 'codename' : 'name';
     const originalName = (originalCharacterData[nameField] as string).split('「')[0];
-    const newNameFromAI = sublimatedData[nameField] as string;
+    const newNameFromAI = updatedDataFromAI[nameField] as string;
     
-    // 提取AI生成的新称号，如果AI直接返回了 `xxx「称号」` 的格式
     let newTitle = newNameFromAI.match(/「(.{1,8})」/)?.[1];
-    
-    // 如果AI没有返回带括号的格式，而是直接返回了称号
-    if (!newTitle && newNameFromAI !== originalName) {
-        newTitle = newNameFromAI;
-    }
-
     if (newTitle) {
-      sublimatedData[nameField] = `${originalName}「${newTitle.substring(0, 8)}」`;
-    } else if (!originalCharacterData[nameField].includes('「')) {
-      // 如果AI没有生成任何新称号，且原名没有称号，则添加一个默认称号
-      sublimatedData[nameField] = `${originalName}「历战」`;
+      sublimatedData[nameField] = `${originalName}「${newTitle}」`;
     } else {
-      // 如果AI没生成，但原来有，则保留原来的称号
+      // 如果AI没有按要求格式返回，则保留原始名称，并记录一个警告
       sublimatedData[nameField] = originalCharacterData[nameField];
+      log.warn('AI未能为角色生成新称号，已保留原名。', { nameField, newNameFromAI });
     }
 
-
-    // 【SRS 3.2.4】历战记录处理
-    const oldHistory = originalCharacterData.arena_history.entries || [];
-    // 保留所有旧的升华记录
-    const newHistory = oldHistory.filter((entry: any) => entry.type === 'sublimation');
-    const lastEntryId = oldHistory.length > 0 ? Math.max(...oldHistory.map((e: any) => e.id)) : 0;
-
-    // 添加新的升华事件记录
-    newHistory.push({
+    // 5. 更新历战记录 (SRS 3.2.4)
+    const oldEntries = originalCharacterData.arena_history.entries || [];
+    const sublimationEntries = oldEntries.filter((entry: any) => entry.type === 'sublimation');
+    const lastEntryId = oldEntries.length > 0 ? Math.max(...oldEntries.map((e: any) => e.id)) : 0;
+    
+    sublimationEntries.push({
       id: lastEntryId + 1,
       type: 'sublimation',
       title: aiResult.sublimationEvent.title,
-      participants: [sublimatedData.codename || sublimatedData.name],
-      winner: sublimatedData.codename || sublimatedData.name,
+      participants: [sublimatedData[nameField]],
+      winner: sublimatedData[nameField],
       impact: aiResult.sublimationEvent.impact,
       metadata: { user_guidance: null, scenario_title: null, non_native_data_involved: !isNative }
     });
-    sublimatedData.arena_history.entries = newHistory;
+    sublimatedData.arena_history.entries = sublimationEntries;
 
-    // 【SRS 3.2.5】属性更新
+    // 6. 更新历战记录属性 (SRS 3.2.5)
     const nowISO = new Date().toISOString();
     sublimatedData.arena_history.attributes.sublimation_count = (originalCharacterData.arena_history.attributes.sublimation_count || 0) + 1;
     sublimatedData.arena_history.attributes.updated_at = nowISO;
     sublimatedData.arena_history.attributes.last_sublimation_at = nowISO;
-
-    // 【SRS 4.1】签名处理
+    
+    // 7. 签名处理 (SRS 4.1)
     if (isNative) {
       sublimatedData.signature = await generateSignature(sublimatedData);
     } else {
@@ -256,5 +281,24 @@ async function handler(req: NextRequest): Promise<Response> {
     return new Response(JSON.stringify({ error: errorMessage, message: errorMessage }), { status: 500 });
   }
 }
+
+// 递归提取对象中所有字符串值的函数，用于敏感词检查
+const extractTextForCheck = (data: any): string => {
+    let textContent = '';
+    if (typeof data === 'string') {
+        textContent += data + ' ';
+    } else if (Array.isArray(data)) {
+        data.forEach(item => {
+            textContent += extractTextForCheck(item);
+        });
+    } else if (typeof data === 'object' && data !== null) {
+        for (const key in data) {
+            if (key !== 'signature' && key !== 'userAnswers') {
+                textContent += extractTextForCheck(data[key]);
+            }
+        }
+    }
+    return textContent;
+};
 
 export default handler;
