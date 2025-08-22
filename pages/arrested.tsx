@@ -24,7 +24,7 @@ export default function ArrestedPage() {
             if (random < 0.6) return '41076'; // 20% 概率为翠雀 (0.4 + 0.2)
             if (random < 0.7) return '41055'; // 10% 概率为樱 (0.6 + 0.1)
             // 剩下的 30% 概率生成随机5位数
-            return Math.floor(10000 + Math.random() * 90000).toString();
+            return Math.floor(10000 + Math.random() * 39999).toString();
         };
 
         // 随机生成一个案件编号
