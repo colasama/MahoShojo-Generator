@@ -116,6 +116,15 @@ const CanshouPage: React.FC = () => {
   const [showLore, setShowLore] = useState(false);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateCanshouCooldown', 60000);
   const [bulkAnswers, setBulkAnswers] = useState(''); // 用于“一键填充”的textarea
+  const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
+
+  useEffect(() => {
+      fetch('/languages.json')
+          .then(res => res.json())
+          .then(data => setLanguages(data))
+          .catch(err => console.error("Failed to load languages:", err));
+  }, []);
 
   // 加载问卷文件
   useEffect(() => {
@@ -212,7 +221,7 @@ const CanshouPage: React.FC = () => {
       const response = await fetch('/api/generate-canshou', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: finalAnswers }),
+        body: JSON.stringify({ answers: finalAnswers, language: selectedLanguage }),
       });
 
       if (!response.ok) {
@@ -356,6 +365,25 @@ const CanshouPage: React.FC = () => {
                     />
                   </div>
                 )}
+
+                {/* 多语言支持 */}
+                <div className="input-group">
+                    <label htmlFor="language-select" className="input-label">
+                        <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
+                        生成语言
+                    </label>
+                    <select
+                        id="language-select"
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className="input-field"
+                        disabled={submitting}
+                    >
+                        {languages.map(lang => (
+                            <option key={lang.code} value={lang.code}>{lang.name}</option>
+                        ))}
+                    </select>
+                </div>
 
                 <div className="my-4 p-4 bg-gray-100 rounded-lg">
                     <label htmlFor="bulk-answers" className="block text-sm font-medium text-gray-700 mb-2">一键填充答案</label>

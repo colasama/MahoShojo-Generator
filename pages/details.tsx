@@ -146,6 +146,17 @@ const DetailsPage: React.FC = () => {
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateDetailsCooldown', 60000);
   const [bulkAnswers, setBulkAnswers] = useState(''); // 用于“一键填充”的textarea
 
+  // 多语言支持
+  const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
+
+  useEffect(() => {
+    fetch('/languages.json')
+        .then(res => res.json())
+        .then(data => setLanguages(data))
+        .catch(err => console.error("Failed to load languages:", err));
+  }, []);
+
     useEffect(() => {
         // 加载问卷数据
         fetch('/questionnaire.json')
@@ -198,27 +209,6 @@ const DetailsPage: React.FC = () => {
             console.error("Failed to save answers to localStorage", e);
         }
     }, [answers]);
-
-  useEffect(() => {
-    // 加载问卷数据
-    fetch('/questionnaire.json')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('加载问卷文件失败');
-        }
-        return response.json();
-      })
-      .then((data: Questionnaire) => {
-        setQuestions(data.questions);
-        setAnswers(new Array(data.questions.length).fill(''));
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('加载问卷失败:', error);
-        setError('📋 加载问卷失败，请刷新页面重试');
-        setLoading(false);
-      });
-  }, []);
 
   const handleNext = () => {
     if (currentAnswer.trim().length === 0) {
@@ -329,7 +319,7 @@ const DetailsPage: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ answers: finalAnswers })
+        body: JSON.stringify({ answers: finalAnswers, language: selectedLanguage }),
       });
 
       if (!response.ok) {
@@ -553,6 +543,25 @@ const DetailsPage: React.FC = () => {
                   >
                     不想回答
                   </button>
+                </div>
+
+                {/* 多语言支持 */}
+                <div className="input-group">
+                    <label htmlFor="language-select" className="input-label">
+                        <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
+                        生成语言
+                    </label>
+                    <select
+                        id="language-select"
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className="input-field"
+                        disabled={submitting}
+                    >
+                        {languages.map(lang => (
+                            <option key={lang.code} value={lang.code}>{lang.name}</option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* 批量回答问卷 */}

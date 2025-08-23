@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
 import { snapdom } from '@zumer/snapdom';
 // TODO: 从这里引入怪怪的，但是先这样吧！
@@ -87,15 +87,14 @@ function checkNameLength(name: string): boolean {
 }
 
 // 使用 API 路由生成魔法少女
-async function generateMagicalGirl(inputName: string): Promise<MagicalGirl> {
+async function generateMagicalGirl(inputName: string, language: string): Promise<MagicalGirl> {
   try {
     const response = await fetch('/api/generate-magical-girl', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      // 移除 persistenceKey，因为它依赖于已删除的队列系统
-      body: JSON.stringify({ name: inputName }),
+      body: JSON.stringify({ name: inputName, language: language }),
     });
 
     if (!response.ok) {
@@ -159,6 +158,16 @@ export default function Name() {
   const resultRef = useRef<HTMLDivElement>(null);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateMagicalGirlCooldown', 60000);
   const router = useRouter();
+  // 多语言支持
+  const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
+
+  useEffect(() => {
+    fetch('/languages.json')
+        .then(res => res.json())
+        .then(data => setLanguages(data))
+        .catch(err => console.error("Failed to load languages:", err));
+  }, []);
 
   const handleGenerate = async () => {
     if (isCooldown) {
@@ -181,7 +190,7 @@ export default function Name() {
     setError(null);
 
     try {
-      const result = await generateMagicalGirl(inputName.trim());
+      const result = await generateMagicalGirl(inputName.trim(), selectedLanguage);
       setMagicalGirl(result);
       setError(null); // 成功时清除错误
     } catch (error) {
@@ -306,6 +315,24 @@ export default function Name() {
                 placeholder="例如：鹿目圆香"
                 onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
               />
+            </div>
+
+            <div className="input-group">
+                <label htmlFor="language-select" className="input-label">
+                    <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
+                    生成语言
+                </label>
+                <select
+                    id="language-select"
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    className="input-field"
+                    disabled={isGenerating}
+                >
+                    {languages.map(lang => (
+                        <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    ))}
+                </select>
             </div>
 
             <button

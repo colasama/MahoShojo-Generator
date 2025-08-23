@@ -1,6 +1,6 @@
 // pages/scenario.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -24,6 +24,17 @@ const ScenarioPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [resultData, setResultData] = useState<any | null>(null);
 
+  // 多语言支持
+  const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
+
+  useEffect(() => {
+      fetch('/languages.json')
+          .then(res => res.json())
+          .then(data => setLanguages(data))
+          .catch(err => console.error("Failed to load languages:", err));
+  }, []);
+
   const handleAnswerChange = (id: string, value: string) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
   };
@@ -45,7 +56,7 @@ const ScenarioPage: React.FC = () => {
       const response = await fetch('/api/generate-scenario', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, language: selectedLanguage }),
       });
 
       if (!response.ok) {
@@ -120,6 +131,25 @@ const ScenarioPage: React.FC = () => {
                   />
                 </div>
               ))}
+            </div>
+
+            {/* 多语言支持 */}
+            <div className="input-group mt-6">
+                <label htmlFor="language-select" className="input-label">
+                    <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
+                    生成语言
+                </label>
+                <select
+                    id="language-select"
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    className="input-field"
+                    disabled={isGenerating}
+                >
+                    {languages.map(lang => (
+                        <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    ))}
+                </select>
             </div>
 
             <button onClick={handleGenerate} disabled={isGenerating} className="generate-button mt-8">

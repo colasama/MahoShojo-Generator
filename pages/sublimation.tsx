@@ -68,6 +68,16 @@ const SublimationPage: React.FC = () => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [pastedJson, setPastedJson] = useState('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+    // 多语言支持
+    const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
+    const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
+
+    useEffect(() => {
+        fetch('/languages.json')
+            .then(res => res.json())
+            .then(data => setLanguages(data))
+            .catch(err => console.error("Failed to load languages:", err));
+    }, []);
 
     useEffect(() => {
         const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
@@ -142,7 +152,7 @@ const SublimationPage: React.FC = () => {
             const response = await fetch('/api/generate-sublimation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(characterData),
+                body: JSON.stringify({ ...characterData, language: selectedLanguage }),
             });
 
             if (!response.ok) {
@@ -249,7 +259,26 @@ const SublimationPage: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        
+
+                        {/* 多语言支持 */}
+                        <div className="input-group">
+                            <label htmlFor="language-select" className="input-label">
+                                <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
+                                生成语言
+                            </label>
+                            <select
+                                id="language-select"
+                                value={selectedLanguage}
+                                onChange={(e) => setSelectedLanguage(e.target.value)}
+                                className="input-field"
+                                disabled={isGenerating}
+                            >
+                                {languages.map(lang => (
+                                    <option key={lang.code} value={lang.code}>{lang.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <button onClick={handleGenerate} disabled={isGenerating || !characterData} className="generate-button">
                             {isGenerating ? '升华中...' : '开始升华'}
                         </button>
