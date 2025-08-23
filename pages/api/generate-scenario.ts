@@ -69,6 +69,7 @@ const createGenerationConfig = (
 2.  **创意与整合**：你的核心工作是将用户零散的回答，富有创意地整合成一个逻辑自洽、充满想象力的完整情景。你需要发掘回答背后隐藏的动机与深层含义，并将其反映在情景的各个要素中。
 3.  **结构化输出**：你必须严格按照我提供的JSON Schema格式返回结果，不得有任何遗漏或格式错误。
 4.  **处理留白**：用户可能不会回答所有问题，或者回答得很模糊。在这种情况下，你拥有一定的创作自由度。对于留空的核心要素（如“角色”），请直接将其设定为空值或空数组，并在描述中注明“未指定”或“待定”，以便用户后续添加。
+5.  **语言使用**：请你必须使用【${language}】进行内容创作。
 
 ## 用户的回答
 ${answerText}
@@ -97,7 +98,7 @@ async function handler(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const { answers } = await req.json();
+    const { answers, language = 'zh-CN' } = await req.json();
 
     if (!answers || typeof answers !== 'object' || Object.keys(answers).length === 0) {
       return new Response(JSON.stringify({ error: 'Answers object is required' }), { status: 400 });
@@ -138,7 +139,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     // --- 生成逻辑 ---
-    const generationConfig = createGenerationConfig(answers);
+    const generationConfig = createGenerationConfig(answers, language);
     const scenarioData = await generateWithAI(null, generationConfig);
 
     // [修改] 修正签名逻辑 (SRS 3.3.3 & 4.1)

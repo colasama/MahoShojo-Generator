@@ -69,9 +69,9 @@ interface BattleApiResponse {
 // =================================================================
 
 /**
- * 判断角色数据是否为结构化数据 (SRS 3.2.2)
- * @param data 角色数据
- * @returns boolean
+ * 检查角色数据是否为结构化数据（即非纯文本）。
+ * @param data 角色数据。
+ * @returns 如果是结构化数据则为 true。
  */
 const isStructuredCharacter = (data: any): boolean => {
     // 只要包含 analysis 字段，就认为是结构化数据。这是最核心的区别。
@@ -436,6 +436,7 @@ const createPromptBuilder = (
         let profileString = `--- 登场角色 #${index + 1}: ${characterName} (${typeDisplay}) ---\n`;
         // [SRS 3.2.2] 根据数据结构采用不同prompt格式
         if (isStructured) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { userAnswers, isPreset: _, ...restOfProfile } = data;
             profileString += filterAndFormatHistory(characterName, data.arena_history, otherNames, isPureBattle);
             profileString += `// 核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
@@ -508,8 +509,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
     
     // [v0.2.1 更新] 一体化内容安全检查 (SRS 3.1)
-    let inputsToCheck: { type: keyof SafetyCheckPolicy, content: string, isNative: boolean }[] = [];
-    let nonNativeInputsForBundle: string[] = [];
+    const inputsToCheck: { type: keyof SafetyCheckPolicy, content: string, isNative: boolean }[] = [];
 
     // 1. 收集所有用户输入及其元数据
     const finalUserGuidance = userGuidance?.trim() || null;
@@ -521,14 +521,13 @@ async function handler(req: NextRequest): Promise<Response> {
         const isNative = await verifySignature(scenario);
         inputsToCheck.push({ type: 'scenario', content: JSON.stringify(scenario), isNative });
         }
-    }
     combatants.forEach((c: any) => {
         inputsToCheck.push({ type: 'character', content: JSON.stringify(c.data), isNative: c.isNative });
     });
 
     // 2. 根据策略决定哪些内容需要检查 (SRS 3.1.1)
     const policy = appConfig.SAFETY_CHECK_POLICY;
-    let contentsToAIFlag = inputsToCheck.filter(input => {
+    const contentsToAIFlag = inputsToCheck.filter(input => {
         const checkPolicy = policy[input.type];
         return checkPolicy === 'all' || (checkPolicy === 'non-native-only' && !input.isNative);
     });
@@ -613,6 +612,8 @@ async function handler(req: NextRequest): Promise<Response> {
         taskName: `生成${mode}模式故事`,
         maxTokens: 8192,
     };
+
+    const aiResult = await generateWithAI({ combatants }, generationConfig);
     
     // 组合成完整的前端报告对象
     const report: NewsReport = {
