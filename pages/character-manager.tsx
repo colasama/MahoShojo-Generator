@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
+import TachieGenerator from '../components/TachieGenerator';
 
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
@@ -25,6 +26,40 @@ const CharacterManagerPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'info' | 'error' | 'success', text: string } | null>(null);
     const [copiedStatus, setCopiedStatus] = useState(false);
+
+    // [新增 SRS 3.3] 立绘生成器相关状态
+    const [isTachieVisible, setIsTachieVisible] = useState(false);
+    const [tachiePrompt, setTachiePrompt] = useState('');
+
+    // [新增 SRS 3.3.3] 动态生成立绘提示词
+    useEffect(() => {
+        if (!characterData) {
+            setTachiePrompt('');
+            return;
+        }
+
+        let newPrompt = '';
+        const isMagicalGirl = !!characterData.codename;
+
+        if (isMagicalGirl && characterData.appearance) {
+            // 魔法少女的 Prompt 逻辑
+            const appearanceString = Object.entries(characterData.appearance)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join(', ');
+            newPrompt = `${appearanceString}, Xiabanmo, 二次元, 魔法少女`;
+        } else if (!isMagicalGirl && characterData.name) {
+            // 残兽的 Prompt 逻辑
+            const parts = [
+                characterData.appearance,
+                characterData.materialAndSkin,
+                characterData.featuresAndAppendages
+            ].filter(Boolean); // 过滤掉空值
+            newPrompt = parts.join(', ');
+        }
+        
+        setTachiePrompt(newPrompt);
+
+    }, [characterData]);
 
     // 核心逻辑：追踪数据变化以判断原生性是否丧失 (SRS 3.7.3)
     useEffect(() => {
@@ -385,6 +420,20 @@ const CharacterManagerPage: React.FC = () => {
                         </div>
                     )}
                 </div>
+                <div className="card mt-6">
+                    <button 
+                        onClick={() => setIsTachieVisible(!isTachieVisible)}
+                        className="w-full text-left text-lg font-bold text-gray-800"
+                    >
+                        {isTachieVisible ? '▼' : '▶'} 立绘生成
+                    </button>
+                    {isTachieVisible && characterData && (
+                        <div className="mt-4 pt-4 border-t">
+                             <TachieGenerator prompt={tachiePrompt} />
+                        </div>
+                    )}
+                </div>
+
                 <div className="text-center mt-8">
                   <Link href="/" className="footer-link">返回首页</Link>
                 </div>

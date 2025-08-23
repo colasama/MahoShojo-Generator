@@ -62,6 +62,7 @@ interface Combatant {
     isValid: boolean; // 用于标记是否为原生设定
     isPreset: boolean; // 标记是否为预设角色
     teamId?: number; // 为分队功能添加可选的teamId
+    isNonStandard?: boolean; // 标记是否为非规范格式
 }
 
 // 定义故事/战斗模式类型
@@ -122,6 +123,10 @@ const BattlePage: React.FC = () => {
     // 模式状态
     const [battleMode, setBattleMode] = useState<BattleMode>('classic');
 
+    // [新增 SRS 3.4] 语言选择状态
+    const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
+    const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
+
     // 用于存储情景模式下上传的情景文件内容
     const [scenarioContent, setScenarioContent] = useState<object | null>(null);
     const [scenarioFileName, setScenarioFileName] = useState<string | null>(null);
@@ -131,6 +136,14 @@ const BattlePage: React.FC = () => {
 
     // 用于存储从API返回的、更新了历战记录的角色数据
     const [updatedCombatants, setUpdatedCombatants] = useState<any[]>([]);
+
+    // 加载语言列表
+    useEffect(() => {
+        fetch('/languages.json')
+            .then(res => res.json())
+            .then(data => setLanguages(data))
+            .catch(err => console.error("Failed to load languages:", err));
+    }, []);
 
     // 检测移动端并默认展开文本域
     useEffect(() => {
@@ -307,73 +320,102 @@ const BattlePage: React.FC = () => {
     };
 
     // 统一处理文件上传和粘贴
-    const processJsonData = async (jsonData: any[], sourceName: string) => {
-        if (jsonData.length > (4 - combatants.length)) {
+    const processJsonData = async (jsonText: string, sourceName: string) => {
+        // [SRS 3.2.2] 兼容性加载核心逻辑
+        let parsedData;
+        let isPotentiallyMalformed = false;
+        try {
+            parsedData = JSON.parse(jsonText);
+        } catch (e) {
+            // 如果直接解析失败，尝试修复并解析为数组 (处理多个JSON对象粘在一起的情况)
+            try {
+                const sanitizedText = `[${jsonText.trim().replace(/}\s*{/g, '},{')}]`;
+                parsedData = JSON.parse(sanitizedText);
+            } catch (finalError) {
+                // 如果修复后仍然失败，但满足最低要求（包含name/codename），则标记为非规范
+                const nameMatch = jsonText.match(/"(codename|name)"\s*:\s*"([^"]+)"/);
+                if (nameMatch && nameMatch[2]) {
+                    parsedData = [{ rawText: jsonText, name: nameMatch[2], codename: nameMatch[2] }];
+                    isPotentiallyMalformed = true;
+                    console.error("非规范内容，但满足最低要求:", e);
+                } else {
+                    throw new Error(`JSON.parse: ${finalError instanceof Error ? finalError.message : String(finalError)}`);
+                }
+            }
+        }
+
+        const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+        if (dataArray.length > (4 - combatants.length)) {
             throw new Error(`队伍将超出4人上限！`);
         }
 
         const loadedCombatants: Combatant[] = [];
-        const newCorrectedFiles: Record<string, boolean> = {};
 
-        for (const item of jsonData) {
-            let type: 'magical-girl' | 'canshou' | null = null;
-            let validationResult: { success: boolean, wasCorrected?: boolean } = { success: false };
+        for (const item of dataArray) {
+            let combatantToAdd: Combatant | null = null;
+            const itemName = item.codename || item.name || sourceName;
 
-            // 启发式检测类型
-            if (item.codename) type = 'magical-girl';
-            else if (item.evolutionStage) type = 'canshou';
+            try {
+                if (isPotentiallyMalformed || typeof item !== 'object') {
+                    // 如果是潜在的格式错误或不是对象，直接进入兼容模式逻辑
+                    throw new Error("Standard validation skipped for potentially malformed data.");
+                }
 
-            if (!type) {
-                throw new Error(`文件 "${item.name || sourceName}" 无法识别为魔法少女或残兽。`);
+                let type: 'magical-girl' | 'canshou';
+                if (item.codename) type = 'magical-girl';
+                else if (item.name) type = 'canshou';
+                else throw new Error('缺少必需的 "codename" 或 "name" 字段。');
+
+                const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
+
+                if (!validationResult.success) {
+                    // 标准验证失败，进入兼容模式检查
+                    throw new Error("Standard validation failed.");
+                }
+
+                const verificationResponse = await fetch('/api/verify-origin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+                const { isValid } = await verificationResponse.json();
+
+                combatantToAdd = { type, data: item, filename: itemName, isValid, isPreset: false, isNonStandard: false };
+
+            } catch {
+                // [SRS 3.2.2] 兼容模式逻辑
+                if (item && (item.codename || item.name)) {
+                    setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。`);
+                    const type = item.codename ? 'magical-girl' : 'canshou';
+                    combatantToAdd = { type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true };
+                } else {
+                    // 如果连最低要求都不满足，则抛出最终错误
+                    throw new Error(`文件 "${itemName}" 格式不规范，缺少必需的 "codename" 或 "name" 字段。`);
+                }
             }
 
-            if (type === 'magical-girl') {
-                validationResult = validateMagicalGirlData(item, item.codename || sourceName);
-            } else {
-                validationResult = validateCanshouData(item, item.name || sourceName);
+            if (combatantToAdd) {
+                loadedCombatants.push(combatantToAdd);
             }
-            if (!validationResult.success) return;
-            if (validationResult.wasCorrected) newCorrectedFiles[item.codename] = true;
-
-            // 调用校验API
-            const verificationResponse = await fetch('/api/verify-origin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(item),
-            });
-            const { isValid } = await verificationResponse.json();
-
-            loadedCombatants.push({ 
-                type, 
-                data: item, 
-                filename: item.codename || item.name, 
-                isValid, 
-                isPreset: false // 用户上传的文件不是预设
-            });
         }
 
         setCombatants(prev => [...prev, ...loadedCombatants]);
-        setCorrectedFiles(prev => ({ ...prev, ...newCorrectedFiles }));
-        if (!error?.startsWith('✔️')) {
-            setError(null);
-        }
     };
+
 
     const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (!files) return;
 
         try {
-            const jsonPromises = Array.from(files).map(file => {
+            const filePromises = Array.from(files).map(file => {
                 if (file.type !== 'application/json') {
                     throw new Error(`文件 "${file.name}" 不是有效的 JSON 文件。`);
                 }
-                return file.text().then(text => JSON.parse(text));
+                return file.text();
             });
-            const jsonData = await Promise.all(jsonPromises);
-            processJsonData(jsonData, '上传的文件');
+            const fileContents = await Promise.all(filePromises);
+            // 合并所有文件内容为一个字符串进行处理
+            await processJsonData(fileContents.join('\n'), '上传的文件');
         } catch (err) {
-             if (err instanceof Error) setError(`❌ 文件处理失败: ${err.message}`);
+            if (err instanceof Error) setError(`❌ 文件处理失败: ${err.message}`);
         } finally {
             if (event.target) event.target.value = '';
         }
@@ -383,22 +425,10 @@ const BattlePage: React.FC = () => {
         const text = pastedJson.trim();
         if (!text) return;
         try {
-            // 尝试将文本解析为 JSON 对象或数组
-            let parsedData;
-            try {
-                // 尝试直接解析
-                parsedData = JSON.parse(text);
-            } catch {
-                // 如果直接解析失败，尝试修复并解析为数组
-                // 这种方法可以处理多个JSON对象被直接拼接在一起的情况
-                const sanitizedText = `[${text.replace(/}\s*{/g, '},{')}]`;
-                parsedData = JSON.parse(sanitizedText);
-            }
-            const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
-            await processJsonData(dataArray, '粘贴的内容');
-            setPastedJson('');
+            await processJsonData(text, '粘贴的内容');
+            setPastedJson(''); // 成功后清空文本域
         } catch (err) {
-             if (err instanceof Error) setError(`❌ 文本解析失败: ${err.message}.`);
+            if (err instanceof Error) setError(`❌ 文本解析失败: ${err.message}.`);
         }
     };
 
@@ -601,8 +631,9 @@ const BattlePage: React.FC = () => {
                     selectedLevel,
                     mode: battleMode,
                     userGuidance: userGuidance,
-                    scenario: scenarioContent, // 新增：发送情景内容
-                    teams: Object.keys(teams).length > 0 ? teams : undefined, // 新增：发送分队信息
+                    scenario: scenarioContent, // 发送情景内容
+                    teams: Object.keys(teams).length > 0 ? teams : undefined, // 发送分队信息
+                    language: selectedLanguage,
                 }),
             });
 
@@ -819,6 +850,7 @@ const BattlePage: React.FC = () => {
                                                         {c.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
                                                         {c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
                                                         {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
+                                                        {c.isNonStandard && <span className="text-xs text-orange-500 ml-1 font-semibold">(非规范格式)</span>}
                                                     </span>
                                                     {/* 分队选择器 */}
                                                     <select
@@ -975,6 +1007,24 @@ const BattlePage: React.FC = () => {
                             </div>
                         )}
 
+                        {/*语言选择下拉菜单*/}
+                        <div className="input-group">
+                            <label htmlFor="language-select" className="input-label">
+                                <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
+                                生成语言
+                            </label>
+                            <select
+                                id="language-select"
+                                value={selectedLanguage}
+                                onChange={(e) => setSelectedLanguage(e.target.value)}
+                                className="input-field"
+                                disabled={isGenerating}
+                            >
+                                {languages.map(lang => (
+                                    <option key={lang.code} value={lang.code}>{lang.name}</option>
+                                ))}
+                            </select>
+                        </div>
 
                         <button onClick={handleGenerate} 
                             // --- 根据模式动态判断禁用条件 ---
