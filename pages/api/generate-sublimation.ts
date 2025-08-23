@@ -327,7 +327,7 @@ async function handler(req: NextRequest): Promise<Response> {
       if (newTitleMatch && newTitleMatch[1]) {
         sublimatedData.name = `${originalBaseName}「${newTitleMatch[1]}」`;
       } else {
-        sublimatedData.name = originalFullName.includes('「') ? originalFullName : `${originalBaseName}「百战」`;
+        sublimatedData.name = originalFullName.includes('「') ? originalFullName : `${originalBaseName}「历战」`;
         log.warn('AI未能为残兽生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
       }
       finalName = sublimatedData.name;
