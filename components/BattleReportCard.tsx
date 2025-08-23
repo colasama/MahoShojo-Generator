@@ -40,6 +40,8 @@ const BattleReportCard: React.FC<BattleReportCardProps> = ({ report, onSaveImage
         return { text: '羁绊模式 ✨', logo: '/kizuna-mode.svg' };
       case 'classic':
         return { text: '经典模式 ⚔️', logo: '/classic-mode.svg' };
+      case 'scenario':
+        return { text: '情景模式 📜', logo: '/scenario-mode.svg' };
       default:
         return null;
     }

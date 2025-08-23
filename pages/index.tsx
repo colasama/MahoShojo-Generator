@@ -112,7 +112,7 @@ export default function Home() {
                 <div className="feature-button-content">
                   <div className="feature-title-container">
                     <img
-                      src="/logo-white.svg"
+                      src="/scenario.svg"
                       width={280}
                       height={40}
                       alt="自定义情景生成"
@@ -144,7 +144,7 @@ export default function Home() {
                 <div className="feature-button-content">
                   <div className="feature-title-container">
                     <img
-                      src="/logo-white.svg"
+                      src="/sublimation.svg"
                       width={280}
                       height={40}
                       alt="角色成长升华"
@@ -160,7 +160,7 @@ export default function Home() {
                 <div className="feature-button-content">
                   <div className="feature-title-container">
                     <img
-                      src="/logo-white.svg"
+                      src="/character-manager.svg"
                       width={280}
                       height={40}
                       alt="角色数据管理"
