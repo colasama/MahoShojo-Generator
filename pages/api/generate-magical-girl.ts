@@ -46,10 +46,11 @@ export type AIGeneratedMagicalGirl = z.infer<
 >;
 
 // 魔法少女生成配置
-const magicalGirlGenerationConfig: GenerationConfig<AIGeneratedMagicalGirl, string> = {
+const magicalGirlGenerationConfig: GenerationConfig<AIGeneratedMagicalGirl, { realName: string, language: string }> = {
   systemPrompt: appConfig.MAGICAL_GIRL_GENERATION.systemPrompt,
   temperature: appConfig.MAGICAL_GIRL_GENERATION.temperature,
-  promptBuilder: (realName: string) => `请为名叫"${realName}"的人设计一个魔法少女角色。真实姓名：${realName}`,
+  promptBuilder: ({ realName, language }: { realName: string, language: string }) => 
+    `请为名叫"${realName}"的人设计一个魔法少女角色。真实姓名：${realName}\n\n【重要指令】请你必须使用【${language}】进行内容创作。`,
   schema: MagicalGirlGenerationSchema,
   taskName: "生成魔法少女",
   maxTokens: 6000,
@@ -57,9 +58,10 @@ const magicalGirlGenerationConfig: GenerationConfig<AIGeneratedMagicalGirl, stri
 
 // 生成魔法少女的函数（使用通用函数）
 export async function generateMagicalGirlWithAI(
-  realName: string
+  realName: string,
+  language: string
 ): Promise<AIGeneratedMagicalGirl> {
-  return generateWithAI(realName, magicalGirlGenerationConfig);
+  return generateWithAI({ realName, language }, magicalGirlGenerationConfig);
 }
 
 // 处理器重构：
@@ -77,7 +79,7 @@ async function handler(
     });
   }
 
-  const { name } = await req.json();
+  const { name, language = 'zh-CN' } = await req.json();
 
   if (!name || typeof name !== 'string') {
     return new Response(JSON.stringify({ error: 'Name is required' }), {
@@ -87,12 +89,12 @@ async function handler(
   }
 
   try {
-    const magicalGirlData = await generateMagicalGirlWithAI(name.trim());
+    const magicalGirlData = await generateMagicalGirlWithAI(name.trim(), language);
 
-    // 新增：为数据生成签名
+    // 为数据生成签名
     const signature = await generateSignature(magicalGirlData);
 
-    // 新增：将签名附加到最终结果中
+    // 将签名附加到最终结果中
     const finalResult = {
         ...magicalGirlData,
         signature: signature

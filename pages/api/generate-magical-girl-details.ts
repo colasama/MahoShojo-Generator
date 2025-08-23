@@ -45,7 +45,7 @@ const MagicalGirlDetailsSchema = z.object({
     abilityReasoning: z.string().describe("能力设定的推理过程和依据"),
     coreTraits: z.array(z.string()).describe("核心性格特征，3-4个关键词"),
     predictionBasis: z.string().describe("预测的主要依据和逻辑"),
-    // 新增：角色背景故事
+    // 角色背景故事
     background: z.object({
         belief: z.string().describe("角色的核心理念、信条或愿望，描述角色为何而战，支撑角色行动的内在动力。"),
         bonds: z.string().describe("角色的情感、羁绊，描述角色与他人（特别是在问卷中出现的人）之间的关系，以及这段关系如何影响了角色，羁绊会如何影响其成长的旅途。")
@@ -57,7 +57,7 @@ type MagicalGirlDetails = z.infer<typeof MagicalGirlDetailsSchema>;
 
 
 // 配置详细信息生成
-const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> = {
+const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, { answers: string[], language: string }> = {
   systemPrompt: `现在如果你是魔法国度的妖精，你准备通过问卷调查的形式，事先通过问卷结果分析某人成为魔法少女后的能力等各项素质。魔法少女的性格倾向、经历背景、行事准则等等都会影响到她们在魔法少女道路上的潜力和表现。
 以下是一位潜在魔法少女对问卷所给出的回答（对方可以不回答某些问题），请你据此预测她成为魔法少女后的情况。
 
@@ -88,11 +88,10 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
 - **羁绊 (bonds)**：根据问卷中涉及他人的回答（如前辈、搭档、家人等），描绘出角色的羁绊关系。关系可以是正面的，也可以是负面的，但应是塑造她性格和能力的关键。
 `,
   temperature: 0.8,
-  promptBuilder: (answers: string[]) => {
-    const questionAnswerPairs = answers.map((answer, index) => `问题${index + 1}的回答: "${answer}"`
-    ).join('\n')
+  promptBuilder: ({ answers, language }) => {
+    const questionAnswerPairs = answers.map((answer, index) => `问题${index + 1}的回答: "${answer}"`).join('\n');
     const flowers = getRandomFlowers();
-    return `请基于以下问卷回答开始分析和预测：${questionAnswerPairs}，可选的花名和对应的花语：${flowers}`
+    return `请基于以下问卷回答开始分析和预测：${questionAnswerPairs}，可选的花名和对应的花语：${flowers}\n\n【重要指令】请你必须使用【${language}】进行内容创作。`;
   },
   schema: MagicalGirlDetailsSchema,
   taskName: "生成魔法少女详细信息",
@@ -103,9 +102,7 @@ const magicalGirlDetailsConfig: GenerationConfig<MagicalGirlDetails, string[]> =
 // 移除了队列和速率限制系统。该系统基于内存，在Serverless/Edge环境中无法正确共享状态，
 // 导致功能失效并错误地拦截了前端的轮询请求。
 // 现在，请求将直接、异步地调用AI生成函数。
-async function handler(
-  req: Request
-): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -113,7 +110,7 @@ async function handler(
     });
   }
 
-  const { answers } = await req.json();
+  const { answers, language = 'zh-CN' } = await req.json();
 
   if (!answers || !Array.isArray(answers) || answers.length === 0) {
     return new Response(JSON.stringify({ error: 'Answers array is required' }), {
@@ -140,7 +137,7 @@ async function handler(
 
   try {
     // 直接调用AI生成，不再入队
-    const magicalGirlDetails = await generateWithAI(answers, magicalGirlDetailsConfig);
+    const magicalGirlDetails = await generateWithAI({ answers, language }, magicalGirlDetailsConfig);
 
     // 异步保存到D1数据库，不阻塞对用户的响应
     // const saveData = {

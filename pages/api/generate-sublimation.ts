@@ -83,7 +83,7 @@ const CanshouSublimationResultSchema = z.object({
 // =================================================================
 // 2. AI Prompt 配置 (SRS 3.2.2)
 // =================================================================
-const createGenerationConfig = (characterData: any): GenerationConfig<any, any> => {
+const createGenerationConfig = (characterData: any, language: string): GenerationConfig<any, any> => {
   const isMagicalGirl = !!characterData.codename;
   const characterType = isMagicalGirl ? '魔法少女' : '残兽';
   const nameField = isMagicalGirl ? 'codename' : 'name';
@@ -142,7 +142,7 @@ ${userAnswersReviewSection}
 3.  **生成升华事件**:
     * 你还需要创作一个“升华事件”，简要描述角色是如何从这些经历中收获成长，升华到新状态的。
 
-请严格按照提供的JSON Schema格式返回结果。`;
+请严格按照提供的JSON Schema格式返回结果，使用【${language}】进行内容创作。`;
   };
 
   // 核心修改：动态选择精确的Schema
@@ -249,7 +249,9 @@ async function handler(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const originalCharacterData = await req.json();
+    const body = await req.json();
+    // 从请求体中同时解构出 language 和 characterData
+    const { language = 'zh-CN', ...originalCharacterData } = body; 
 
     // 安全检查：检查用户上传的原始数据
     const textToCheck = extractTextForCheck(originalCharacterData);
@@ -262,7 +264,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     const isNative = await verifySignature(originalCharacterData);
-    const generationConfig = createGenerationConfig(originalCharacterData);
+    const generationConfig = createGenerationConfig(originalCharacterData, language);
     
     // --- AI 生成 ---
     const aiResult = await generateWithAI(null, generationConfig);

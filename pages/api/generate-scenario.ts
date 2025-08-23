@@ -51,7 +51,8 @@ const ScenarioSchema = z.object({
 // =================================================================
 
 const createGenerationConfig = (
-  answers: Record<string, string>
+  answers: Record<string, string>,
+  language: string
 ): GenerationConfig<z.infer<typeof ScenarioSchema>, any> => {
   const promptBuilder = () => {
     const answerText = Object.entries(answers)

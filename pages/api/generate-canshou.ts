@@ -71,18 +71,18 @@ const CanshouSchema = z.object({
 type CanshouDetails = z.infer<typeof CanshouSchema>;
 
 // AI生成配置
-const canshouGenerationConfig: GenerationConfig<CanshouDetails, Record<string, string>> = {
+const canshouGenerationConfig: GenerationConfig<CanshouDetails, { answers: Record<string, string>, language: string }> = {
   systemPrompt: `你是一名魔法国度的残兽研究学者，你的任务是根据一线调查员提交的问卷报告，分析并生成一份详细的残兽档案。
   首先，这是关于残兽的基础设定，你必须严格遵守：
   ${canshouLore}
 
   请根据用户提供的问卷答案，以结构化的JSON格式返回残兽的详细设定，包括对其各项特征的详细描述和你作为研究学者的专业分析笔记。`,
   temperature: 0.8,
-  promptBuilder: (answers: Record<string, string>) => {
+  promptBuilder: ({ answers, language }: { answers: Record<string, string>, language: string }) => {
     const answerText = Object.entries(answers)
       .map(([key, value]) => `- ${key}: ${value}`)
       .join('\n');
-    return `以下是调查员提交的问卷报告，请基于此进行分析：\n${answerText}`;
+    return `以下是调查员提交的问卷报告，请基于此进行分析：\n${answerText}\n\n【重要指令】请你必须使用【${language}】进行内容创作。`;
   },
   schema: CanshouSchema,
   taskName: "生成残兽档案",
@@ -99,7 +99,7 @@ async function handler(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const { answers } = await req.json();
+    const { answers, language = 'zh-CN' } = await req.json();
 
     if (!answers || typeof answers !== 'object' || Object.keys(answers).length === 0) {
       return new Response(JSON.stringify({ error: 'Answers object is required' }), {
@@ -121,7 +121,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     // 调用通用AI生成函数
-    const canshouDetails = await generateWithAI(answers, canshouGenerationConfig);
+    const canshouDetails = await generateWithAI({ answers, language }, canshouGenerationConfig);
 
     // 新增：将用户答案和生成结果合并，为签名做准备
     const dataToSign = {
