@@ -386,7 +386,7 @@ const CharacterManagerPage: React.FC = () => {
                             <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
                             <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">codename</code> (魔法少女) 或 <code className="bg-gray-200 px-1 rounded text-xs">name</code> (残兽) 字段。</li>
                             <li>在“历战记录管理”中<span className="font-semibold">删除</span>一条或多条历史记录。</li>
-                            <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”</span>按钮。</li>
+                            <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”或“清除所有记录”</span>按钮。</li>
                             </ul>
                             <p className="text-xs text-gray-500 mt-2">（注：新增或修改历战记录、编辑除代号/名称外的任何字段，都会导致原生性丧失。）</p>
                         </div>
