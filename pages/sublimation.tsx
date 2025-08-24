@@ -90,7 +90,7 @@ const SublimationPage: React.FC = () => {
         try {
             const json = JSON.parse(jsonText);
             if (!json.arena_history) {
-                throw new Error('角色文件缺少必需的“arena_history”（历战记录）属性。');
+                throw new Error('角色文件缺少必需的“arena_history”（历战记录）属性，需使用在竞技场下载的经历战斗后的角色文件！');
             }
             setCharacterData(json);
             setFileName('粘贴的内容');
