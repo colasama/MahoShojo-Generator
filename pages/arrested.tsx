@@ -11,6 +11,11 @@ export default function ArrestedPage() {
     const [magicalTimestamp, setMagicalTimestamp] = useState('');
     const [reason, setReason] = useState('使用危险符文'); // 默认理由
 
+    // 存储从JSON加载的新闻列表
+    const [newsTickerItems, setNewsTickerItems] = useState<string[]>([]);
+    // 当前显示的新闻条目的索引
+    const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
+
     useEffect(() => {
         // 从 URL query 获取理由
         if (router.isReady && router.query.reason) {
@@ -48,6 +53,34 @@ export default function ArrestedPage() {
         setCaseNumber(generateCaseNumber());
         setMagicalTimestamp(generateMagicalTimestamp());
     }, [router.isReady, router.query.reason]);
+
+    // --- 获取新闻数据并设置随机初始索引 ---
+    useEffect(() => {
+        fetch('/arrested_news.json')
+            .then(res => res.json())
+            .then(data => {
+                if (data.news && data.news.length > 0) {
+                    setNewsTickerItems(data.news);
+                    // 从一个随机索引开始播放，增加趣味性
+                    setCurrentNewsIndex(Math.floor(Math.random() * data.news.length));
+                }
+            })
+            .catch(err => console.error("Failed to load arrested news:", err));
+    }, []); // 空依赖数组确保此 effect 仅在组件挂载时运行一次
+
+    // --- 设置定时器以循环播放新闻 ---
+    useEffect(() => {
+        // 仅当新闻列表加载完毕后才启动定时器
+        if (newsTickerItems.length === 0) return;
+
+        // 设置一个定时器，每5秒切换到下一条新闻
+        const intervalId = setInterval(() => {
+            setCurrentNewsIndex(prevIndex => (prevIndex + 1) % newsTickerItems.length);
+        }, 5000); // 5000毫秒 = 5秒
+
+        // 组件卸载时清除定时器，防止内存泄漏
+        return () => clearInterval(intervalId);
+    }, [newsTickerItems]); // 当新闻列表变化时，重新设置定时器
 
     return (
         <>
@@ -143,6 +176,23 @@ export default function ArrestedPage() {
                     </div>
                 </div>
 
+                {/* --- 新闻滚动条UI --- */}
+                {newsTickerItems.length > 0 && (
+                    <div className="news-ticker-container">
+                        <div className="news-ticker-content">
+                            <span className="news-ticker-label">国度速报</span>
+                            {/* 核心注释：
+                              通过将 currentNewsIndex 作为 <p> 元素的 key，我们告诉 React 
+                              每次索引变化时都应将此元素视为一个全新的元素。
+                              这会强制重新渲染并重新触发 CSS 动画，从而实现每次都有进入和消失的效果。
+                            */}
+                            <p key={currentNewsIndex} className="news-ticker-item">
+                                {newsTickerItems[currentNewsIndex]}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Custom animations */}
                 <style jsx>{`
                   @keyframes float {
@@ -151,6 +201,63 @@ export default function ArrestedPage() {
                   }
                   .animate-float {
                     animation: float 4s ease-in-out infinite;
+                  }
+                  .news-ticker-container {
+                      position: fixed;
+                      bottom: 0;
+                      left: 0;
+                      width: 100%;
+                      background-color: rgba(0, 0, 0, 0.5);
+                      backdrop-filter: blur(5px);
+                      color: #e9d5ff; /* 淡紫色文字 */
+                      padding: 0.5rem 1rem;
+                      font-size: 0.875rem; /* 14px */
+                      z-index: 20;
+                      overflow: hidden;
+                      border-top: 1px solid rgba(233, 213, 255, 0.3);
+                  }
+                  .news-ticker-content {
+                      display: flex;
+                      align-items: center;
+                      white-space: nowrap;
+                  }
+                  .news-ticker-label {
+                      font-weight: 600;
+                      color: #f3e8ff; /* 更亮的紫色 */
+                      padding-right: 1rem;
+                      margin-right: 1rem;
+                      border-right: 1px solid rgba(233, 213, 255, 0.5);
+                      flex-shrink: 0; /* 防止标签被压缩 */
+                  }
+                  .news-ticker-item {
+                      margin: 0;
+                      display: inline-block;
+                      /* 动画组合：先滑入，停留4秒，然后淡出 */
+                      animation: slideIn 0.5s ease-out forwards, fadeOut 0.5s ease-in 4.5s forwards;
+                  }
+
+                  /* 定义滑入动画 */
+                  @keyframes slideIn {
+                      from {
+                          opacity: 0;
+                          transform: translateY(100%);
+                      }
+                      to {
+                          opacity: 1;
+                          transform: translateY(0);
+                      }
+                  }
+
+                  /* 定义淡出动画 */
+                  @keyframes fadeOut {
+                      from {
+                          opacity: 1;
+                          transform: translateY(0);
+                      }
+                      to {
+                          opacity: 0;
+                          transform: translateY(-100%);
+                      }
                   }
                 `}</style>
             </div>
