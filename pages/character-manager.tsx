@@ -27,6 +27,9 @@ const CharacterManagerPage: React.FC = () => {
     const [message, setMessage] = useState<{ type: 'info' | 'error' | 'success', text: string } | null>(null);
     const [copiedStatus, setCopiedStatus] = useState(false);
 
+    // 用于控制说明区域的显示与隐藏，默认为 true
+    const [isGuideVisible, setIsGuideVisible] = useState(true);
+
     // [新增 SRS 3.3] 立绘生成器相关状态
     const [isTachieVisible, setIsTachieVisible] = useState(false);
     const [tachiePrompt, setTachiePrompt] = useState('');
@@ -345,6 +348,50 @@ const CharacterManagerPage: React.FC = () => {
                     <div className="text-center mb-4">
                         <h1 className="text-3xl font-bold text-gray-800">角色管理中心</h1>
                         <p className="subtitle mt-2">在这里查看、编辑和维护你的角色档案</p>
+                    </div>
+
+                    <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-800">
+                    <button
+                        onClick={() => setIsGuideVisible(!isGuideVisible)}
+                        className="w-full text-left font-bold text-gray-700 mb-2 focus:outline-none"
+                    >
+                        {isGuideVisible ? '▼' : '▶'} 使用指南
+                    </button>
+                    {isGuideVisible && (
+                        <div className="mt-2 space-y-3">
+                        <div>
+                            <h4 className="font-semibold text-gray-800">核心功能：</h4>
+                            <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
+                            <li><span className="font-semibold">加载角色：</span>通过上传 <code>.json</code> 文件或直接粘贴文本内容来加载你的角色档案。</li>
+                            <li><span className="font-semibold">编辑数据：</span>可视化地查看并修改角色的各项设定，包括调整历战记录。</li>
+                            <li><span className="font-semibold">生成立绘：</span>加载角色后，展开下方的“立绘生成”模块，可为你的角色创建立绘。</li>
+                            <li><span className="font-semibold">保存与导出：</span>完成修改后，可下载新的 <code>.json</code> 文件或将内容复制到剪贴板。</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-gray-800">关于“原生数据”：</h4>
+                            <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
+                            <li>“原生数据”指由本生成器直接产出、未经核心修改的角色文件。它包含一个数字签名，用于验证其真实性。</li>
+                            <li>在竞技场等功能中，系统会更信任原生数据。对非原生数据可能会启用更严格的内容安全检查。</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-gray-800">如何保持角色“原生性”：</h4>
+                            <p className="mt-1">
+                            请注意：对角色档案的<span className="font-bold text-red-600">绝大多数修改</span>都会使其失去“原生性”，保存后数字签名将被移除。
+                            </p>
+                            <p className="mt-2">
+                            以下是<span className="font-bold text-green-600">唯一允许</span>在保持原生性的前提下进行的操作：
+                            </p>
+                            <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
+                            <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">codename</code> (魔法少女) 或 <code className="bg-gray-200 px-1 rounded text-xs">name</code> (残兽) 字段。</li>
+                            <li>在“历战记录管理”中<span className="font-semibold">删除</span>一条或多条历史记录。</li>
+                            <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”</span>按钮。</li>
+                            </ul>
+                            <p className="text-xs text-gray-500 mt-2">（注：新增或修改历战记录、编辑除代号/名称外的任何字段，都会导致原生性丧失。）</p>
+                        </div>
+                        </div>
+                    )}
                     </div>
 
                     {!characterData ? (
