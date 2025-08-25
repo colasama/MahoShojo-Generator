@@ -220,9 +220,11 @@ export default function Name() {
       // 临时隐藏保存按钮和说明文字
       const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement;
       const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement;
+      const downloadJsonButton = resultRef.current.querySelector('#download-json') as HTMLElement;
 
       if (saveButton) saveButton.style.display = 'none';
       if (logoPlaceholder) logoPlaceholder.style.display = 'flex';
+      if (downloadJsonButton) downloadJsonButton.style.display = 'none';
 
       const result = await snapdom(resultRef.current, {
         scale: 1,
@@ -231,6 +233,7 @@ export default function Name() {
       // 恢复按钮显示
       if (saveButton) saveButton.style.display = 'block';
       if (logoPlaceholder) logoPlaceholder.style.display = 'none';
+      if (downloadJsonButton) downloadJsonButton.style.display = 'block';
 
       // 获取 result.toPng() 生成的 HTMLImageElement 的图片 URL
       // toPng() 返回 Promise<HTMLImageElement>，可通过 .src 获取图片的 base64 url
@@ -298,9 +301,6 @@ export default function Name() {
             </p>
             <div style={{ marginTop: '1rem', marginBottom: '2rem', textAlign: 'center' }}>
               <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>本测试设定来源于小说《下班，然后变成魔法少女》</p>
-              <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>首页：mahoshojo.colanns.me</p>
-              <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>以及广告位募集中</del></p>
-              <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>如有意向请联系魔法国度研究院院长 @祖母绿：1********</del></p>
             </div>
             <div className="input-group">
               <label htmlFor="name" className="input-label">
@@ -426,7 +426,7 @@ export default function Name() {
                     📱 保存为图片
                   </button>
 
-                  <button onClick={handleSaveJson} className="save-button" style={{marginTop: '0.5rem', background: 'linear-gradient(135deg, #5c7cfa 0%, #748ffc 100%)'}}>
+                  <button id="download-json" onClick={handleSaveJson} className="save-button" style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #5c7cfa 0%, #748ffc 100%)' }}>
                     📄 下载设定文件
                   </button>
 

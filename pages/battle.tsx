@@ -14,17 +14,17 @@ import { config as appConfig } from '../lib/config';
 import { ArenaHistory } from '../types/arena';
 
 interface UpdatedCombatantData {
-  codename?: string;
-  name?: string;
-  arena_history: ArenaHistory;
-  signature?: string;
-  // 允许包含角色文件的其他所有字段
-  [key: string]: any; 
+    codename?: string;
+    name?: string;
+    arena_history: ArenaHistory;
+    signature?: string;
+    // 允许包含角色文件的其他所有字段
+    [key: string]: any;
 }
 
 interface BattleApiResponse {
-  report: NewsReport;
-  updatedCombatants: UpdatedCombatantData[];
+    report: NewsReport;
+    updatedCombatants: UpdatedCombatantData[];
 }
 
 // 魔法少女设定核心字段（用于验证）
@@ -119,7 +119,7 @@ const BattlePage: React.FC = () => {
     const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
     // 状态：用于显示加载状态
     const [isLoadingStats, setIsLoadingStats] = useState(true);
-    
+
     // 模式状态
     const [battleMode, setBattleMode] = useState<BattleMode>('classic');
 
@@ -130,7 +130,7 @@ const BattlePage: React.FC = () => {
     // 用于存储情景模式下上传的情景文件内容
     const [scenarioContent, setScenarioContent] = useState<object | null>(null);
     const [scenarioFileName, setScenarioFileName] = useState<string | null>(null);
-    
+
     // 用于追踪情景文件的原生性
     const [isScenarioNative, setIsScenarioNative] = useState<boolean>(false);
 
@@ -280,14 +280,14 @@ const BattlePage: React.FC = () => {
     const handleSelectPreset = async (preset: Preset) => {
         // 修改：在操作开始时就锁定按钮，防止重复点击
         setLoadingPreset(preset.filename);
-    
+
         try {
             if (combatants.some(c => c.filename === preset.filename)) {
                 handleRemoveCombatant(preset.filename);
                 setError(null);
                 return;
             }
-    
+
             const response = await fetch(`/presets/${preset.filename}`);
             if (!response.ok) throw new Error(`无法加载 ${preset.name} 的设定文件。`);
             const presetData = await response.json();
@@ -303,10 +303,10 @@ const BattlePage: React.FC = () => {
 
             presetData.isPreset = true;
             // 预设文件默认视为原生
-            addCombatant({ 
-                type: preset.type, 
-                data: presetData, 
-                filename: preset.filename, 
+            addCombatant({
+                type: preset.type,
+                data: presetData,
+                filename: preset.filename,
                 isValid: true, // 预设始终是原生的
                 isPreset: true // 在 Combatant 对象层面标记为预设
             });
@@ -502,8 +502,8 @@ const BattlePage: React.FC = () => {
     };
 
     const handleTeamChange = (filename: string, teamId: number) => {
-        setCombatants(prev => 
-            prev.map(c => 
+        setCombatants(prev =>
+            prev.map(c =>
                 c.filename === filename ? { ...c, teamId: teamId === 0 ? undefined : teamId } : c
             )
         );
@@ -548,7 +548,7 @@ const BattlePage: React.FC = () => {
             setScenarioFileName(null);
             setIsScenarioNative(false); // 出错时重置
         } finally {
-            if(event.target) event.target.value = ''; // 允许重复上传同一个文件
+            if (event.target) event.target.value = ''; // 允许重复上传同一个文件
         }
     };
 
@@ -606,7 +606,7 @@ const BattlePage: React.FC = () => {
             if (await checkSensitiveWords(JSON.stringify(combatantsForCheck))) return;
             if (userGuidance && (await checkSensitiveWords(userGuidance))) return;
             if (scenarioContent && (await checkSensitiveWords(JSON.stringify(scenarioContent)))) return;
-            
+
             // 构造分队信息
             const teams: { [key: number]: string[] } = {};
             combatants.forEach(c => {
@@ -622,8 +622,8 @@ const BattlePage: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    combatants: combatants.map(c => ({ 
-                        type: c.type, 
+                    combatants: combatants.map(c => ({
+                        type: c.type,
                         data: c.data,
                         isNative: c.isValid,
                         isPreset: c.isPreset
@@ -664,7 +664,7 @@ const BattlePage: React.FC = () => {
                 }
                 throw new Error(errorMessage);
             }
-            
+
             // 处理新的API响应结构
             const result: BattleApiResponse = await response.json();
 
@@ -675,7 +675,7 @@ const BattlePage: React.FC = () => {
             setUpdatedCombatants(result.updatedCombatants);
 
             // 关键：用返回的最新角色数据更新当前页面的参战者状态 (SRS 3.1.4)
-            setCombatants(prev => 
+            setCombatants(prev =>
                 prev.map(oldCombatant => {
                     const updatedData = result.updatedCombatants.find(
                         uc => (uc.codename || uc.name) === (oldCombatant.data.codename || oldCombatant.data.name)
@@ -697,22 +697,22 @@ const BattlePage: React.FC = () => {
             setIsGenerating(false);
         }
     };
-    
+
     // 修复：为情景模式添加按钮文本
     const getButtonText = () => {
         if (isCooldown) return `记者赶稿中...请等待 ${remainingTime} 秒`;
         if (isGenerating) {
-            switch(battleMode) {
+            switch (battleMode) {
                 case 'daily': return '撰写日常逸闻中... (｡･ω･｡)ﾉ';
                 case 'kizuna': return '描绘宿命对决中... (ง •̀_•́)ง';
                 case 'classic': return '推演激烈战斗中... (ง •̀_•́)ง';
                 case 'scenario': return '演绎指定剧本中... (｡･ω･｡)ﾉ';
             }
         }
-        switch(battleMode) {
+        switch (battleMode) {
             case 'daily': return '生成日常故事 (´｡• ᵕ •｡`) ♡';
             case 'kizuna': return '生成宿命对决 (๑•̀ㅂ•́)و✧';
-            case 'classic': return '生成独家新闻 (๑•̀ㅂ•́)و✧';
+            case 'classic': return '生成独家新闻 _φ(❐_❐✧';
             case 'scenario': return '开始演绎情景 (´｡• ᵕ •｡`)';
         }
     };
@@ -760,9 +760,9 @@ const BattlePage: React.FC = () => {
                     </div>
                     {presets.length > presetsPerPage && (
                         <div className="flex justify-center items-center mt-4 space-x-2">
-                             <button onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} disabled={currentPage === 1} className={`px-3 py-1 rounded text-sm ${currentPage === 1 ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>上一页</button>
-                             <span className="text-sm text-gray-600">第 {currentPage} / {Math.ceil(presets.length / presetsPerPage)} 页</span>
-                             <button onClick={() => setCurrentPage(Math.min(currentPage + 1, Math.ceil(presets.length / presetsPerPage)))} disabled={currentPage === Math.ceil(presets.length / presetsPerPage)} className={`px-3 py-1 rounded text-sm ${currentPage === Math.ceil(presets.length / presetsPerPage) ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>下一页</button>
+                            <button onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} disabled={currentPage === 1} className={`px-3 py-1 rounded text-sm ${currentPage === 1 ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>上一页</button>
+                            <span className="text-sm text-gray-600">第 {currentPage} / {Math.ceil(presets.length / presetsPerPage)} 页</span>
+                            <button onClick={() => setCurrentPage(Math.min(currentPage + 1, Math.ceil(presets.length / presetsPerPage)))} disabled={currentPage === Math.ceil(presets.length / presetsPerPage)} className={`px-3 py-1 rounded text-sm ${currentPage === Math.ceil(presets.length / presetsPerPage) ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>下一页</button>
                         </div>
                     )}
                 </div>
@@ -799,7 +799,7 @@ const BattlePage: React.FC = () => {
 
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">上传自己的 .json 设定文件</label>
-                            <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"/>
+                            <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" />
                         </div>
 
                         <div className="mb-6">
@@ -808,12 +808,12 @@ const BattlePage: React.FC = () => {
                             </button>
                             {isPasteAreaVisible && (
                                 <div className="input-group mt-2">
-                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个或多个魔法少女/残兽的设定文件(.json)内容..." className="input-field resize-y h-32"/>
+                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个或多个魔法少女/残兽的设定文件(.json)内容..." className="input-field resize-y h-32" />
                                     <button onClick={handleAddFromPaste} disabled={!pastedJson.trim() || isGenerating || combatants.length >= 4} className="generate-button mt-2 mb-0">从文本添加角色</button>
                                 </div>
                             )}
                         </div>
-                        
+
                         {/* 新增：情景粘贴区 */}
                         {battleMode === 'scenario' && (
                             <div className="mb-6">
@@ -822,7 +822,7 @@ const BattlePage: React.FC = () => {
                                 </button>
                                 {isScenarioPasteAreaVisible && (
                                     <div className="input-group mt-2">
-                                        <textarea value={pastedScenarioJson} onChange={(e) => setPastedScenarioJson(e.target.value)} placeholder="在此处粘贴一个情景的设定文件(.json)内容..." className="input-field resize-y h-24"/>
+                                        <textarea value={pastedScenarioJson} onChange={(e) => setPastedScenarioJson(e.target.value)} placeholder="在此处粘贴一个情景的设定文件(.json)内容..." className="input-field resize-y h-24" />
                                         <button onClick={handlePasteAndLoadScenario} disabled={!pastedScenarioJson.trim() || isGenerating} className="generate-button mt-2 mb-0" style={{ backgroundColor: '#8b5cf6', backgroundImage: 'linear-gradient(to right, #8b5cf6, #a78bfa)' }}>从文本加载情景</button>
                                     </div>
                                 )}
@@ -955,33 +955,33 @@ const BattlePage: React.FC = () => {
                             )}
                         </div>
 
-                            {/* --- 情景模式UI --- */}
-                            {battleMode === 'scenario' && (
-                                <div className="mt-4">
-                                    <label htmlFor="scenario-upload" className="input-label">上传情景文件 (.json)</label>
-                                    <input 
-                                        id="scenario-upload" 
-                                        type="file" 
-                                        accept=".json" 
-                                        onChange={handleScenarioFileChange}
-                                        className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                                    />
-                                    {scenarioFileName && (
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            已加载情景: {scenarioFileName}
-                                            {isScenarioNative && <span className="text-xs text-green-600 ml-1 font-semibold">(原生)</span>}
-                                        </p>
-                                    )}
-                                    <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
-                                        <p className="font-bold">你已选择【情景模式】！</p>
-                                        <p className="mt-1">上传一个情景文件，让角色们在自定义的舞台上展开故事吧！</p>
-                                    </div>
+                        {/* --- 情景模式UI --- */}
+                        {battleMode === 'scenario' && (
+                            <div className="mt-4">
+                                <label htmlFor="scenario-upload" className="input-label">上传情景文件 (.json)</label>
+                                <input
+                                    id="scenario-upload"
+                                    type="file"
+                                    accept=".json"
+                                    onChange={handleScenarioFileChange}
+                                    className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                                />
+                                {scenarioFileName && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        已加载情景: {scenarioFileName}
+                                        {isScenarioNative && <span className="text-xs text-green-600 ml-1 font-semibold">(原生)</span>}
+                                    </p>
+                                )}
+                                <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
+                                    <p className="font-bold">你已选择【情景模式】！</p>
+                                    <p className="mt-1">上传一个情景文件，让角色们在自定义的舞台上展开故事吧！</p>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
                         {/* --- 在非日常模式下显示等级选择 --- */}
                         {battleMode !== 'daily' && (
-                           <div className="input-group">
+                            <div className="input-group">
                                 <label htmlFor="level-select" className="input-label">指定平均等级 (可选):</label>
                                 <select id="level-select" value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="input-field" style={{ cursor: 'pointer' }}>
                                     {battleLevels.map(level => (<option key={level.value} value={level.value}>{level.label}</option>))}
@@ -1026,13 +1026,13 @@ const BattlePage: React.FC = () => {
                             </select>
                         </div>
 
-                        <button onClick={handleGenerate} 
+                        <button onClick={handleGenerate}
                             // --- 根据模式动态判断禁用条件 ---
                             disabled={
-                                isGenerating || 
-                                isCooldown || 
+                                isGenerating ||
+                                isCooldown ||
                                 (battleMode === 'daily' || battleMode === 'scenario' ? combatants.length < 1 : combatants.length < 2)
-                            } 
+                            }
                             className="generate-button"
                         >
                             {getButtonText()}
@@ -1056,7 +1056,7 @@ const BattlePage: React.FC = () => {
                                 {updatedCombatants.map((charData) => {
                                     const latestEntry = charData.arena_history?.entries?.[charData.arena_history.entries.length - 1];
                                     const name = charData.codename || charData.name;
-                                    
+
                                     // 直接根据当前角色数据（charData）的字段来判断类型,魔法少女有 codename 字段，而残兽没有。
                                     const typeDisplay = charData.codename ? '魔法少女' : '残兽';
 
@@ -1072,7 +1072,7 @@ const BattlePage: React.FC = () => {
                                                         {latestEntry.impact}
                                                     </p>
                                                 </div>
-                                                <button 
+                                                <button
                                                     onClick={() => downloadUpdatedJson(charData)}
                                                     className="ml-4 px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors shrink-0"
                                                 >
