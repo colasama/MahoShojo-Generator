@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router'
+import { useRouter } from 'next/router';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
@@ -15,6 +15,15 @@ const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto
 
 // 定义允许保持原生性的可编辑字段 (顶级键) (SRS 3.7.3)
 const NATIVE_PRESERVING_FIELDS = new Set(['codename', 'name']);
+
+/**
+ * 辅助函数：判断一个值是否为可以遍历的普通对象（非数组、非null）。
+ * @param item - 要检查的值。
+ * @returns {boolean} 如果是对象则返回true，否则返回false。
+ */
+const isObject = (item: any): boolean => {
+    return (item && typeof item === 'object' && !Array.isArray(item));
+};
 
 const CharacterManagerPage: React.FC = () => {
     const router = useRouter();
@@ -208,9 +217,11 @@ const CharacterManagerPage: React.FC = () => {
         });
     }, []);
 
-    // 递归渲染表单
+    // 递归渲染表单，增加了对数组的专门处理逻辑
     const renderFormFields = (data: any, path: string = ''): React.ReactNode => {
         // 渲染顺序：基本信息 -> 外观 -> 魔装 -> 奇境 -> 繁开 -> 分析 -> 问卷 -> 历战记录
+        if (!isObject(data)) return null;
+
         const keyOrder = [
             'codename', 'name', 'appearance', 'magicConstruct', 'wonderlandRule', 
             'blooming', 'analysis', 'userAnswers', 'arena_history'
@@ -227,16 +238,52 @@ const CharacterManagerPage: React.FC = () => {
 
         return sortedKeys.map(key => {
             const currentPath = path ? `${path}.${key}` : key;
-            if (key === 'signature' || key === 'isPreset') return null;
-            if (key === 'arena_history') return null; // 历战记录单独渲染
+            if (key === 'signature' || key === 'isPreset' || key === 'arena_history') return null;
 
             const value = data[key];
 
-            const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-                handleFieldChange(currentPath, e.target.value);
-            };
+            // [新增] 专门处理数组类型的逻辑
+            if (Array.isArray(value)) {
+                // 判断是否为字符串数组，这是我们主要支持编辑的类型
+                const isStringArray = value.every(item => typeof item === 'string');
+                if (isStringArray) {
+                    const handleArrayChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                        // 将文本域内容按换行符分割，变回数组，从而保持数据类型正确
+                        const newArray = e.target.value.split('\n');
+                        handleFieldChange(currentPath, newArray);
+                    };
+                    return (
+                        <div key={currentPath} className="mt-4">
+                            <label htmlFor={currentPath} className="block text-sm font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1')}</label>
+                            <textarea
+                                id={currentPath}
+                                value={value.join('\n')}
+                                onChange={handleArrayChange}
+                                rows={Math.max(3, value.length)} // 动态调整高度
+                                className="input-field"
+                                placeholder="每行输入一个项目"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">此字段为列表，请每行输入一个项目。</p>
+                        </div>
+                    );
+                }
+                // 对于其他类型的数组（如对象数组），暂时以只读JSON形式显示，防止数据结构被破坏
+                return (
+                     <div key={currentPath} className="mt-4">
+                        <label htmlFor={currentPath} className="block text-sm font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1')} (只读)</label>
+                        <textarea
+                            id={currentPath}
+                            value={JSON.stringify(value, null, 2)}
+                            readOnly
+                            rows={5}
+                            className="input-field bg-gray-100 cursor-not-allowed"
+                        />
+                     </div>
+                );
+            }
 
-            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            // 处理嵌套对象的逻辑
+            if (isObject(value)) {
                 return (
                     <fieldset key={currentPath} className="border border-gray-300 p-4 rounded-lg mt-4">
                         <legend className="text-sm font-semibold px-2 text-gray-600 capitalize">{key.replace(/([A-Z])/g, ' $1')}</legend>
@@ -244,6 +291,11 @@ const CharacterManagerPage: React.FC = () => {
                     </fieldset>
                 );
             }
+
+            // 处理字符串和其他原始类型的逻辑
+            const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                handleFieldChange(currentPath, e.target.value);
+            };
 
             return (
                 <div key={currentPath}>
@@ -491,11 +543,11 @@ const CharacterManagerPage: React.FC = () => {
                             )}
 
                             <div className="mt-8 pt-4 border-t space-y-2">
-                                <button onClick={() => handleSaveChanges('download')} disabled={message?.type === 'error'} className="generate-button w-full">
-                                    保存修改并下载
+                                <button onClick={() => handleSaveChanges('download')} disabled={message?.type === 'error' || isLoading} className="generate-button w-full">
+                                    {isLoading ? '处理中...' : '保存修改并下载'}
                                 </button>
-                                <button onClick={() => handleSaveChanges('copy')} disabled={message?.type === 'error'} className="generate-button w-full" style={{backgroundColor: '#3b82f6', backgroundImage: 'linear-gradient(to right, #3b82f6, #2563eb)'}}>
-                                    {copiedStatus ? '已复制！' : '复制到剪贴板'}
+                                <button onClick={() => handleSaveChanges('copy')} disabled={message?.type === 'error' || isLoading} className="generate-button w-full" style={{backgroundColor: '#3b82f6', backgroundImage: 'linear-gradient(to right, #3b82f6, #2563eb)'}}>
+                                    {isLoading ? '处理中...' : copiedStatus ? '已复制！' : '复制到剪贴板'}
                                 </button>
                                 <button onClick={() => { setCharacterData(null); setPastedJson('') }} className="footer-link mt-4 w-full text-center">
                                     加载其他角色
