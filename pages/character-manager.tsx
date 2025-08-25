@@ -7,6 +7,8 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
 import TachieGenerator from '../components/TachieGenerator';
+// [核心修复] 导入签名生成函数
+import { generateSignature } from '@/lib/signature';
 
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
@@ -299,6 +301,7 @@ const CharacterManagerPage: React.FC = () => {
     // ===================================
     // 保存与输出 (SRS 3.7.4 & 3.7.5)
     // ===================================
+    // [核心修复] 将函数改造为 async，以支持异步的签名生成
     const handleSaveChanges = async (type: 'download' | 'copy') => {
         if (!characterData) return;
         setMessage(null);
@@ -309,10 +312,23 @@ const CharacterManagerPage: React.FC = () => {
             return;
         }
         
-        // 2. 构造最终数据
+        // 2. 构造最终数据，这是一个可变对象
         const finalData = { ...characterData };
+        
+        // [核心修复] 签名逻辑改造
         if (hasLostNativeness || !isNative) {
+            // 如果原生性已丧失，则移除签名
             delete finalData.signature;
+        } else {
+            // 如果数据仍然是原生的，则为其重新生成一个有效的签名
+            // 这是为了确保即便是允许的修改（如codename），签名也能与最新的数据匹配
+            const newSignature = await generateSignature(finalData);
+            if (newSignature) {
+                finalData.signature = newSignature;
+            } else {
+                // 如果密钥未配置导致签名生成失败，也移除签名，避免保留无效的旧签名
+                delete finalData.signature;
+            }
         }
         
         const name = finalData.codename || finalData.name;
