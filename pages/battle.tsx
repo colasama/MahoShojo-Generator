@@ -1057,9 +1057,8 @@ const BattlePage: React.FC = () => {
                                     const latestEntry = charData.arena_history?.entries?.[charData.arena_history.entries.length - 1];
                                     const name = charData.codename || charData.name;
                                     
-                                    // 查找原始 combatant 以获取类型
-                                    const originalCombatant = combatants.find(c => (c.data.codename || c.data.name) === name);
-                                    const typeDisplay = originalCombatant?.type === 'magical-girl' ? '魔法少女' : '残兽';
+                                    // 直接根据当前角色数据（charData）的字段来判断类型,魔法少女有 codename 字段，而残兽没有。
+                                    const typeDisplay = charData.codename ? '魔法少女' : '残兽';
 
                                     if (!latestEntry) return null;
 
