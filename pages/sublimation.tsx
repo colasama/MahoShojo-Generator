@@ -7,6 +7,7 @@ import Link from 'next/link';
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import CanshouCard from '../components/CanshouCard';
 import { quickCheck } from '@/lib/sensitive-word-filter';
+import { useCooldown } from '../lib/cooldown';
 
 // 颜色处理方案，用于修复背景色问题
 const MainColor = {
@@ -68,6 +69,8 @@ const SublimationPage: React.FC = () => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [pastedJson, setPastedJson] = useState('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+    // 实例化 useCooldown hook，设置60秒冷却时间
+    const { isCooldown, startCooldown, remainingTime } = useCooldown('sublimationCooldown', 60000);
     // 多语言支持
     const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
     const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
@@ -131,6 +134,11 @@ const SublimationPage: React.FC = () => {
     };
 
     const handleGenerate = async () => {
+        // [修改] 增加冷却检查
+        if (isCooldown) {
+            setError(`操作过于频繁，请等待 ${remainingTime} 秒后再试。`);
+            return;
+        }
         if (!characterData) {
             setError('⚠️ 请先上传一个角色设定文件。');
             return;
@@ -169,6 +177,7 @@ const SublimationPage: React.FC = () => {
 
             const result: SublimationResponse = await response.json();
             setResultData(result);
+            startCooldown();
 
         } catch (err) {
             const message = err instanceof Error ? err.message : '发生未知错误';
@@ -279,8 +288,16 @@ const SublimationPage: React.FC = () => {
                             </select>
                         </div>
 
-                        <button onClick={handleGenerate} disabled={isGenerating || !characterData} className="generate-button">
-                            {isGenerating ? '升华中...' : '开始升华'}
+                        {/* 成功提示信息 */}
+                        {!isGenerating && resultData && (
+                            <div className="text-center text-sm text-green-600 mb-2 font-semibold">
+                                🎉 升华成功！结果已显示在下方，请下滑查看。
+                            </div>
+                        )}
+
+                        {/* 更新按钮状态和文本 */}
+                        <button onClick={handleGenerate} disabled={isGenerating || !characterData || isCooldown} className="generate-button">
+                            {isCooldown ? `冷却中 (${remainingTime}s)` : isGenerating ? '升华中...' : '开始升华'}
                         </button>
 
                         {error && <div className="error-message mt-4">{error}</div>}

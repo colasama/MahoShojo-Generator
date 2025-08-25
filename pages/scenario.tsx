@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { quickCheck } from '@/lib/sensitive-word-filter';
+import { useCooldown } from '../lib/cooldown';
 
 // 定义引导性问题
 const scenarioQuestions = [
@@ -15,7 +16,7 @@ const scenarioQuestions = [
   { id: 'development', label: '故事可能会有哪些有趣的发展方向？', placeholder: '例如：决斗中途有第三方介入；谜题的答案指向一个惊人的秘密；采访者突然问了一个尖锐的问题...' },
 ];
 
-// [新增] 定义可供用户选择留空的字段列表
+// 定义可供用户选择留空的字段列表
 // 这里的 'value' 必须精确对应 Zod Schema 中的路径
 const optionalFields = [
     { label: '场景时间', value: 'elements.scene.time' },
@@ -35,9 +36,11 @@ const ScenarioPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [resultData, setResultData] = useState<any | null>(null);
 
-  // [新增] 用于存储希望留空的字段的状态
+  // 实例化 useCooldown hook，设置60秒冷却时间
+  const { isCooldown, startCooldown, remainingTime } = useCooldown('scenarioCooldown', 60000);
+  // 用于存储希望留空的字段的状态
   const [fieldsToKeepEmpty, setFieldsToKeepEmpty] = useState<string[]>([]);
-  // [新增] 用于控制高级选项的显示/隐藏
+  // 用于控制高级选项的显示/隐藏
   const [isAdvancedVisible, setIsAdvancedVisible] = useState(false);
 
   // 多语言支持
@@ -55,7 +58,7 @@ const ScenarioPage: React.FC = () => {
     setAnswers(prev => ({ ...prev, [id]: value }));
   };
   
-  // [新增] 处理留空字段复选框的点击事件
+  // 处理留空字段复选框的点击事件
   const handleOptionalFieldChange = (fieldValue: string) => {
       setFieldsToKeepEmpty(prev => 
           prev.includes(fieldValue)
@@ -65,6 +68,11 @@ const ScenarioPage: React.FC = () => {
   };
 
   const handleGenerate = async () => {
+    // [修改] 增加冷却检查
+    if (isCooldown) {
+        setError(`操作过于频繁，请等待 ${remainingTime} 秒后再试。`);
+        return;
+    }
     setIsGenerating(true);
     setError(null);
     setResultData(null);
@@ -99,6 +107,7 @@ const ScenarioPage: React.FC = () => {
 
       const result = await response.json();
       setResultData(result);
+      startCooldown();
 
     } catch (err) {
       const message = err instanceof Error ? err.message : '发生未知错误';
@@ -159,7 +168,7 @@ const ScenarioPage: React.FC = () => {
               ))}
             </div>
             
-            {/* [新增] 高级选项UI */}
+            {/* 高级选项UI */}
             <div className="input-group mt-6">
                 <button 
                     onClick={() => setIsAdvancedVisible(!isAdvancedVisible)}
@@ -206,8 +215,15 @@ const ScenarioPage: React.FC = () => {
                 </select>
             </div>
 
-            <button onClick={handleGenerate} disabled={isGenerating} className="generate-button mt-8">
-              {isGenerating ? '正在构建舞台...' : '生成情景'}
+            {/* 成功提示信息 */}
+            {!isGenerating && resultData && (
+                <div className="text-center text-sm text-green-600 my-2 font-semibold">
+                    🎉 情景生成成功！结果已显示在下方。
+                </div>
+            )}
+
+            <button onClick={handleGenerate} disabled={isGenerating || isCooldown} className="generate-button mt-4">
+              {isCooldown ? `冷却中 (${remainingTime}s)` : isGenerating ? '正在构建舞台...' : '生成情景'}
             </button>
             {error && <div className="error-message mt-4">{error}</div>}
           </div>
