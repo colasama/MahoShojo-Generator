@@ -205,13 +205,23 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
             </button>
             {isHistoryVisible && (
               <div className="result-value mt-2 space-y-2 text-xs">
-                {magicalGirl.arena_history.entries.slice().reverse().map((entry: ArenaHistoryEntry) => (
-                  <div key={entry.id} className="p-2 bg-black bg-opacity-10 rounded">
-                    <p><strong>{entry.title}</strong></p>
-                    <p><strong>类型:</strong> {entry.type} | <strong>胜利者:</strong> {entry.winner}</p>
-                    <p><strong>影响:</strong> {entry.impact}</p>
-                  </div>
-                ))}
+                {magicalGirl.arena_history.entries.slice().reverse().map((entry: ArenaHistoryEntry) => {
+                  // [UI改进] 从 gradientStyle 中提取起始颜色，用作历战记录条目的背景
+                  const startColor = gradientStyle.startsWith('linear-gradient(to right, ')
+                    ? gradientStyle.split(', ')[1].trim()
+                    : 'rgba(0, 0, 0, 0.05)'; // 默认颜色
+
+                  // 可以根据需要调整透明度或混合模式
+                  const historyItemBackground = `${startColor}20`; // 添加一些透明度
+
+                  return (
+                    <div key={entry.id} className="p-2 rounded" style={{ backgroundColor: historyItemBackground }}>
+                      <p><strong>{entry.title}</strong></p>
+                      <p><strong>类型:</strong> {entry.type} | <strong>胜利者:</strong> {entry.winner}</p>
+                      <p><strong>影响:</strong> {entry.impact}</p>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
