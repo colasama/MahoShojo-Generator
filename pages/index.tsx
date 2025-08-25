@@ -2,17 +2,92 @@ import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 
+interface LogoConfig {
+  id: string;
+  src: string;
+  width: number;
+  height: number;
+  alt: string;
+  href?: string;
+  className?: string;
+  color?: string;
+}
+
+const logoConfigs: LogoConfig[] = [
+  {
+    id: 'magical-generator',
+    src: '/logo-white.svg',
+    width: 250,
+    height: 60,
+    alt: '魔法少女生成器',
+    href: '/name',
+    className: 'magical-generator',
+    color: 'white'
+  },
+  {
+    id: 'fairy-quest',
+    src: '/questionnaire-logo.svg',
+    width: 250,
+    height: 40,
+    alt: '奇妙妖精大调查',
+    href: '/details',
+    className: 'fairy-quest'
+  },
+  {
+    id: 'canshou-generator',
+    src: '/beast-logo-white.svg',
+    width: 280,
+    height: 40,
+    alt: '危险残兽大调查',
+    href: '/canshou',
+    className: 'canshou-generator',
+    color: 'white'
+  },
+  {
+    id: 'battle-arena',
+    src: '/arena-white.svg',
+    width: 280,
+    height: 80,
+    alt: '魔法少女竞技场',
+    href: '/battle',
+    className: 'battle-arena',
+    color: 'white'
+  },
+  {
+    id: 'scenario-generator',
+    src: '/scenario.svg',
+    width: 280,
+    height: 40,
+    alt: '自定义情景生成',
+    href: '/scenario',
+    className: 'scenario-generator'
+  },
+  {
+    id: 'sublimation',
+    src: '/sublimation.svg',
+    width: 280,
+    height: 40,
+    alt: '角色成长升华',
+    href: '/sublimation',
+    className: 'sublimation'
+  },
+  {
+    id: 'character-manager',
+    src: '/character-manager.svg',
+    width: 280,
+    height: 40,
+    alt: '角色数据管理',
+    href: '/character-manager',
+    className: 'character-manager'
+  }
+];
+
 export default function Home() {
   const [, setImagesLoaded] = useState(false);
 
   useEffect(() => {
-    // 预加载关键图片
     const preloadImages = async () => {
-      const imageUrls = [
-        '/logo.svg',
-        '/logo-white.svg',
-        '/questionnaire-logo.svg'
-      ];
+      const imageUrls = logoConfigs.map(logo => logo.src);
 
       const imagePromises = imageUrls.map(url => {
         return new Promise((resolve, reject) => {
@@ -40,9 +115,15 @@ export default function Home() {
       <Head>
         <title>✨ 魔法少女生成器 ✨</title>
         <meta name="description" content="AI驱动的魔法少女角色生成器，创建独一无二的魔法少女角色" />
-        <link rel="preload" href="/logo.svg" as="image" type="image/svg+xml" />
-        <link rel="preload" href="/mahou-title.svg" as="image" type="image/svg+xml" />
-        <link rel="preload" href="/questionnaire-title.svg" as="image" type="image/svg+xml" />
+        {logoConfigs.map(logo => (
+          <link
+            key={logo.id}
+            rel="preload"
+            href={logo.src}
+            as="image"
+            type="image/svg+xml"
+          />
+        ))}
       </Head>
       <div className="magic-background-white">
         <div className="container">
@@ -58,117 +139,22 @@ export default function Home() {
               由于用户爆炸可能需要多次尝试，正在努力优化中 ——
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* 魔法少女生成器按钮 */}
-              <Link href="/name" className="feature-button magical-generator">
-                <div className="gradient-overlay"></div>
-                <div className="feature-button-content">
-                  <div className="feature-title-container">
-                    <img
-                      src="/logo-white.svg"
-                      width={250}
-                      height={60}
-                      alt="魔法少女生成器"
-                      className="feature-title-svg"
-                    />
+              {logoConfigs.filter(logo => logo.href).map((logo) => (
+                <Link key={logo.id} href={logo.href!} className={`feature-button ${logo.className}`}>
+                  <div className="gradient-overlay"></div>
+                  <div className="feature-button-content">
+                    <div className="feature-title-container">
+                      <img
+                        src={logo.src}
+                        width={logo.width}
+                        height={logo.height}
+                        alt={logo.alt}
+                        className="feature-title-svg"
+                      />
+                    </div>
                   </div>
-                </div>
-              </Link>
-
-              {/* 奇妙妖精大调查按钮 */}
-              <Link href="/details" className="feature-button fairy-quest">
-                <div className="gradient-overlay"></div>
-                <div className="feature-button-content">
-                  <div className="feature-title-container">
-                    <img
-                      src="/questionnaire-logo.svg"
-                      width={250}
-                      height={40}
-                      alt="奇妙妖精大调查"
-                      className="feature-title-svg"
-                    />
-                  </div>
-                </div>
-              </Link>
-
-              {/* 残兽生成器按钮 */}
-              <Link href="/canshou" className="feature-button canshou-generator">
-                <div className="gradient-overlay"></div>
-                <div className="feature-button-content">
-                  <div className="feature-title-container">
-                    <img
-                      src="/beast-logo-white.svg"
-                      width={280}
-                      height={40}
-                      alt="危险残兽大调查"
-                      className="feature-title-svg"
-                    />
-                  </div>
-                </div>
-              </Link>
-
-              {/* 情景生成器按钮 */}
-              <Link href="/scenario" className="feature-button scenario-generator">
-                <div className="gradient-overlay"></div>
-                <div className="feature-button-content">
-                  <div className="feature-title-container">
-                    <img
-                      src="/scenario.svg"
-                      width={280}
-                      height={40}
-                      alt="自定义情景生成"
-                      className="feature-title-svg"
-                    />
-                  </div>
-                </div>
-              </Link>
-
-              {/* 魔法少女竞技场按钮 */}
-              <Link href="/battle" className="feature-button battle-arena">
-                <div className="gradient-overlay"></div>
-                <div className="feature-button-content">
-                  <div className="feature-title-container">
-                    <img
-                      src="/arena-white.svg"
-                      width={280}
-                      height={80}
-                      alt="魔法少女竞技场"
-                      className="feature-title-svg"
-                    />
-                  </div>
-                </div>
-              </Link>
-
-              {/* 成长升华按钮 */}
-              <Link href="/sublimation" className="feature-button sublimation">
-                <div className="gradient-overlay"></div>
-                <div className="feature-button-content">
-                  <div className="feature-title-container">
-                    <img
-                      src="/sublimation.svg"
-                      width={280}
-                      height={40}
-                      alt="角色成长升华"
-                      className="feature-title-svg"
-                    />
-                  </div>
-                </div>
-              </Link>
-
-              {/* 角色数据管理按钮 */}
-              <Link href="/character-manager" className="feature-button character-manager">
-                <div className="gradient-overlay"></div>
-                <div className="feature-button-content">
-                  <div className="feature-title-container">
-                    <img
-                      src="/character-manager.svg"
-                      width={280}
-                      height={40}
-                      alt="角色数据管理"
-                      className="feature-title-svg"
-                    />
-                  </div>
-                </div>
-              </Link>
+                </Link>
+              ))}
             </div>
 
             <div style={{ marginTop: '2rem', textAlign: 'center' }}>
