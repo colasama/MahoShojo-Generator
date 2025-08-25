@@ -202,7 +202,7 @@ const SublimationPage: React.FC = () => {
         const data = resultData.sublimatedData;
 
         if (data.codename) { // 魔法少女
-            const colorScheme = data.appearance.colorScheme || "粉色、白色";
+            const colorScheme = data.appearance.colorScheme || "红色、粉色";
             const mainColorName = Object.values(MainColor).find(color => colorScheme.includes(color)) || MainColor.Pink;
             const colors = gradientColors[mainColorName] || gradientColors[MainColor.Pink];
             const gradientStyle = `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
