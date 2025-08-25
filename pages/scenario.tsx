@@ -15,6 +15,17 @@ const scenarioQuestions = [
   { id: 'development', label: '故事可能会有哪些有趣的发展方向？', placeholder: '例如：决斗中途有第三方介入；谜题的答案指向一个惊人的秘密；采访者突然问了一个尖锐的问题...' },
 ];
 
+// [新增] 定义可供用户选择留空的字段列表
+// 这里的 'value' 必须精确对应 Zod Schema 中的路径
+const optionalFields = [
+    { label: '场景时间', value: 'elements.scene.time' },
+    { label: '场景地点', value: 'elements.scene.place' },
+    { label: '场景特征', value: 'elements.scene.features' },
+    { label: '预设NPC', value: 'elements.roles' },
+    { label: '故事氛围', value: 'elements.atmosphere' },
+    { label: '发展方向', value: 'elements.development' },
+];
+
 const ScenarioPage: React.FC = () => {
   const router = useRouter();
   const [answers, setAnswers] = useState<Record<string, string>>(
@@ -23,6 +34,11 @@ const ScenarioPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultData, setResultData] = useState<any | null>(null);
+
+  // [新增] 用于存储希望留空的字段的状态
+  const [fieldsToKeepEmpty, setFieldsToKeepEmpty] = useState<string[]>([]);
+  // [新增] 用于控制高级选项的显示/隐藏
+  const [isAdvancedVisible, setIsAdvancedVisible] = useState(false);
 
   // 多语言支持
   const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
@@ -37,6 +53,15 @@ const ScenarioPage: React.FC = () => {
 
   const handleAnswerChange = (id: string, value: string) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
+  };
+  
+  // [新增] 处理留空字段复选框的点击事件
+  const handleOptionalFieldChange = (fieldValue: string) => {
+      setFieldsToKeepEmpty(prev => 
+          prev.includes(fieldValue)
+              ? prev.filter(f => f !== fieldValue)
+              : [...prev, fieldValue]
+      );
   };
 
   const handleGenerate = async () => {
@@ -56,7 +81,8 @@ const ScenarioPage: React.FC = () => {
       const response = await fetch('/api/generate-scenario', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers, language: selectedLanguage }),
+        // [修改] 在请求体中加入 fieldsToKeepEmpty
+        body: JSON.stringify({ answers, language: selectedLanguage, fieldsToKeepEmpty }),
       });
 
       if (!response.ok) {
@@ -131,6 +157,34 @@ const ScenarioPage: React.FC = () => {
                   />
                 </div>
               ))}
+            </div>
+            
+            {/* [新增] 高级选项UI */}
+            <div className="input-group mt-6">
+                <button 
+                    onClick={() => setIsAdvancedVisible(!isAdvancedVisible)}
+                    className="text-sm font-semibold text-purple-700 hover:underline focus:outline-none"
+                >
+                    {isAdvancedVisible ? '▼ ' : '▶ '}高级选项：强制留空字段
+                </button>
+                {isAdvancedVisible && (
+                    <div className="mt-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <p className="text-xs text-gray-600 mb-3">勾选你希望AI在生成时强制留空的字段，以获得更灵活的情景文件。</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {optionalFields.map(field => (
+                                <label key={field.value} className="flex items-center text-sm cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={fieldsToKeepEmpty.includes(field.value)}
+                                        onChange={() => handleOptionalFieldChange(field.value)}
+                                        className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                    />
+                                    <span className="ml-2 text-gray-700">{field.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* 多语言支持 */}

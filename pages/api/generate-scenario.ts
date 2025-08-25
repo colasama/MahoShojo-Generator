@@ -52,13 +52,27 @@ const ScenarioSchema = z.object({
 
 const createGenerationConfig = (
   answers: Record<string, string>,
-  language: string
+  language: string,
+  fieldsToKeepEmpty: string[]
 ): GenerationConfig<z.infer<typeof ScenarioSchema>, any> => {
   const promptBuilder = () => {
     const answerText = Object.entries(answers)
       .filter(([, value]) => value.trim() !== '')
       .map(([key, value]) => `【${key}】\n${value}\n`)
       .join('\n');
+    // [新增] 根据用户选择，构建强制留空指令
+    let emptyFieldsInstruction = '';
+    if (fieldsToKeepEmpty && fieldsToKeepEmpty.length > 0) {
+        emptyFieldsInstruction = `
+## 强制留空指令 (CRITICAL INSTRUCTION)
+用户已指定以下字段必须留空。在你的JSON输出中：
+- 对于类型为 "string" 的字段，你必须返回一个空字符串 ""。
+- 对于类型为 "array" 的字段，你必须返回一个空数组 []。
+绝对不要为这些字段生成任何内容。
+需要留空的字段列表:
+${fieldsToKeepEmpty.map(f => `- ${f}`).join('\n')}
+`;
+    }
 
     return `
 你是一个富有想象力的故事场景设计师。你的任务是根据用户提供的几个核心要素，构思并生成一个结构化的、可供后续故事使用的自定义情景（Scenario）文件。
@@ -70,6 +84,8 @@ const createGenerationConfig = (
 3.  **结构化输出**：你必须严格按照我提供的JSON Schema格式返回结果，不得有任何遗漏或格式错误。
 4.  **处理留白**：用户可能不会回答所有问题，或者回答得很模糊。在这种情况下，你拥有一定的创作自由度。对于留空的核心要素（如“角色”），请直接将其设定为空值或空数组，并在描述中注明“未指定”或“待定”，以便用户后续添加。
 5.  **语言使用**：请你必须使用【${language}】进行内容创作。
+
+${emptyFieldsInstruction}
 
 ## 用户的回答
 ${answerText}
@@ -98,7 +114,7 @@ async function handler(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const { answers, language = 'zh-CN' } = await req.json();
+    const { answers, language = 'zh-CN', fieldsToKeepEmpty = [] } = await req.json();
 
     if (!answers || typeof answers !== 'object' || Object.keys(answers).length === 0) {
       return new Response(JSON.stringify({ error: 'Answers object is required' }), { status: 400 });
@@ -139,7 +155,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     // --- 生成逻辑 ---
-    const generationConfig = createGenerationConfig(answers, language);
+    const generationConfig = createGenerationConfig(answers, language, fieldsToKeepEmpty);
     const scenarioData = await generateWithAI(null, generationConfig);
 
     // [修改] 修正签名逻辑 (SRS 3.3.3 & 4.1)
