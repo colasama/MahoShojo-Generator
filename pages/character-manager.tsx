@@ -3,12 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router'
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
 import TachieGenerator from '../components/TachieGenerator';
-// [核心修复] 导入签名生成函数
-import { generateSignature } from '@/lib/signature';
 
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
@@ -18,6 +17,7 @@ const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto
 const NATIVE_PRESERVING_FIELDS = new Set(['codename', 'name']);
 
 const CharacterManagerPage: React.FC = () => {
+    const router = useRouter();
     const [pastedJson, setPastedJson] = useState('');
     const [characterData, setCharacterData] = useState<any | null>(null);
     const [originalData, setOriginalData] = useState<any | null>(null);
@@ -301,55 +301,86 @@ const CharacterManagerPage: React.FC = () => {
     // ===================================
     // 保存与输出 (SRS 3.7.4 & 3.7.5)
     // ===================================
-    // [核心修复] 将函数改造为 async，以支持异步的签名生成
     const handleSaveChanges = async (type: 'download' | 'copy') => {
         if (!characterData) return;
         setMessage(null);
-        
-        // 1. 内容安全检查
+        setCopiedStatus(false); // 重置复制状态
+
+        // 1. 前端先行内容安全检查，提供快速反馈
         if ((await quickCheck(JSON.stringify(characterData))).hasSensitiveWords) {
             setMessage({ type: 'error', text: '检测到不适宜内容，无法保存。请修改后重试。' });
             return;
         }
-        
-        // 2. 构造最终数据，这是一个可变对象
-        const finalData = { ...characterData };
-        
-        // [核心修复] 签名逻辑改造
-        if (hasLostNativeness || !isNative) {
-            // 如果原生性已丧失，则移除签名
-            delete finalData.signature;
-        } else {
-            // 如果数据仍然是原生的，则为其重新生成一个有效的签名
-            // 这是为了确保即便是允许的修改（如codename），签名也能与最新的数据匹配
-            const newSignature = await generateSignature(finalData);
-            if (newSignature) {
-                finalData.signature = newSignature;
+
+        // 声明一个变量，用于存储最终要处理的数据
+        let finalData;
+
+        try {
+            // 2. 核心逻辑分歧：判断是否需要重新签名
+            if (isNative && !hasLostNativeness) {
+                // **情况一：数据为原生且未被破坏**
+                // 此时，我们需要将当前编辑后的数据发送到服务器，获取一个新的有效签名。
+                setMessage({ type: 'info', text: '正在请求服务器进行原生性签名认证...' });
+                setIsLoading(true);
+
+                const response = await fetch('/api/resign-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(characterData),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    if (errorData.shouldRedirect) {
+                        router.push({
+                            pathname: '/arrested',
+                            query: { reason: errorData.reason || '编辑内容不合规' }
+                        });
+                        // 中断执行，因为页面即将跳转
+                        return;
+                    }
+                    // 如果是其他错误，则抛出异常
+                    throw new Error(errorData.message || '签名服务器认证失败');
+                }
+                
+                // 使用服务器返回的、带有最新有效签名的数据作为最终数据
+                finalData = await response.json();
+                setMessage({ type: 'success', text: '原生性签名认证成功！' });
+
             } else {
-                // 如果密钥未配置导致签名生成失败，也移除签名，避免保留无效的旧签名
+                // **情况二：数据为衍生数据（非原生或已失去原生性）**
+                // 按照原有逻辑，直接移除签名。
+                finalData = { ...characterData };
                 delete finalData.signature;
             }
-        }
-        
-        const name = finalData.codename || finalData.name;
-        const jsonData = JSON.stringify(finalData, null, 2);
 
-        if (type === 'download') {
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `角色档案_${name}_已编辑.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            setMessage({ type: 'success', text: '文件已下载！' });
-        } else {
-            navigator.clipboard.writeText(jsonData).then(() => {
+            // 3. 执行下载或复制操作
+            const name = finalData.codename || finalData.name;
+            const jsonData = JSON.stringify(finalData, null, 2);
+
+            if (type === 'download') {
+                const blob = new Blob([jsonData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `角色档案_${name}_已编辑.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                // 延迟更新消息，确保用户能看到签名成功的提示
+                setTimeout(() => setMessage({ type: 'success', text: '文件已下载！' }), 1000);
+            } else {
+                await navigator.clipboard.writeText(jsonData);
                 setCopiedStatus(true);
                 setTimeout(() => setCopiedStatus(false), 2000);
-            });
+            }
+
+        } catch (err) {
+            const text = err instanceof Error ? err.message : '处理数据时发生未知错误。';
+            setMessage({ type: 'error', text: `操作失败: ${text}` });
+        } finally {
+            setIsLoading(false);
         }
     };
     
