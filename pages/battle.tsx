@@ -98,7 +98,7 @@ const BattlePage: React.FC = () => {
     const [presetInfo, setPresetInfo] = useState<Map<string, string>>(new Map());
     // 状态：用于显示加载状态
     const [isLoadingStats, setIsLoadingStats] = useState(true);
-    
+
     // 模式状态
     const [battleMode, setBattleMode] = useState<BattleMode>('classic');
 
@@ -236,14 +236,14 @@ const BattlePage: React.FC = () => {
     const handleSelectPreset = async (preset: Preset) => {
         // 修改：在操作开始时就锁定按钮，防止重复点击
         setLoadingPreset(preset.filename);
-    
+
         try {
             if (combatants.some(c => c.filename === preset.filename)) {
                 handleRemoveCombatant(preset.filename);
                 setError(null);
                 return;
             }
-    
+
             const response = await fetch(`/presets/${preset.filename}`);
             if (!response.ok) throw new Error(`无法加载 ${preset.name} 的设定文件。`);
             const presetData = await response.json();
@@ -337,7 +337,7 @@ const BattlePage: React.FC = () => {
             const jsonData = await Promise.all(jsonPromises);
             processJsonData(jsonData, '上传的文件');
         } catch (err) {
-             if (err instanceof Error) setError(`❌ 文件处理失败: ${err.message}`);
+            if (err instanceof Error) setError(`❌ 文件处理失败: ${err.message}`);
         } finally {
             if (event.target) event.target.value = '';
         }
@@ -362,7 +362,7 @@ const BattlePage: React.FC = () => {
             await processJsonData(dataArray, '粘贴的内容');
             setPastedJson('');
         } catch (err) {
-             if (err instanceof Error) setError(`❌ 文本解析失败: ${err.message}.`);
+            if (err instanceof Error) setError(`❌ 文本解析失败: ${err.message}.`);
         }
     };
 
@@ -448,8 +448,8 @@ const BattlePage: React.FC = () => {
             const response = await fetch('/api/generate-battle-story', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    combatants: combatantsData, 
+                body: JSON.stringify({
+                    combatants: combatantsData,
                     selectedLevel,
                     mode: battleMode, // 将当前选择的模式发送给后端
                     userGuidance: userGuidance, // 将用户引导文本发送给后端
@@ -498,21 +498,21 @@ const BattlePage: React.FC = () => {
             setIsGenerating(false);
         }
     };
-    
+
     // 根据模式决定生成按钮的文本
     const getButtonText = () => {
         if (isCooldown) return `记者赶稿中...请等待 ${remainingTime} 秒`;
         if (isGenerating) {
-            switch(battleMode) {
+            switch (battleMode) {
                 case 'daily': return '撰写日常逸闻中... (｡･ω･｡)ﾉ';
                 case 'kizuna': return '描绘宿命对决中... (ง •̀_•́)ง';
                 case 'classic': return '推演激烈战斗中... (ง •̀_•́)ง';
             }
         }
-        switch(battleMode) {
+        switch (battleMode) {
             case 'daily': return '生成日常故事 (´｡• ᵕ •｡`) ♡';
             case 'kizuna': return '生成宿命对决 (๑•̀ㅂ•́)و✧';
-            case 'classic': return '生成独家新闻 (๑•̀ㅂ•́)و✧';
+            case 'classic': return '生成独家新闻 _φ(❐_❐✧';
         }
     };
 
@@ -559,9 +559,9 @@ const BattlePage: React.FC = () => {
                     </div>
                     {presets.length > presetsPerPage && (
                         <div className="flex justify-center items-center mt-4 space-x-2">
-                             <button onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} disabled={currentPage === 1} className={`px-3 py-1 rounded text-sm ${currentPage === 1 ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>上一页</button>
-                             <span className="text-sm text-gray-600">第 {currentPage} / {Math.ceil(presets.length / presetsPerPage)} 页</span>
-                             <button onClick={() => setCurrentPage(Math.min(currentPage + 1, Math.ceil(presets.length / presetsPerPage)))} disabled={currentPage === Math.ceil(presets.length / presetsPerPage)} className={`px-3 py-1 rounded text-sm ${currentPage === Math.ceil(presets.length / presetsPerPage) ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>下一页</button>
+                            <button onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} disabled={currentPage === 1} className={`px-3 py-1 rounded text-sm ${currentPage === 1 ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>上一页</button>
+                            <span className="text-sm text-gray-600">第 {currentPage} / {Math.ceil(presets.length / presetsPerPage)} 页</span>
+                            <button onClick={() => setCurrentPage(Math.min(currentPage + 1, Math.ceil(presets.length / presetsPerPage)))} disabled={currentPage === Math.ceil(presets.length / presetsPerPage)} className={`px-3 py-1 rounded text-sm ${currentPage === Math.ceil(presets.length / presetsPerPage) ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>下一页</button>
                         </div>
                     )}
                 </div>
@@ -598,7 +598,7 @@ const BattlePage: React.FC = () => {
 
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">上传自己的 .json 设定文件</label>
-                            <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"/>
+                            <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" />
                         </div>
 
                         <div className="mb-6">
@@ -607,7 +607,7 @@ const BattlePage: React.FC = () => {
                             </button>
                             {isPasteAreaVisible && (
                                 <div className="input-group mt-2">
-                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个或多个魔法少女/残兽的设定文件(.json)内容..." className="input-field resize-y h-32"/>
+                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个或多个魔法少女/残兽的设定文件(.json)内容..." className="input-field resize-y h-32" />
                                     <button onClick={handleAddFromPaste} disabled={!pastedJson.trim() || isGenerating || combatants.length >= 4} className="generate-button mt-2 mb-0">从文本添加角色</button>
                                 </div>
                             )}
@@ -703,7 +703,7 @@ const BattlePage: React.FC = () => {
 
                         {/* --- 在非日常模式下显示等级选择 --- */}
                         {battleMode !== 'daily' && (
-                           <div className="input-group">
+                            <div className="input-group">
                                 <label htmlFor="level-select" className="input-label">指定平均等级 (可选):</label>
                                 <select id="level-select" value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="input-field" style={{ cursor: 'pointer' }}>
                                     {battleLevels.map(level => (<option key={level.value} value={level.value}>{level.label}</option>))}
@@ -730,13 +730,13 @@ const BattlePage: React.FC = () => {
                         )}
 
 
-                        <button onClick={handleGenerate} 
+                        <button onClick={handleGenerate}
                             // --- 根据模式动态判断禁用条件 ---
                             disabled={
-                                isGenerating || 
-                                isCooldown || 
+                                isGenerating ||
+                                isCooldown ||
                                 (battleMode === 'daily' ? combatants.length < 1 : combatants.length < 2)
-                            } 
+                            }
                             className="generate-button"
                         >
                             {getButtonText()}

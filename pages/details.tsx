@@ -46,8 +46,8 @@ interface MagicalGirlDetails {
     coreTraits: string[];
     predictionBasis: string;
     background: {
-        belief: string;
-        bonds: string;
+      belief: string;
+      bonds: string;
     };
   };
 }
@@ -375,9 +375,6 @@ const DetailsPage: React.FC = () => {
                 >
                   你在魔法少女道路上的潜力和表现将会如何？<br />
                   <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>本测试设定来源于小说《下班，然后变成魔法少女》</p>
-                  <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>首页：mahoshojo.colanns.me</p>
-                  <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>以及广告位募集中</del></p>
-                  <p style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#999', fontStyle: '' }}><del>如有意向请联系魔法国度研究院院长 @祖母绿：1********</del></p>
                 </div>
                 <button
                   onClick={handleStartQuestionnaire}
@@ -471,31 +468,32 @@ const DetailsPage: React.FC = () => {
                 </div>
 
                 {/* 下一题按钮 */}
-                <button
-                  onClick={handleNext}
-                  disabled={submitting || currentAnswer.trim().length === 0 || isTransitioning || isCooldown}
-                  className="generate-button"
-                >
-                  {isCooldown
-                    ? `请等待 ${remainingTime} 秒`
-                    : submitting
-                      ? (
-                        <span className="flex items-center justify-center">
-                          <svg className="animate-spin h-4 w-4 text-white" style={{ marginLeft: '-0.25rem', marginRight: '0.5rem' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          提交中...
-                        </span>
-                      )
-                      : isLastQuestion
-                        ? '提交'
-                        : '下一题'}
-                </button>
-
-                <button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0}>
-                  返回上题
-                </button>
+                <div className="flex justify-between gap-2">
+                  <button className="generate-button w-1/4" onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || submitting || isTransitioning || isCooldown}>
+                    返回上题
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    disabled={submitting || currentAnswer.trim().length === 0 || isTransitioning || isCooldown}
+                    className="generate-button"
+                  >
+                    {isCooldown
+                      ? `请等待 ${remainingTime} 秒`
+                      : submitting
+                        ? (
+                          <span className="flex items-center justify-center">
+                            <svg className="animate-spin h-4 w-4 text-white" style={{ marginLeft: '-0.25rem', marginRight: '0.5rem' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            提交中...
+                          </span>
+                        )
+                        : isLastQuestion
+                          ? '提交'
+                          : '下一题'}
+                  </button>
+                </div>
 
                 {/* 错误信息显示 */}
                 {error && (
@@ -505,8 +503,8 @@ const DetailsPage: React.FC = () => {
                 )}
 
                 {/* 复制已填写内容 */}
-                <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                  <button onClick={handleCopyContent} style={{ marginRight: '10px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <button className="border-2 border-grey-900 rounded-md px-4 py-2 cursor-pointer" onClick={handleCopyContent} style={{ marginRight: '10px' }}>
                     复制已填写内容
                   </button>
                   <p style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>

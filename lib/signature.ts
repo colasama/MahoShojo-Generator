@@ -1,11 +1,5 @@
 // lib/signature.ts
-
-// 在Edge Runtime中，`crypto`是全局对象。在Node.js环境中，我们需要从'crypto'模块导入。
-// 这种方式可以确保在两种环境下都能正确工作。
-import { webcrypto } from 'crypto';
-
-const subtle = typeof crypto !== 'undefined' ? crypto.subtle : webcrypto.subtle;
-const TextEncoder = globalThis.TextEncoder;
+const subtle = crypto.subtle;
 
 let secretKeyPromise: Promise<CryptoKey | null> | null = null;
 
