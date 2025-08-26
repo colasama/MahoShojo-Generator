@@ -54,9 +54,6 @@ export default function Home() {
             <p className="subtitle text-center">
               欢迎来到魔法国度！选择一个项目开始玩耍吧！
             </p>
-            <p className="subtitle text-center" style={{ marginBottom: '3rem' }}>
-              由于用户爆炸可能需要多次尝试，正在努力优化中 ——
-            </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* 魔法少女生成器按钮 */}
               <Link href="/name" className="feature-button magical-generator">
