@@ -22,14 +22,14 @@ const MainColor = {
 } as const;
 
 const gradientColors: Record<string, { first: string; second: string }> = {
-  [MainColor.Red]: { first: '#ff6b6b', second: '#ee5a6f' },
-  [MainColor.Orange]: { first: '#ff922b', second: '#ffa94d' },
-  [MainColor.Cyan]: { first: '#22b8cf', second: '#66d9e8' },
-  [MainColor.Blue]: { first: '#5c7cfa', second: '#748ffc' },
-  [MainColor.Purple]: { first: '#9775fa', second: '#b197fc' },
-  [MainColor.Pink]: { first: '#ff9a9e', second: '#fecfef' },
-  [MainColor.Yellow]: { first: '#f59f00', second: '#fcc419' },
-  [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
+    [MainColor.Red]: { first: '#ff6b6b', second: '#ee5a6f' },
+    [MainColor.Orange]: { first: '#ff922b', second: '#ffa94d' },
+    [MainColor.Cyan]: { first: '#22b8cf', second: '#66d9e8' },
+    [MainColor.Blue]: { first: '#5c7cfa', second: '#748ffc' },
+    [MainColor.Purple]: { first: '#9775fa', second: '#b197fc' },
+    [MainColor.Pink]: { first: '#ff9a9e', second: '#fecfef' },
+    [MainColor.Yellow]: { first: '#f59f00', second: '#fcc419' },
+    [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
 };
 
 // 递归提取对象中所有字符串值的函数，用于敏感词检查
@@ -191,7 +191,7 @@ const SublimationPage: React.FC = () => {
         setSavedImageUrl(imageUrl);
         setShowImageModal(true);
     };
-    
+
     const downloadJson = (data: any) => {
         const name = data.codename || data.name;
         const jsonData = JSON.stringify(data, null, 2);
@@ -205,7 +205,7 @@ const SublimationPage: React.FC = () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     };
-    
+
     const renderResultCard = () => {
         if (!resultData?.sublimatedData) return null;
         const data = resultData.sublimatedData;
@@ -232,8 +232,10 @@ const SublimationPage: React.FC = () => {
                 <div className="container">
                     <div className="card">
                         <div className="text-center mb-4">
-                            <h1 className="text-3xl font-bold text-gray-800">成长升华</h1>
-                            <p className="subtitle mt-2">见证她们在战斗与经历中完成的蜕变</p>
+                            <div className="flex justify-center items-center" style={{ marginBottom: '1rem' }}>
+                                <img src="/sublimation.svg" width={360} height={40} alt="角色成长升华" />
+                            </div>
+                            <p className="subtitle mt-2">角色成长升华，见证她们在战斗与经历中完成的蜕变</p>
                         </div>
                         <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
                             <h3 className="font-bold mb-2">✨ 功能说明</h3>
@@ -245,10 +247,10 @@ const SublimationPage: React.FC = () => {
                         </div>
                         <div className="input-group">
                             <label htmlFor="character-upload" className="input-label">上传角色设定文件</label>
-                            <input 
-                                id="character-upload" 
-                                type="file" 
-                                accept=".json" 
+                            <input
+                                id="character-upload"
+                                type="file"
+                                accept=".json"
                                 onChange={handleFileChange}
                                 className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
                             />
@@ -256,14 +258,14 @@ const SublimationPage: React.FC = () => {
                                 <p className="text-xs text-gray-500 mt-2">已加载角色: {fileName}</p>
                             )}
                         </div>
-                        
+
                         <div className="mb-6">
                             <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-purple-700 hover:underline cursor-pointer mb-2 font-semibold">
                                 {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
                             </button>
                             {isPasteAreaVisible && (
                                 <div className="input-group mt-2">
-                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个角色的设定文件(.json)内容..." className="input-field resize-y h-32"/>
+                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个角色的设定文件(.json)内容..." className="input-field resize-y h-32" />
                                     <button onClick={handlePasteAndLoad} disabled={isGenerating} className="generate-button mt-2 mb-0" style={{ backgroundColor: '#8b5cf6', backgroundImage: 'linear-gradient(to right, #8b5cf6, #a78bfa)' }}>从文本加载角色</button>
                                 </div>
                             )}
@@ -304,7 +306,7 @@ const SublimationPage: React.FC = () => {
                     </div>
 
                     {isGenerating && <div className="text-center mt-6">少女蜕变中，请稍后...</div>}
-                    
+
                     {resultData && (
                         <>
                             {resultData.unchangedFields && resultData.unchangedFields.length > 0 && (

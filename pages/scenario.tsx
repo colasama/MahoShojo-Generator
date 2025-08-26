@@ -19,12 +19,12 @@ const scenarioQuestions = [
 // 定义可供用户选择留空的字段列表
 // 这里的 'value' 必须精确对应 Zod Schema 中的路径
 const optionalFields = [
-    { label: '场景时间', value: 'elements.scene.time' },
-    { label: '场景地点', value: 'elements.scene.place' },
-    { label: '场景特征', value: 'elements.scene.features' },
-    { label: '预设NPC', value: 'elements.roles' },
-    { label: '故事氛围', value: 'elements.atmosphere' },
-    { label: '发展方向', value: 'elements.development' },
+  { label: '场景时间', value: 'elements.scene.time' },
+  { label: '场景地点', value: 'elements.scene.place' },
+  { label: '场景特征', value: 'elements.scene.features' },
+  { label: '预设NPC', value: 'elements.roles' },
+  { label: '故事氛围', value: 'elements.atmosphere' },
+  { label: '发展方向', value: 'elements.development' },
 ];
 
 const ScenarioPage: React.FC = () => {
@@ -48,40 +48,40 @@ const ScenarioPage: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
 
   useEffect(() => {
-      fetch('/languages.json')
-          .then(res => res.json())
-          .then(data => setLanguages(data))
-          .catch(err => console.error("Failed to load languages:", err));
+    fetch('/languages.json')
+      .then(res => res.json())
+      .then(data => setLanguages(data))
+      .catch(err => console.error("Failed to load languages:", err));
   }, []);
 
   const handleAnswerChange = (id: string, value: string) => {
     setAnswers(prev => ({ ...prev, [id]: value }));
   };
-  
+
   // 处理留空字段复选框的点击事件
   const handleOptionalFieldChange = (fieldValue: string) => {
-      setFieldsToKeepEmpty(prev => 
-          prev.includes(fieldValue)
-              ? prev.filter(f => f !== fieldValue)
-              : [...prev, fieldValue]
-      );
+    setFieldsToKeepEmpty(prev =>
+      prev.includes(fieldValue)
+        ? prev.filter(f => f !== fieldValue)
+        : [...prev, fieldValue]
+    );
   };
 
   const handleGenerate = async () => {
     // [修改] 增加冷却检查
     if (isCooldown) {
-        setError(`操作过于频繁，请等待 ${remainingTime} 秒后再试。`);
-        return;
+      setError(`操作过于频繁，请等待 ${remainingTime} 秒后再试。`);
+      return;
     }
     setIsGenerating(true);
     setError(null);
     setResultData(null);
-    
+
     try {
       if ((await quickCheck(JSON.stringify(answers))).hasSensitiveWords) {
         router.push({
-            pathname: '/arrested',
-            query: { reason: '在情景问卷中使用了危险符文' }
+          pathname: '/arrested',
+          query: { reason: '在情景问卷中使用了危险符文' }
         });
         return;
       }
@@ -94,15 +94,15 @@ const ScenarioPage: React.FC = () => {
       });
 
       if (!response.ok) {
-          const errorJson = await response.json().catch(() => ({ message: '服务器响应异常' }));
-          if (errorJson.shouldRedirect) {
-              router.push({
-                  pathname: '/arrested',
-                  query: { reason: errorJson.reason || '使用危险符文' }
-              });
-              return;
-          }
-          throw new Error(errorJson.message || errorJson.error || '生成失败');
+        const errorJson = await response.json().catch(() => ({ message: '服务器响应异常' }));
+        if (errorJson.shouldRedirect) {
+          router.push({
+            pathname: '/arrested',
+            query: { reason: errorJson.reason || '使用危险符文' }
+          });
+          return;
+        }
+        throw new Error(errorJson.message || errorJson.error || '生成失败');
       }
 
       const result = await response.json();
@@ -130,7 +130,7 @@ const ScenarioPage: React.FC = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-  
+
   const copyToClipboard = (data: any) => {
     const jsonData = JSON.stringify(data, null, 2);
     navigator.clipboard.writeText(jsonData)
@@ -141,17 +141,19 @@ const ScenarioPage: React.FC = () => {
   return (
     <>
       <Head>
-        <title>情景生成 - MahoShojo Generator</title>
+        <title>箱庭物语 - MahoShojo Generator</title>
         <meta name="description" content="通过回答问题，快速生成用于竞技场的自定义故事场景。" />
       </Head>
       <div className="magic-background-white">
         <div className="container">
           <div className="card">
             <div className="text-center mb-4">
-              <h1 className="text-3xl font-bold text-gray-800">情景生成</h1>
-              <p className="subtitle mt-2">创建独一无二的舞台，上演属于你的故事</p>
+              <div className="flex justify-center items-center" style={{ marginBottom: '1rem' }}>
+                <img src="/scenario-shadow.svg" width={360} height={40} alt="箱庭物语" />
+              </div>
+              <p className="subtitle mt-2">情景生成器，创建独一无二的舞台，上演属于你的故事</p>
             </div>
-            
+
             <div className="space-y-6">
               {scenarioQuestions.map(q => (
                 <div key={q.id} className="input-group">
@@ -167,59 +169,59 @@ const ScenarioPage: React.FC = () => {
                 </div>
               ))}
             </div>
-            
+
             {/* 高级选项UI */}
             <div className="input-group mt-6">
-                <button 
-                    onClick={() => setIsAdvancedVisible(!isAdvancedVisible)}
-                    className="text-sm font-semibold text-purple-700 hover:underline focus:outline-none"
-                >
-                    {isAdvancedVisible ? '▼ ' : '▶ '}高级选项：强制留空字段
-                </button>
-                {isAdvancedVisible && (
-                    <div className="mt-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                        <p className="text-xs text-gray-600 mb-3">勾选你希望AI在生成时强制留空的字段，以获得更灵活的情景文件。</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            {optionalFields.map(field => (
-                                <label key={field.value} className="flex items-center text-sm cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={fieldsToKeepEmpty.includes(field.value)}
-                                        onChange={() => handleOptionalFieldChange(field.value)}
-                                        className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                                    />
-                                    <span className="ml-2 text-gray-700">{field.label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                )}
+              <button
+                onClick={() => setIsAdvancedVisible(!isAdvancedVisible)}
+                className="text-sm font-semibold text-purple-700 hover:underline focus:outline-none"
+              >
+                {isAdvancedVisible ? '▼ ' : '▶ '}高级选项：强制留空字段
+              </button>
+              {isAdvancedVisible && (
+                <div className="mt-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-3">勾选你希望AI在生成时强制留空的字段，以获得更灵活的情景文件。</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {optionalFields.map(field => (
+                      <label key={field.value} className="flex items-center text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={fieldsToKeepEmpty.includes(field.value)}
+                          onChange={() => handleOptionalFieldChange(field.value)}
+                          className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="ml-2 text-gray-700">{field.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 多语言支持 */}
             <div className="input-group mt-6">
-                <label htmlFor="language-select" className="input-label">
-                    <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
-                    生成语言
-                </label>
-                <select
-                    id="language-select"
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="input-field"
-                    disabled={isGenerating}
-                >
-                    {languages.map(lang => (
-                        <option key={lang.code} value={lang.code}>{lang.name}</option>
-                    ))}
-                </select>
+              <label htmlFor="language-select" className="input-label">
+                <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
+                生成语言
+              </label>
+              <select
+                id="language-select"
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="input-field"
+                disabled={isGenerating}
+              >
+                {languages.map(lang => (
+                  <option key={lang.code} value={lang.code}>{lang.name}</option>
+                ))}
+              </select>
             </div>
 
             {/* 成功提示信息 */}
             {!isGenerating && resultData && (
-                <div className="text-center text-sm text-green-600 my-2 font-semibold">
-                    🎉 情景生成成功！结果已显示在下方。
-                </div>
+              <div className="text-center text-sm text-green-600 my-2 font-semibold">
+                🎉 情景生成成功！结果已显示在下方。
+              </div>
             )}
 
             <button onClick={handleGenerate} disabled={isGenerating || isCooldown} className="generate-button mt-4">

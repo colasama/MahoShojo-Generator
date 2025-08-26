@@ -137,11 +137,29 @@
 
 .scenario-generator .gradient-overlay {
   background: linear-gradient(45deg,
-      #66D9A3 0%,
-      #4FD1C7 25%,
-      #3ABAB4 50%,
-      #52D196 75%,
-      #66D9A3 100%);
+      #A8E6C1 0%,
+      #81E3D3 25%,
+      #7DD3C0 50%,
+      #8FE5B7 75%,
+      #A8E6C1 100%);
+}
+
+.sublimation .gradient-overlay {
+  background: linear-gradient(45deg,
+      #FFD700 0%,
+      #FFA500 25%,
+      #FF8C00 50%,
+      #FFB347 75%,
+      #FFD700 100%);
+}
+
+.character-manager .gradient-overlay {
+  background: linear-gradient(45deg,
+      #5D4E75 0%,
+      #8B7BA8 25%,
+      #B19CD9 50%,
+      #9A89B4 75%,
+      #6B5B95 100%);
 }
 
 .feature-button:hover .gradient-overlay {

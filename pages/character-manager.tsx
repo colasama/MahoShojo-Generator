@@ -30,7 +30,7 @@ const CharacterManagerPage: React.FC = () => {
     const [pastedJson, setPastedJson] = useState('');
     const [characterData, setCharacterData] = useState<any | null>(null);
     const [originalData, setOriginalData] = useState<any | null>(null);
-    
+
     // 状态管理
     const [isNative, setIsNative] = useState(false);
     const [hasLostNativeness, setHasLostNativeness] = useState(false);
@@ -70,7 +70,7 @@ const CharacterManagerPage: React.FC = () => {
             ].filter(Boolean); // 过滤掉空值
             newPrompt = parts.join(', ');
         }
-        
+
         setTachiePrompt(newPrompt);
 
     }, [characterData]);
@@ -85,9 +85,9 @@ const CharacterManagerPage: React.FC = () => {
         const deepEqual = (obj1: any, obj2: any): boolean => {
             return JSON.stringify(obj1) === JSON.stringify(obj2);
         };
-        
+
         let hasBreakingChange = false;
-        
+
         // 1. 检查除特许字段和历战记录外的所有字段
         for (const key in originalData) {
             if (key === 'signature' || key === 'arena_history' || NATIVE_PRESERVING_FIELDS.has(key)) {
@@ -99,7 +99,7 @@ const CharacterManagerPage: React.FC = () => {
                 break;
             }
         }
-        
+
         // 2. 单独检查 arena_history 的复杂修改规则 (SRS 3.7.3)
         if (!hasBreakingChange && originalData.arena_history && characterData.arena_history) {
             const originalAttrs = originalData.arena_history.attributes || {};
@@ -137,14 +137,14 @@ const CharacterManagerPage: React.FC = () => {
                 }
             }
         }
-        
+
         if (hasBreakingChange) {
             setHasLostNativeness(true);
             setMessage({ type: 'info', text: '注意：您已修改角色的核心数据，该角色将变为“衍生数据”，保存时会移除原生签名。' });
         }
 
     }, [characterData, originalData, isNative, hasLostNativeness]);
-    
+
     // 加载和处理JSON数据
     const processJsonData = async (jsonText: string) => {
         setIsLoading(true);
@@ -153,11 +153,11 @@ const CharacterManagerPage: React.FC = () => {
 
         try {
             const data = JSON.parse(jsonText);
-            
+
             if (typeof data !== 'object' || data === null || (!data.codename && !data.name)) {
                 throw new Error('无效的角色文件格式。');
             }
-            
+
             // 调用API验证原生性
             const verificationResponse = await fetch('/api/verify-origin', {
                 method: 'POST',
@@ -165,7 +165,7 @@ const CharacterManagerPage: React.FC = () => {
                 body: JSON.stringify(data),
             });
             const { isValid } = await verificationResponse.json();
-            
+
             setCharacterData(data);
             setOriginalData(JSON.parse(JSON.stringify(data))); // 深拷贝作为原始备份
             setIsNative(isValid);
@@ -180,7 +180,7 @@ const CharacterManagerPage: React.FC = () => {
             setIsLoading(false);
         }
     };
-    
+
     // 文件上传处理
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -193,7 +193,7 @@ const CharacterManagerPage: React.FC = () => {
         reader.readAsText(file);
         event.target.value = ''; // 允许重复上传
     };
-    
+
     // 粘贴加载处理
     const handlePasteAndLoad = () => {
         if (!pastedJson.trim()) {
@@ -223,7 +223,7 @@ const CharacterManagerPage: React.FC = () => {
         if (!isObject(data)) return null;
 
         const keyOrder = [
-            'codename', 'name', 'appearance', 'magicConstruct', 'wonderlandRule', 
+            'codename', 'name', 'appearance', 'magicConstruct', 'wonderlandRule',
             'blooming', 'analysis', 'userAnswers', 'arena_history'
         ];
 
@@ -269,7 +269,7 @@ const CharacterManagerPage: React.FC = () => {
                 }
                 // 对于其他类型的数组（如对象数组），暂时以只读JSON形式显示，防止数据结构被破坏
                 return (
-                     <div key={currentPath} className="mt-4">
+                    <div key={currentPath} className="mt-4">
                         <label htmlFor={currentPath} className="block text-sm font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1')} (只读)</label>
                         <textarea
                             id={currentPath}
@@ -278,7 +278,7 @@ const CharacterManagerPage: React.FC = () => {
                             rows={5}
                             className="input-field bg-gray-100 cursor-not-allowed"
                         />
-                     </div>
+                    </div>
                 );
             }
 
@@ -319,7 +319,7 @@ const CharacterManagerPage: React.FC = () => {
         const newCodename = randomChooseOneHanaName();
         handleFieldChange('codename', newCodename);
     };
-    
+
     // ===================================
     // 历战记录管理函数 (SRS 3.7.2)
     // ===================================
@@ -339,7 +339,7 @@ const CharacterManagerPage: React.FC = () => {
             return { ...prev, arena_history: newHistory };
         });
     };
-    
+
     const handleClearHistory = () => {
         if (window.confirm('确定要清除所有历战记录吗？此操作将清空 entries 数组。')) {
             setCharacterData((prev: any) => {
@@ -349,7 +349,7 @@ const CharacterManagerPage: React.FC = () => {
             });
         }
     };
-    
+
     // ===================================
     // 保存与输出 (SRS 3.7.4 & 3.7.5)
     // ===================================
@@ -394,7 +394,7 @@ const CharacterManagerPage: React.FC = () => {
                     // 如果是其他错误，则抛出异常
                     throw new Error(errorData.message || '签名服务器认证失败');
                 }
-                
+
                 // 使用服务器返回的、带有最新有效签名的数据作为最终数据
                 finalData = await response.json();
                 setMessage({ type: 'success', text: '原生性签名认证成功！' });
@@ -435,157 +435,158 @@ const CharacterManagerPage: React.FC = () => {
             setIsLoading(false);
         }
     };
-    
+
     return (
-      <>
-        <Head>
-            <title>角色管理中心 - MahoShojo Generator</title>
-        </Head>
-        <div className="magic-background-white">
-            <div className="container">
-                <div className="card">
-                    <div className="text-center mb-4">
-                        <h1 className="text-3xl font-bold text-gray-800">角色管理中心</h1>
-                        <p className="subtitle mt-2">在这里查看、编辑和维护你的角色档案</p>
-                    </div>
-
-                    <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-800">
-                    <button
-                        onClick={() => setIsGuideVisible(!isGuideVisible)}
-                        className="w-full text-left font-bold text-gray-700 mb-2 focus:outline-none"
-                    >
-                        {isGuideVisible ? '▼' : '▶'} 使用指南
-                    </button>
-                    {isGuideVisible && (
-                        <div className="mt-2 space-y-3">
-                        <div>
-                            <h4 className="font-semibold text-gray-800">核心功能：</h4>
-                            <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
-                            <li><span className="font-semibold">加载角色：</span>通过上传 <code>.json</code> 文件或直接粘贴文本内容来加载你的角色档案。</li>
-                            <li><span className="font-semibold">编辑数据：</span>可视化地查看并修改角色的各项设定，包括调整历战记录。</li>
-                            <li><span className="font-semibold">生成立绘：</span>加载角色后，展开下方的“立绘生成”模块，可为你的角色创建立绘。</li>
-                            <li><span className="font-semibold">保存与导出：</span>完成修改后，可下载新的 <code>.json</code> 文件或将内容复制到剪贴板。</li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-gray-800">关于“原生数据”：</h4>
-                            <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
-                            <li>“原生数据”指由本生成器直接产出、未经核心修改的角色文件。它包含一个数字签名，用于验证其真实性。</li>
-                            <li>在竞技场等功能中，系统会更信任原生数据。对非原生数据可能会启用更严格的内容安全检查。</li>
-                            </ul>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-gray-800">如何保持角色“原生性”：</h4>
-                            <p className="mt-1">
-                            请注意：对角色档案的<span className="font-bold text-red-600">绝大多数修改</span>都会使其失去“原生性”，保存后数字签名将被移除。
-                            </p>
-                            <p className="mt-2">
-                            以下是<span className="font-bold text-green-600">唯一允许</span>在保持原生性的前提下进行的操作：
-                            </p>
-                            <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
-                            <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">codename</code> (魔法少女) 或 <code className="bg-gray-200 px-1 rounded text-xs">name</code> (残兽) 字段。</li>
-                            <li>在“历战记录管理”中<span className="font-semibold">删除</span>一条或多条历史记录。</li>
-                            <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”或“清除所有记录”</span>按钮。</li>
-                            </ul>
-                            <p className="text-xs text-gray-500 mt-2">（注：新增或修改历战记录、编辑除代号/名称外的任何字段，都会导致原生性丧失。）</p>
-                        </div>
-                        </div>
-                    )}
-                    </div>
-
-                    {!characterData ? (
-                        <>
-                            <div className="input-group">
-                                <label htmlFor="file-upload" className="input-label">上传 .json 设定文件</label>
-                                <input id="file-upload" type="file" accept=".json" onChange={handleFileChange} className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0" />
+        <>
+            <Head>
+                <title>角色管理中心 - MahoShojo Generator</title>
+            </Head>
+            <div className="magic-background-white">
+                <div className="container">
+                    <div className="card">
+                        <div className="text-center mb-4">
+                            <div className="flex justify-center items-center mt-4" style={{ marginBottom: '1rem' }}>
+                                <img src="/character-manager.svg" width={320} height={40} alt="角色数据管理" />
                             </div>
-                            <div className="text-center my-4 text-gray-500">或</div>
-                            <div className="input-group">
-                                <label htmlFor="paste-area" className="input-label">粘贴JSON文本内容</label>
-                                <textarea id="paste-area" value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} rows={8} className="input-field" />
-                                <button onClick={handlePasteAndLoad} disabled={isLoading} className="generate-button mt-2">
-                                    {isLoading ? '加载中...' : '加载数据'}
-                                </button>
-                            </div>
-                        </>
-                    ) : (
-                        <div>
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold">编辑角色: {originalData.codename || originalData.name}</h2>
-                                {isNative && !hasLostNativeness ? (
-                                    <span className="px-3 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">原生数据</span>
-                                ) : (
-                                    <span className="px-3 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">衍生数据</span>
-                                )}
-                            </div>
+                            <p className="subtitle mt-2">在这里查看、编辑和维护你的角色档案</p>
+                        </div>
 
-                            <div className="space-y-4">
-                                {renderFormFields(characterData)}
-                            </div>
-
-                            {/* 历战记录管理模块 */}
-                            {characterData.arena_history && (
-                                <fieldset className="border border-gray-300 p-4 rounded-lg mt-4">
-                                    <legend className="text-sm font-semibold px-2 text-gray-600">历战记录管理</legend>
-                                    <div className="space-y-4">
-                                        {characterData.arena_history.entries?.map((entry: any) => (
-                                            <div key={entry.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                                <p className="text-xs truncate" title={entry.title}>{entry.id}: {entry.title}</p>
-                                                <button onClick={() => handleDeleteHistoryEntry(entry.id)} className="text-red-500 hover:text-red-700 text-xs font-bold px-2">删除</button>
-                                            </div>
-                                        ))}
-                                        <div className="flex flex-wrap gap-2 pt-2 border-t">
-                                            <button onClick={handleResetHistoryAttributes} className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-200">重置属性</button>
-                                            <button onClick={handleClearHistory} className="text-xs bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200">清除所有记录</button>
-                                        </div>
+                        <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-800">
+                            <button
+                                onClick={() => setIsGuideVisible(!isGuideVisible)}
+                                className="w-full text-left font-bold text-gray-700 mb-2 focus:outline-none"
+                            >
+                                {isGuideVisible ? '▼' : '▶'} 使用指南
+                            </button>
+                            {isGuideVisible && (
+                                <div className="mt-2 space-y-3">
+                                    <div>
+                                        <h4 className="font-semibold text-gray-800">核心功能：</h4>
+                                        <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
+                                            <li><span className="font-semibold">加载角色：</span>通过上传 <code>.json</code> 文件或直接粘贴文本内容来加载你的角色档案。</li>
+                                            <li><span className="font-semibold">编辑数据：</span>可视化地查看并修改角色的各项设定，包括调整历战记录。</li>
+                                            <li><span className="font-semibold">生成立绘：</span>加载角色后，展开下方的“立绘生成”模块，可为你的角色创建立绘。</li>
+                                            <li><span className="font-semibold">保存与导出：</span>完成修改后，可下载新的 <code>.json</code> 文件或将内容复制到剪贴板。</li>
+                                        </ul>
                                     </div>
-                                </fieldset>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-800">关于“原生数据”：</h4>
+                                        <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
+                                            <li>“原生数据”指由本生成器直接产出、未经核心修改的角色文件。它包含一个数字签名，用于验证其真实性。</li>
+                                            <li>在竞技场等功能中，系统会更信任原生数据。对非原生数据可能会启用更严格的内容安全检查。</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-800">如何保持角色“原生性”：</h4>
+                                        <p className="mt-1">
+                                            请注意：对角色档案的<span className="font-bold text-red-600">绝大多数修改</span>都会使其失去“原生性”，保存后数字签名将被移除。
+                                        </p>
+                                        <p className="mt-2">
+                                            以下是<span className="font-bold text-green-600">唯一允许</span>在保持原生性的前提下进行的操作：
+                                        </p>
+                                        <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
+                                            <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">codename</code> (魔法少女) 或 <code className="bg-gray-200 px-1 rounded text-xs">name</code> (残兽) 字段。</li>
+                                            <li>在“历战记录管理”中<span className="font-semibold">删除</span>一条或多条历史记录。</li>
+                                            <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”或“清除所有记录”</span>按钮。</li>
+                                        </ul>
+                                        <p className="text-xs text-gray-500 mt-2">（注：新增或修改历战记录、编辑除代号/名称外的任何字段，都会导致原生性丧失。）</p>
+                                    </div>
+                                </div>
                             )}
+                        </div>
 
-                            <div className="mt-8 pt-4 border-t space-y-2">
-                                <button onClick={() => handleSaveChanges('download')} disabled={message?.type === 'error' || isLoading} className="generate-button w-full">
-                                    {isLoading ? '处理中...' : '保存修改并下载'}
-                                </button>
-                                <button onClick={() => handleSaveChanges('copy')} disabled={message?.type === 'error' || isLoading} className="generate-button w-full" style={{backgroundColor: '#3b82f6', backgroundImage: 'linear-gradient(to right, #3b82f6, #2563eb)'}}>
-                                    {isLoading ? '处理中...' : copiedStatus ? '已复制！' : '复制到剪贴板'}
-                                </button>
-                                <button onClick={() => { setCharacterData(null); setPastedJson('') }} className="footer-link mt-4 w-full text-center">
-                                    加载其他角色
-                                </button>
+                        {!characterData ? (
+                            <>
+                                <div className="input-group">
+                                    <label htmlFor="file-upload" className="input-label">上传 .json 设定文件</label>
+                                    <input id="file-upload" type="file" accept=".json" onChange={handleFileChange} className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0" />
+                                </div>
+                                <div className="text-center my-4 text-gray-500">或</div>
+                                <div className="input-group">
+                                    <label htmlFor="paste-area" className="input-label">粘贴JSON文本内容</label>
+                                    <textarea id="paste-area" value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} rows={8} className="input-field" />
+                                    <button onClick={handlePasteAndLoad} disabled={isLoading} className="generate-button mt-2">
+                                        {isLoading ? '加载中...' : '加载数据'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold">编辑角色: {originalData.codename || originalData.name}</h2>
+                                    {isNative && !hasLostNativeness ? (
+                                        <span className="px-3 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">原生数据</span>
+                                    ) : (
+                                        <span className="px-3 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">衍生数据</span>
+                                    )}
+                                </div>
+
+                                <div className="space-y-4">
+                                    {renderFormFields(characterData)}
+                                </div>
+
+                                {/* 历战记录管理模块 */}
+                                {characterData.arena_history && (
+                                    <fieldset className="border border-gray-300 p-4 rounded-lg mt-4">
+                                        <legend className="text-sm font-semibold px-2 text-gray-600">历战记录管理</legend>
+                                        <div className="space-y-4">
+                                            {characterData.arena_history.entries?.map((entry: any) => (
+                                                <div key={entry.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                                    <p className="text-xs truncate" title={entry.title}>{entry.id}: {entry.title}</p>
+                                                    <button onClick={() => handleDeleteHistoryEntry(entry.id)} className="text-red-500 hover:text-red-700 text-xs font-bold px-2">删除</button>
+                                                </div>
+                                            ))}
+                                            <div className="flex flex-wrap gap-2 pt-2 border-t">
+                                                <button onClick={handleResetHistoryAttributes} className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded hover:bg-yellow-200">重置属性</button>
+                                                <button onClick={handleClearHistory} className="text-xs bg-red-100 text-red-800 px-3 py-1 rounded hover:bg-red-200">清除所有记录</button>
+                                            </div>
+                                        </div>
+                                    </fieldset>
+                                )}
+
+                                <div className="mt-8 pt-4 border-t space-y-2">
+                                    <button onClick={() => handleSaveChanges('download')} disabled={message?.type === 'error' || isLoading} className="generate-button w-full">
+                                        {isLoading ? '处理中...' : '保存修改并下载'}
+                                    </button>
+                                    <button onClick={() => handleSaveChanges('copy')} disabled={message?.type === 'error' || isLoading} className="generate-button w-full" style={{ backgroundColor: '#3b82f6', backgroundImage: 'linear-gradient(to right, #3b82f6, #2563eb)' }}>
+                                        {isLoading ? '处理中...' : copiedStatus ? '已复制！' : '复制到剪贴板'}
+                                    </button>
+                                    <button onClick={() => { setCharacterData(null); setPastedJson('') }} className="footer-link mt-4 w-full text-center">
+                                        加载其他角色
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                    
-                    {message && (
-                        <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${
-                            message.type === 'error' ? 'bg-red-100 text-red-800' :
-                            message.type === 'success' ? 'bg-green-100 text-green-800' :
-                            'bg-blue-100 text-blue-800'
-                        }`}>
-                            {message.text}
-                        </div>
-                    )}
-                </div>
-                <div className="card mt-6">
-                    <button 
-                        onClick={() => setIsTachieVisible(!isTachieVisible)}
-                        className="w-full text-left text-lg font-bold text-gray-800"
-                    >
-                        {isTachieVisible ? '▼' : '▶'} 立绘生成
-                    </button>
-                    {isTachieVisible && characterData && (
-                        <div className="mt-4 pt-4 border-t">
-                             <TachieGenerator prompt={tachiePrompt} />
-                        </div>
-                    )}
-                </div>
+                        )}
 
-                <div className="text-center mt-8">
-                  <Link href="/" className="footer-link">返回首页</Link>
+                        {message && (
+                            <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${message.type === 'error' ? 'bg-red-100 text-red-800' :
+                                message.type === 'success' ? 'bg-green-100 text-green-800' :
+                                    'bg-blue-100 text-blue-800'
+                                }`}>
+                                {message.text}
+                            </div>
+                        )}
+                    </div>
+                    <div className="card mt-6">
+                        <button
+                            onClick={() => setIsTachieVisible(!isTachieVisible)}
+                            className="w-full text-left text-lg font-bold text-gray-800"
+                        >
+                            {isTachieVisible ? '▼' : '▶'} 立绘生成
+                        </button>
+                        {isTachieVisible && characterData && (
+                            <div className="mt-4 pt-4 border-t">
+                                <TachieGenerator prompt={tachiePrompt} />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="text-center mt-8">
+                        <Link href="/" className="footer-link">返回首页</Link>
+                    </div>
                 </div>
             </div>
-        </div>
-      </>
+        </>
     );
 };
 

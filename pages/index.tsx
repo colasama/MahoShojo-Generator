@@ -64,7 +64,7 @@ const logoConfigs: LogoConfig[] = [
   },
   {
     id: 'sublimation',
-    src: '/sublimation.svg',
+    src: '/sublimation-white.svg',
     width: 280,
     height: 40,
     alt: '角色成长升华',
@@ -73,7 +73,7 @@ const logoConfigs: LogoConfig[] = [
   },
   {
     id: 'character-manager',
-    src: '/character-manager.svg',
+    src: '/character-manager-white.svg',
     width: 280,
     height: 40,
     alt: '角色数据管理',
