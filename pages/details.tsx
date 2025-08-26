@@ -144,7 +144,9 @@ const DetailsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const { isCooldown, startCooldown, remainingTime } = useCooldown('generateDetailsCooldown', 60000);
-  const [bulkAnswers, setBulkAnswers] = useState(''); // 用于“一键填充”的textarea
+  const [bulkAnswers, setBulkAnswers] = useState(''); // 用于"一键填充"的textarea
+  const [showLanguageSection, setShowLanguageSection] = useState(false); // 控制生成语言区域的折叠状态
+  const [showBulkFillSection, setShowBulkFillSection] = useState(false); // 控制一键填充区域的折叠状态
 
   // 多语言支持
   const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
@@ -152,63 +154,63 @@ const DetailsPage: React.FC = () => {
 
   useEffect(() => {
     fetch('/languages.json')
-        .then(res => res.json())
-        .then(data => setLanguages(data))
-        .catch(err => console.error("Failed to load languages:", err));
+      .then(res => res.json())
+      .then(data => setLanguages(data))
+      .catch(err => console.error("Failed to load languages:", err));
   }, []);
 
-    useEffect(() => {
-        // 加载问卷数据
-        fetch('/questionnaire.json')
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('加载问卷文件失败');
-            }
-            return response.json();
-          })
-          .then((data: Questionnaire) => {
-            setQuestions(data.questions);
-            const emptyAnswers = new Array(data.questions.length).fill('');
-            
-            // 尝试从 localStorage 读取存档
-            try {
-              const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
-              if (savedDraft) {
-                const parsedAnswers = JSON.parse(savedDraft);
-                if (Array.isArray(parsedAnswers) && parsedAnswers.length === data.questions.length) {
-                  setAnswers(parsedAnswers);
-                  setCurrentAnswer(parsedAnswers[0] || ''); // 直接设置第一个问题的答案
-                  return; // 读取成功，提前返回
-                }
-              }
-            } catch (e) {
-              console.error("Failed to load answers from localStorage", e);
-            }
-
-            // 如果没有有效存档，则设置空答案
-            setAnswers(emptyAnswers);
-          })
-          .catch(error => {
-            console.error('加载问卷失败:', error);
-            setError('📋 加载问卷失败，请刷新页面重试');
-          })
-          .finally(() => {
-            setLoading(false);
-          });
-    }, []); // 这个 Hook 只在组件首次挂载时运行一次
-
-    // 答案变化时，自动保存到 localStorage (这个 useEffect 保持不变)
-    useEffect(() => {
-        try {
-            // 只有当至少有一个答案非空时才保存，避免保存初始的空数组
-            if(answers.some(answer => answer.trim() !== '')) {
-                const dataToSave = JSON.stringify(answers);
-                localStorage.setItem(LOCAL_STORAGE_KEY, dataToSave);
-            }
-        } catch (e) {
-            console.error("Failed to save answers to localStorage", e);
+  useEffect(() => {
+    // 加载问卷数据
+    fetch('/questionnaire.json')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('加载问卷文件失败');
         }
-    }, [answers]);
+        return response.json();
+      })
+      .then((data: Questionnaire) => {
+        setQuestions(data.questions);
+        const emptyAnswers = new Array(data.questions.length).fill('');
+
+        // 尝试从 localStorage 读取存档
+        try {
+          const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (savedDraft) {
+            const parsedAnswers = JSON.parse(savedDraft);
+            if (Array.isArray(parsedAnswers) && parsedAnswers.length === data.questions.length) {
+              setAnswers(parsedAnswers);
+              setCurrentAnswer(parsedAnswers[0] || ''); // 直接设置第一个问题的答案
+              return; // 读取成功，提前返回
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load answers from localStorage", e);
+        }
+
+        // 如果没有有效存档，则设置空答案
+        setAnswers(emptyAnswers);
+      })
+      .catch(error => {
+        console.error('加载问卷失败:', error);
+        setError('📋 加载问卷失败，请刷新页面重试');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []); // 这个 Hook 只在组件首次挂载时运行一次
+
+  // 答案变化时，自动保存到 localStorage (这个 useEffect 保持不变)
+  useEffect(() => {
+    try {
+      // 只有当至少有一个答案非空时才保存，避免保存初始的空数组
+      if (answers.some(answer => answer.trim() !== '')) {
+        const dataToSave = JSON.stringify(answers);
+        localStorage.setItem(LOCAL_STORAGE_KEY, dataToSave);
+      }
+    } catch (e) {
+      console.error("Failed to save answers to localStorage", e);
+    }
+  }, [answers]);
 
   const handleNext = () => {
     if (currentAnswer.trim().length === 0) {
@@ -272,35 +274,35 @@ const DetailsPage: React.FC = () => {
     return false;
   }
 
-    const handleClearDraft = () => {
-        if (window.confirm('确定要清空所有已保存的问卷答案吗？此操作不可撤销。')) {
-            localStorage.removeItem(LOCAL_STORAGE_KEY);
-            const emptyAnswers = new Array(questions.length).fill('');
-            setAnswers(emptyAnswers);
-            setCurrentAnswer('');
-            alert('存档已清空！');
-        }
-    };
+  const handleClearDraft = () => {
+    if (window.confirm('确定要清空所有已保存的问卷答案吗？此操作不可撤销。')) {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      const emptyAnswers = new Array(questions.length).fill('');
+      setAnswers(emptyAnswers);
+      setCurrentAnswer('');
+      alert('存档已清空！');
+    }
+  };
 
-    const handleBulkFill = () => {
-        const lines = bulkAnswers.split('\n');
-        if (lines.length > questions.length) {
-            setError(`⚠️ 粘贴的答案有 ${lines.length} 行，超过了问卷问题总数 ${questions.length}！`);
-            return;
-        }
-        const newAnswers = [...answers];
-        lines.forEach((line, index) => {
-            if (index < questions.length) {
-                newAnswers[index] = line.slice(0, 120); // 限制单行长度
-            }
-        });
-        setAnswers(newAnswers);
-        setCurrentAnswer(newAnswers[currentQuestionIndex] || '');
-        setError(null);
-        alert(`成功填充了 ${lines.length} 个答案！`);
-        setBulkAnswers('');
-    };
-    
+  const handleBulkFill = () => {
+    const lines = bulkAnswers.split('\n');
+    if (lines.length > questions.length) {
+      setError(`⚠️ 粘贴的答案有 ${lines.length} 行，超过了问卷问题总数 ${questions.length}！`);
+      return;
+    }
+    const newAnswers = [...answers];
+    lines.forEach((line, index) => {
+      if (index < questions.length) {
+        newAnswers[index] = line.slice(0, 120); // 限制单行长度
+      }
+    });
+    setAnswers(newAnswers);
+    setCurrentAnswer(newAnswers[currentQuestionIndex] || '');
+    setError(null);
+    alert(`成功填充了 ${lines.length} 个答案！`);
+    setBulkAnswers('');
+  };
+
   const handleSubmit = async (finalAnswers: string[]) => {
     if (isCooldown) {
       setError(`请等待 ${remainingTime} 秒后再生成`);
@@ -542,42 +544,6 @@ const DetailsPage: React.FC = () => {
                   </button>
                 </div>
 
-                {/* 多语言支持 */}
-                <div className="input-group">
-                    <label htmlFor="language-select" className="input-label">
-                        <img src="/globe.svg" alt="Language" className="inline-block w-4 h-4 mr-2" />
-                        生成语言
-                    </label>
-                    <select
-                        id="language-select"
-                        value={selectedLanguage}
-                        onChange={(e) => setSelectedLanguage(e.target.value)}
-                        className="input-field"
-                        disabled={submitting}
-                    >
-                        {languages.map(lang => (
-                            <option key={lang.code} value={lang.code}>{lang.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* 批量回答问卷 */}
-                <div className="my-4 p-4 bg-gray-100 rounded-lg">
-                    <label htmlFor="bulk-answers" className="block text-sm font-medium text-gray-700 mb-2">一键填充答案</label>
-                    <textarea
-                        id="bulk-answers"
-                        value={bulkAnswers}
-                        onChange={(e) => setBulkAnswers(e.target.value)}
-                        placeholder="在此处粘贴所有答案，每行一个。"
-                        className="input-field h-20"
-                        rows={4}
-                    />
-                    <div className="flex justify-between items-center mt-2">
-                        <button onClick={handleBulkFill} className="text-sm text-blue-600 hover:underline">填充</button>
-                        <button onClick={handleClearDraft} className="text-sm text-red-600 hover:underline">清空存档</button>
-                    </div>
-                </div>
-
                 {/* 下一题按钮 */}
                 <div className="flex justify-between gap-2">
                   <button className="generate-button w-1/4" onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0 || submitting || isTransitioning || isCooldown}>
@@ -606,6 +572,58 @@ const DetailsPage: React.FC = () => {
                   </button>
                 </div>
 
+                {/* 多语言支持 */}
+                <div className="my-4 bg-gray-100 rounded-lg p-3">
+                  <button
+                    onClick={() => setShowLanguageSection(!showLanguageSection)}
+                    className="flex items-center justify-between w-full text-left font-medium text-gray-700 hover:text-blue-600"
+                  >
+                    <span>生成语言</span>
+                    <span className="ml-2">{showLanguageSection ? '▼' : '▶'}</span>
+                  </button>
+                  {showLanguageSection && (
+                    <div className="mt-3">
+                      <select
+                        id="language-select"
+                        value={selectedLanguage}
+                        onChange={(e) => setSelectedLanguage(e.target.value)}
+                        className="input-field"
+                        disabled={submitting}
+                      >
+                        {languages.map(lang => (
+                          <option key={lang.code} value={lang.code}>{lang.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* 批量回答问卷 */}
+                <div className="my-4 bg-gray-100 rounded-lg p-3">
+                  <button
+                    onClick={() => setShowBulkFillSection(!showBulkFillSection)}
+                    className="flex items-center justify-between w-full text-left font-medium text-gray-700 hover:text-blue-600"
+                  >
+                    <span>一键填充答案</span>
+                    <span className="ml-2">{showBulkFillSection ? '▼' : '▶'}</span>
+                  </button>
+                  {showBulkFillSection && (
+                    <div className="mt-3">
+                      <textarea
+                        id="bulk-answers"
+                        value={bulkAnswers}
+                        onChange={(e) => setBulkAnswers(e.target.value)}
+                        placeholder="在此处粘贴所有答案，每行一个。"
+                        className="input-field h-20"
+                        rows={4}
+                      />
+                      <div className="flex justify-between items-center mt-2">
+                        <button onClick={handleBulkFill} className="text-sm text-blue-600 hover:underline">填充</button>
+                        <button onClick={handleClearDraft} className="text-sm text-red-600 hover:underline">清空存档</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {/* 错误信息显示 */}
                 {error && (
                   <div className="error-message">
