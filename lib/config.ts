@@ -127,7 +127,7 @@ const getEnableSensitiveWordFilter = (): boolean => {
 };
 
 const getEnableAiSafetyCheck = (): boolean => {
-  const enabled = process.env.NEXT_PUBLIC_ENABLE_AI_SAFETY_CHECK ?? 'true';
+  const enabled = process.env.NEXT_PUBLIC_ENABLE_AI_SAFETY_CHECK ?? 'false';
   return enabled === 'true';
 };
 
