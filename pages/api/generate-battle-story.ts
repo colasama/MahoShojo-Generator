@@ -166,7 +166,10 @@ const updateCombatantsWithHistory = async (
         const characterName = characterData.codename || characterData.name;
 
         // 【SRS 3.1.1】如果角色没有历战记录，则初始化
+        // [健壮性与安全修复]
+        // 1. 确保 arena_history 和其内部结构（特别是 entries 数组）的存在。
         if (!characterData.arena_history) {
+            // 如果角色完全没有历战记录，则初始化
             characterData.arena_history = {
                 attributes: {
                     world_line_id: randomUUID(),
@@ -178,14 +181,21 @@ const updateCombatantsWithHistory = async (
                 entries: [],
             };
         } else {
-            // 否则只更新时间戳
-            characterData.arena_history.attributes.updated_at = nowISO;
+            // 如果有历战记录对象，但缺少 entries 数组，则为其补上一个空数组
+            if (!Array.isArray(characterData.arena_history.entries)) {
+                log.warn('角色数据 arena_history 中缺少 entries 数组，已自动补全。', { name: characterName });
+                characterData.arena_history.entries = [];
+            }
+            // 确保 attributes 对象存在并更新时间戳
+            characterData.arena_history.attributes = {
+                ...characterData.arena_history.attributes,
+                updated_at: nowISO,
+            };
         }
 
-        // 获取最后一个条目的ID，用于自增
-        const lastEntryId = characterData.arena_history.entries.length > 0
-            ? characterData.arena_history.entries[characterData.arena_history.entries.length - 1].id
-            : 0;
+        // 2. 在确认 entries 数组存在后，安全地获取最后一个ID
+        const entries = characterData.arena_history.entries;
+        const lastEntryId = entries.length > 0 ? entries[entries.length - 1].id : 0;
 
         // 从AI结果中找到对当前角色的影响描述
         const characterImpact = impacts.find(i => i.characterName === characterName)?.impact || "在此次事件中获得了成长。";
