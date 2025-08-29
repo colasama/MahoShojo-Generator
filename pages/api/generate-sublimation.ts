@@ -116,7 +116,7 @@ const createGenerationConfig = (characterData: any, language: string, userGuidan
     // 根据用户引导，构建额外的指令
     let guidanceInstruction = '';
     if (userGuidance) {
-      guidanceInstruction = `\n## 成长方向引导\n角色成长升华方向可以参考：“${userGuidance}”。`;
+      guidanceInstruction = `\n## 成长方向引导\n角色可以朝这个方向成长升华：“${userGuidance}”。请在重塑角色时将此作为最重要的参考。`;
     }
 
     return `
