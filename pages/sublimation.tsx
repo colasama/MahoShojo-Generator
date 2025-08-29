@@ -297,11 +297,11 @@ const SublimationPage: React.FC = () => {
                             {/* 新增：根据配置和用户输入显示不同的提示信息 */}
                             {userGuidance && appConfig.ALLOW_GUIDED_SUBLIMATION_NATIVE_SIGNING ? (
                                 <p className="text-xs text-green-700 mt-1">
-                                    ✅ 管理员已开启特殊模式：本次引导升华将**保留**原生签名。
+                                    ✅ 管理员已允许引导升华保留原生签名。
                                 </p>
                             ) : (
                                 <p className="text-xs text-yellow-700 mt-1">
-                                    ⚠️ **注意**: 提供引导将使生成的角色变为“衍生数据”，并移除其原生签名。
+                                    ⚠️ 注意: 提供引导将使生成的角色变为“衍生数据”，并移除其原生签名。
                                 </p>
                             )}
                         </div>
