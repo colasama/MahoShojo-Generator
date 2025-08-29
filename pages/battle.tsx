@@ -95,6 +95,8 @@ const BattlePage: React.FC = () => {
     const [userGuidance, setUserGuidance] = useState('');
     // 用于锁定正在加载的预设按钮的状态
     const [loadingPreset, setLoadingPreset] = useState<string | null>(null);
+    // 新增：用于控制是否使用历战记录的状态
+    const [useArenaHistory, setUseArenaHistory] = useState(true);
 
 
     // 冷却状态钩子，设置为2分钟
@@ -634,6 +636,7 @@ const BattlePage: React.FC = () => {
                     scenario: scenarioContent, // 发送情景内容
                     teams: Object.keys(teams).length > 0 ? teams : undefined, // 发送分队信息
                     language: selectedLanguage,
+                    useArenaHistory: useArenaHistory, // 新增：传递是否使用历战记录的选项
                 }),
             });
 
@@ -822,7 +825,7 @@ const BattlePage: React.FC = () => {
                                 </button>
                                 {isScenarioPasteAreaVisible && (
                                     <div className="input-group mt-2">
-                                        <textarea value={pastedScenarioJson} onChange={(e) => setPastedScenarioJson(e.target.value)} placeholder="在此处粘贴一个情景的设定文件(.json)内容..." className="input-field resize-y h-24" disabled={isGenerating}/>
+                                        <textarea value={pastedScenarioJson} onChange={(e) => setPastedScenarioJson(e.target.value)} placeholder="在此处粘贴一个情景的设定文件(.json)内容..." className="input-field resize-y h-24" disabled={isGenerating} />
                                         <button onClick={handlePasteAndLoadScenario} disabled={!pastedScenarioJson.trim() || isGenerating} className="generate-button mt-2 mb-0" style={{ backgroundColor: '#8b5cf6', backgroundImage: 'linear-gradient(to right, #8b5cf6, #a78bfa)' }}>从文本加载情景</button>
                                     </div>
                                 )}
@@ -873,10 +876,10 @@ const BattlePage: React.FC = () => {
                                                             <button onClick={() => handleCopyCorrectedJson(name)} disabled={isGenerating} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">{copiedStatus[name] ? '已复制!' : '复制'}</button>
                                                         </div>
                                                     )}
-                                                    {/* 单个删除按钮 */}
+                                                    {/* 核心修改：移除 group-hover 和 opacity-0，使其始终可见 */}
                                                     <button
                                                         onClick={() => !isGenerating && handleRemoveCombatant(c.filename)}
-                                                        className={`w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold transition-opacity ${isGenerating ? 'opacity-20 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100 hover:bg-red-300'}`}
+                                                        className={`w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-300'}`}
                                                         aria-label={`移除 ${name}`}
                                                         disabled={isGenerating}
                                                     >
@@ -985,6 +988,23 @@ const BattlePage: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                        {/* 新增：历战记录使用选项 */}
+                        <div className="input-group">
+                            <label className="flex items-center text-sm font-medium text-gray-700 cursor-pointer">
+                                <input
+                                type="checkbox"
+                                checked={useArenaHistory}
+                                onChange={(e) => setUseArenaHistory(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-pink-600 focus:ring-pink-500 mr-2 disabled:opacity-50"
+                                disabled={isGenerating}
+                                />
+                                使用角色的“历战记录”
+                            </label>
+                            <p className="text-xs text-gray-500 mt-1">
+                                默认启用。AI会参考角色的过往经历来创作故事。取消勾选后，AI将视其为初次登场，且旧的历战记录不会被保留。
+                            </p>
+                        </div>
+
 
                         {/* --- 在非日常模式下显示等级选择 --- */}
                         {battleMode !== 'daily' && (

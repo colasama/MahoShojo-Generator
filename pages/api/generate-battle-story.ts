@@ -143,6 +143,7 @@ const filterAndFormatHistory = (
  * @param impacts AI为每个角色生成的impact
  * @param userGuidance 用户提供的故事指引
  * @param scenario 情景模式下的情景文件
+ * @param useArenaHistory 是否保留并追加到旧的历战记录
  * @returns 更新后的参战者数据列表
  */
 const updateCombatantsWithHistory = async (
@@ -150,7 +151,8 @@ const updateCombatantsWithHistory = async (
     report: NewsReport,
     impacts: { characterName: string; impact: string }[],
     userGuidance: string | null,
-    scenario: any | null
+    scenario: any | null,
+    useArenaHistory: boolean // 新增参数
 ): Promise<any[]> => {
     const updatedCombatants = [];
     const participantNames = combatants.map(c => c.data.codename || c.data.name);
@@ -162,45 +164,40 @@ const updateCombatantsWithHistory = async (
 
     for (const combatant of combatants) {
         // 深拷贝以避免副作用
-        const characterData = JSON.parse(JSON.stringify(combatant.data)); 
+        const characterData = JSON.parse(JSON.stringify(combatant.data));
         const characterName = characterData.codename || characterData.name;
 
-        // 【SRS 3.1.1】如果角色没有历战记录，则初始化
-        // [健壮性与安全修复]
-        // 1. 确保 arena_history 和其内部结构（特别是 entries 数组）的存在。
-        if (!characterData.arena_history) {
-            // 如果角色完全没有历战记录，则初始化
-            characterData.arena_history = {
+        // 核心修改：根据 useArenaHistory 决定是继承还是重置历史
+        let newHistory: ArenaHistory;
+
+        if (useArenaHistory && characterData.arena_history) {
+            // **行为 1: 继承并追加**
+            // 深拷贝现有历史，确保 entries 数组存在，并更新时间戳
+            newHistory = JSON.parse(JSON.stringify(characterData.arena_history));
+            if (!Array.isArray(newHistory.entries)) {
+                newHistory.entries = [];
+            }
+            newHistory.attributes.updated_at = nowISO;
+        } else {
+            // **行为 2: 重置历史**
+            // 创建一个全新的 history 对象，只保留必要的迁越信息
+            newHistory = {
                 attributes: {
-                    world_line_id: randomUUID(),
+                    world_line_id: randomUUID(), // 生成新的世界线ID
                     created_at: nowISO,
                     updated_at: nowISO,
-                    sublimation_count: 0,
-                    last_sublimation_at: null,
+                    // 保留升华次数和最后升华时间，因为这是角色本质的成长，不应被清空
+                    sublimation_count: characterData.arena_history?.attributes?.sublimation_count || 0,
+                    last_sublimation_at: characterData.arena_history?.attributes?.last_sublimation_at || null,
                 },
-                entries: [],
-            };
-        } else {
-            // 如果有历战记录对象，但缺少 entries 数组，则为其补上一个空数组
-            if (!Array.isArray(characterData.arena_history.entries)) {
-                log.warn('角色数据 arena_history 中缺少 entries 数组，已自动补全。', { name: characterName });
-                characterData.arena_history.entries = [];
-            }
-            // 确保 attributes 对象存在并更新时间戳
-            characterData.arena_history.attributes = {
-                ...characterData.arena_history.attributes,
-                updated_at: nowISO,
+                entries: [], // 从一个空的条目列表开始
             };
         }
 
-        // 2. 在确认 entries 数组存在后，安全地获取最后一个ID
-        const entries = characterData.arena_history.entries;
-        const lastEntryId = entries.length > 0 ? entries[entries.length - 1].id : 0;
-
-        // 从AI结果中找到对当前角色的影响描述
+        const lastEntryId = newHistory.entries.length > 0 ? newHistory.entries[newHistory.entries.length - 1].id : 0;
         const characterImpact = impacts.find(i => i.characterName === characterName)?.impact || "在此次事件中获得了成长。";
 
-        // 【SRS 3.1.2】创建新的历战记录条目
+        // 创建新的历战记录条目
         const newEntry: ArenaHistoryEntry = {
             id: lastEntryId + 1,
             type: report.mode as ArenaHistoryEntry['type'] || 'classic',
@@ -215,10 +212,11 @@ const updateCombatantsWithHistory = async (
             },
         };
 
-        characterData.arena_history.entries.push(newEntry);
+        // 将新条目添加到（继承的或全新的）entries 数组中
+        newHistory.entries.push(newEntry);
+        characterData.arena_history = newHistory; // 将处理后的 history 对象赋回角色数据
 
-        // 【SRS 4.1 & 错误修复】处理数据签名
-        // 关键修复：现在我们有了从前端传递来的 isNative 标志
+        // 签名逻辑保持不变
         if (combatant.isNative) {
             // 如果原始数据是原生的（包括预设），则为更新后的数据重新生成签名
             characterData.signature = await generateSignature(characterData);
@@ -232,6 +230,7 @@ const updateCombatantsWithHistory = async (
 
     return updatedCombatants;
 };
+
 
 /**
  * 更新数据库中的战斗统计信息
@@ -426,10 +425,11 @@ const createPromptBuilder = (
     userGuidance: string | null,
     worldviewWarning: boolean,
     language: string,
-    selectedLevel?: string,
-    mode?: string,
-    scenario?: any,
-    teams?: { [key: string]: string[] } // 新增：分队信息
+    selectedLevel: string | undefined,
+    mode: string | undefined,
+    scenario: any | null,
+    teams: { [key: string]: string[] } | undefined,
+    useArenaHistory: boolean // 新增：是否使用历战记录
 ) => (input: { combatants: any[] }): string => {
     const { combatants } = input;
     const allNames = combatants.map(c => c.data.codename || c.data.name);
@@ -444,11 +444,17 @@ const createPromptBuilder = (
         const otherNames = allNames.filter(name => name !== characterName);
         const typeDisplay = type === 'magical-girl' ? '魔法少女' : '残兽';
         let profileString = `--- 登场角色 #${index + 1}: ${characterName} (${typeDisplay}) ---\n`;
+        // [核心修改] 根据 useArenaHistory 的值来决定是否格式化并添加历战记录
+        if (useArenaHistory) {
+            profileString += filterAndFormatHistory(characterName, data.arena_history, otherNames, isPureBattle);
+        } else {
+            profileString += `// 注意：该角色本次不参考过往经历，视为初次登场。\n`
+        }
+        
         // [SRS 3.2.2] 根据数据结构采用不同prompt格式
         if (isStructured) {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const { userAnswers, isPreset: _, ...restOfProfile } = data;
-            profileString += filterAndFormatHistory(characterName, data.arena_history, otherNames, isPureBattle);
             profileString += `// 核心设定\n${JSON.stringify(restOfProfile, null, 2)}\n`;
             if (userAnswers && Array.isArray(userAnswers)) {
                 profileString += `\n// 问卷回答 (用于理解角色深层性格与理念)\n`;
@@ -510,7 +516,7 @@ async function handler(req: NextRequest): Promise<Response> {
   }
 
   try {
-    const { combatants, selectedLevel, mode = 'classic', userGuidance, scenario, teams, language = 'zh-CN' } = await req.json();
+    const { combatants, selectedLevel, mode = 'classic', userGuidance, scenario, teams, language = 'zh-CN', useArenaHistory = true } = await req.json();
 
     const minParticipants = (mode === 'daily' || mode === 'scenario') ? 1 : 2;
     if (!Array.isArray(combatants) || combatants.length < minParticipants || combatants.length > 4) {
@@ -617,7 +623,7 @@ async function handler(req: NextRequest): Promise<Response> {
     const generationConfig: GenerationConfig<z.infer<typeof BattleReportCoreSchema>, any> = {
         systemPrompt,
         temperature: 0.9,
-        promptBuilder: createPromptBuilder(questionnaire.questions, finalUserGuidance, needsWorldviewWarning, language, selectedLevel, mode, scenario, teams),
+        promptBuilder: createPromptBuilder(questionnaire.questions, finalUserGuidance, needsWorldviewWarning, language, selectedLevel, mode, scenario, teams, useArenaHistory),
         schema: BattleReportCoreSchema,
         taskName: `生成${mode}模式故事`,
         maxTokens: 8192,
@@ -643,7 +649,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
     
     // 更新所有参战者的历战记录
-    const updatedCombatants = await updateCombatantsWithHistory(combatants, report, aiResult.impacts, finalUserGuidance, scenario);
+    const updatedCombatants = await updateCombatantsWithHistory(combatants, report, aiResult.impacts, finalUserGuidance, scenario, useArenaHistory);
 
     const apiResponse: BattleApiResponse = { report, updatedCombatants };
 
