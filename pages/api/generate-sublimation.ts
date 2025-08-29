@@ -30,7 +30,7 @@ const MagicalGirlSublimationPayloadSchema = z.object({
   }).describe("根据角色经历更新后的外观描述。"),
   magicConstruct: z.object({
     form: z.string().describe("魔装形态的演变。"),
-    basicAbilities: z.array(z.string()).describe("基础能力的进化或新增。"),
+    basicAbilities: z.array(z.string()).describe("基础能力的进化或新增，不得重复。"),
     description: z.string().describe("对魔装当前状态的全新描述。"),
   }).describe("魔力构装的更新，但名字（name）不能改变。"),
   analysis: z.object({
@@ -137,7 +137,7 @@ ${userAnswersReviewSection}
 
 2.  **体现成长**:
     * **可变字段**: 除了上述字段外，其他所有字段都可以被你重写，以反映角色从历战记录中的成长、感悟和变化。
-    * 请确保更新后的设定在逻辑上与角色的经历自洽。
+    * 请确保更新后的设定在逻辑上与角色的经历自洽，并且有创意，不得抄袭已有内容。
 
 3.  **生成升华事件**:
     * 你还需要创作一个“升华事件”，简要描述角色是如何从这些经历中收获成长，升华到新状态的。
