@@ -8,6 +8,7 @@ import MagicalGirlCard from '../components/MagicalGirlCard';
 import CanshouCard from '../components/CanshouCard';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { useCooldown } from '../lib/cooldown';
+import { config as appConfig } from '../lib/config'; // 导入应用配置
 
 // 颜色处理方案，用于修复背景色问题
 const MainColor = {
@@ -69,6 +70,9 @@ const SublimationPage: React.FC = () => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [pastedJson, setPastedJson] = useState('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+    // 新增：用于存储用户引导输入的状态
+    const [userGuidance, setUserGuidance] = useState('');
+
     // 实例化 useCooldown hook，设置60秒冷却时间
     const { isCooldown, startCooldown, remainingTime } = useCooldown('sublimationCooldown', 60000);
     // 多语言支持
@@ -148,11 +152,12 @@ const SublimationPage: React.FC = () => {
         setResultData(null);
 
         try {
-            const textToCheck = extractTextForCheck(characterData);
+            // 安全检查现在包括了用户引导
+            const textToCheck = extractTextForCheck(characterData) + " " + userGuidance;
             if ((await quickCheck(textToCheck)).hasSensitiveWords) {
                 router.push({
                     pathname: '/arrested',
-                    query: { reason: '上传的角色档案包含危险符文' }
+                    query: { reason: '上传的角色档案或引导内容包含危险符文' }
                 });
                 return;
             }
@@ -160,7 +165,12 @@ const SublimationPage: React.FC = () => {
             const response = await fetch('/api/generate-sublimation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...characterData, language: selectedLanguage }),
+                // 在请求体中加入 userGuidance
+                body: JSON.stringify({ 
+                    ...characterData, 
+                    language: selectedLanguage,
+                    userGuidance: userGuidance.trim(),
+                }),
             });
 
             if (!response.ok) {
@@ -271,6 +281,31 @@ const SublimationPage: React.FC = () => {
                             )}
                         </div>
 
+                        {/* 新增：成长方向引导输入框 */}
+                        <div className="input-group">
+                            <label htmlFor="user-guidance" className="input-label">成长方向引导 (可选)</label>
+                            <input
+                                id="user-guidance"
+                                type="text"
+                                value={userGuidance}
+                                onChange={(e) => setUserGuidance(e.target.value)}
+                                className="input-field"
+                                placeholder="输入关键词或一句话 (最多30字)"
+                                maxLength={30}
+                                disabled={isGenerating}
+                            />
+                            {/* 新增：根据配置和用户输入显示不同的提示信息 */}
+                            {userGuidance && appConfig.ALLOW_GUIDED_SUBLIMATION_NATIVE_SIGNING ? (
+                                <p className="text-xs text-green-700 mt-1">
+                                    ✅ 管理员已开启特殊模式：本次引导升华将**保留**原生签名。
+                                </p>
+                            ) : (
+                                <p className="text-xs text-yellow-700 mt-1">
+                                    ⚠️ **注意**: 提供引导将使生成的角色变为“衍生数据”，并移除其原生签名。
+                                </p>
+                            )}
+                        </div>
+
                         {/* 多语言支持 */}
                         <div className="input-group">
                             <label htmlFor="language-select" className="input-label">
@@ -292,16 +327,15 @@ const SublimationPage: React.FC = () => {
 
                         {/* 成功提示信息 */}
                         {!isGenerating && resultData && (
-                            <div className="text-center text-sm text-green-600 mb-2 font-semibold">
+                            <div className="text-center text-sm text-green-600 my-2 font-semibold">
                                 🎉 升华成功！结果已显示在下方，请下滑查看。
                             </div>
                         )}
 
                         {/* 更新按钮状态和文本 */}
-                        <button onClick={handleGenerate} disabled={isGenerating || !characterData || isCooldown} className="generate-button">
+                        <button onClick={handleGenerate} disabled={isGenerating || !characterData || isCooldown} className="generate-button mt-4">
                             {isCooldown ? `冷却中 (${remainingTime}s)` : isGenerating ? '升华中...' : '开始升华'}
                         </button>
-
                         {error && <div className="error-message mt-4">{error}</div>}
                     </div>
 

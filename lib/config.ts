@@ -184,6 +184,15 @@ const getAiSafetyPromptLevel = (): 'strict' | 'moderate' | 'lenient' => {
     return 'moderate'; // 默认为 'moderate'
 };
 
+/**
+ * [新增] 获取是否允许被引导的升华保持原生性签名。
+ * @returns {boolean}
+ */
+const getAllowGuidedSublimationNativeSigning = (): boolean => {
+    // 默认为 false, 只有当环境变量明确设置为 'true' 时才开启
+    return process.env.ALLOW_GUIDED_SUBLIMATION_NATIVE_SIGNING === 'true';
+};
+
 export const config = {
   // Vercel AI 配置
   API_PAIRS: parseApiPairs(),
@@ -212,6 +221,9 @@ export const config = {
   SAFETY_CHECK_POLICY: getSafetyCheckPolicy(),
   ENABLE_BUNDLE_SAFETY_CHECK: getEnableBundleSafetyCheck(),
   AI_SAFETY_PROMPT_LEVEL: getAiSafetyPromptLevel(),
+
+  // [新增] 升华功能配置
+  ALLOW_GUIDED_SUBLIMATION_NATIVE_SIGNING: getAllowGuidedSublimationNativeSigning(),
 
   // 魔法少女生成配置
   MAGICAL_GIRL_GENERATION: {

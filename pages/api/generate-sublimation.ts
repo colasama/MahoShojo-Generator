@@ -7,6 +7,7 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
 import magicalGirlQuestionnaire from '../../public/questionnaire.json';
+import { config as appConfig } from '../../lib/config'; // 导入应用配置
 
 const log = getLogger('api-gen-sublimation');
 
@@ -83,7 +84,7 @@ const CanshouSublimationResultSchema = z.object({
 // =================================================================
 // 2. AI Prompt 配置 (SRS 3.2.2)
 // =================================================================
-const createGenerationConfig = (characterData: any, language: string): GenerationConfig<any, any> => {
+const createGenerationConfig = (characterData: any, language: string, userGuidance: string | null): GenerationConfig<any, any> => {
   const isMagicalGirl = !!characterData.codename;
   const characterType = isMagicalGirl ? '魔法少女' : '残兽';
   const nameField = isMagicalGirl ? 'codename' : 'name';
@@ -112,11 +113,19 @@ const createGenerationConfig = (characterData: any, language: string): Generatio
         userAnswersReviewSection = `## 问卷回答回顾 (用于理解角色深层性格)\n${userAnswersText}`;
     }
 
+    // 根据用户引导，构建额外的指令
+    let guidanceInstruction = '';
+    if (userGuidance) {
+      guidanceInstruction = `\n## 成长方向引导\n角色成长升华方向可以参考：“${userGuidance}”。`;
+    }
+
     return `
 # 角色成长升华任务
 
 你是一位资深的角色设定师。你的任务是为一个${characterType}角色进行“成长升华”。
 该角色经历了诸多事件，现在需要你基于其完整的设定和所有“历战记录”，对其进行一次全面的重塑和升级，以体现其成长与蜕变。
+
+${guidanceInstruction}
 
 ## 原始角色设定
 \`\`\`json
@@ -250,13 +259,14 @@ async function handler(req: NextRequest): Promise<Response> {
 
   try {
     const body = await req.json();
-    // 从请求体中同时解构出 language 和 characterData
-    const { language = 'zh-CN', ...originalCharacterData } = body; 
+    // 从请求体中同时解构出 language、userGuidance 和 characterData
+    const { language = 'zh-CN', userGuidance = '', ...originalCharacterData } = body; 
+    const finalUserGuidance = userGuidance.trim() || null;
 
-    // 安全检查：检查用户上传的原始数据
-    const textToCheck = extractTextForCheck(originalCharacterData);
+    // 安全检查：检查用户上传的原始数据和引导文本
+    const textToCheck = extractTextForCheck(originalCharacterData) + " " + (finalUserGuidance || '');
     if ((await quickCheck(textToCheck)).hasSensitiveWords) {
-        return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true, reason: '上传的角色档案包含危险符文' }), { status: 400 });
+        return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true, reason: '上传的角色档案或引导内容包含危险符文' }), { status: 400 });
     }
 
     if (!originalCharacterData.arena_history) {
@@ -264,7 +274,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     const isNative = await verifySignature(originalCharacterData);
-    const generationConfig = createGenerationConfig(originalCharacterData, language);
+    const generationConfig = createGenerationConfig(originalCharacterData, language, finalUserGuidance);
     
     // --- AI 生成 ---
     const aiResult = await generateWithAI(null, generationConfig);
@@ -348,7 +358,7 @@ async function handler(req: NextRequest): Promise<Response> {
       participants: [finalName],
       winner: finalName,
       impact: aiResult.sublimationEvent.impact,
-      metadata: { user_guidance: null, scenario_title: null, non_native_data_involved: !isNative }
+      metadata: { user_guidance: finalUserGuidance, scenario_title: null, non_native_data_involved: !isNative || !!finalUserGuidance }
     });
     sublimatedData.arena_history.entries = sublimationEntries;
 
@@ -358,11 +368,18 @@ async function handler(req: NextRequest): Promise<Response> {
     sublimatedData.arena_history.attributes.updated_at = nowISO;
     sublimatedData.arena_history.attributes.last_sublimation_at = nowISO;
 
-    // 8. 签名处理 (SRS 4.1)
-    if (isNative) {
-      sublimatedData.signature = await generateSignature(sublimatedData);
+    // 8. 签名处理 (SRS 4.1, updated logic)
+    // 默认情况下，有引导的升华会失去原生性
+    let shouldSign = isNative && !finalUserGuidance;
+    // 但是，如果管理员在配置中开启了特例，则即使有引导也进行签名
+    if (isNative && finalUserGuidance && appConfig.ALLOW_GUIDED_SUBLIMATION_NATIVE_SIGNING) {
+      shouldSign = true;
+    }
+
+    if (shouldSign) {
+        sublimatedData.signature = await generateSignature(sublimatedData);
     } else {
-      delete sublimatedData.signature;
+        delete sublimatedData.signature;
     }
 
     // 9. 构造最终的API响应体
