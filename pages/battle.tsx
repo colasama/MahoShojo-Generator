@@ -734,9 +734,9 @@ const BattlePage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {presets.slice((currentPage - 1) * presetsPerPage, currentPage * presetsPerPage).map(preset => {
                             const isSelected = combatants.some(c => c.filename === preset.filename);
-                            // 修改：增加 loadingPreset 的判断
+                            // 修改：增加 loadingPreset 和 isGenerating 的判断
                             const isLoadingThis = loadingPreset === preset.filename;
-                            const isDisabled = isLoadingThis || (!isSelected && combatants.length >= 4);
+                            const isDisabled = isGenerating || isLoadingThis || (!isSelected && combatants.length >= 4);
 
                             const bgColor = preset.type === 'canshou'
                                 ? (isSelected ? 'bg-red-200 border-red-400 hover:bg-red-300' : 'bg-white border-gray-300 hover:border-red-400 hover:bg-red-50')
@@ -760,9 +760,9 @@ const BattlePage: React.FC = () => {
                     </div>
                     {presets.length > presetsPerPage && (
                         <div className="flex justify-center items-center mt-4 space-x-2">
-                            <button onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} disabled={currentPage === 1} className={`px-3 py-1 rounded text-sm ${currentPage === 1 ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>上一页</button>
+                            <button onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))} disabled={isGenerating || currentPage === 1} className={`px-3 py-1 rounded text-sm ${currentPage === 1 || isGenerating ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>上一页</button>
                             <span className="text-sm text-gray-600">第 {currentPage} / {Math.ceil(presets.length / presetsPerPage)} 页</span>
-                            <button onClick={() => setCurrentPage(Math.min(currentPage + 1, Math.ceil(presets.length / presetsPerPage)))} disabled={currentPage === Math.ceil(presets.length / presetsPerPage)} className={`px-3 py-1 rounded text-sm ${currentPage === Math.ceil(presets.length / presetsPerPage) ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>下一页</button>
+                            <button onClick={() => setCurrentPage(Math.min(currentPage + 1, Math.ceil(presets.length / presetsPerPage)))} disabled={isGenerating || currentPage === Math.ceil(presets.length / presetsPerPage)} className={`px-3 py-1 rounded text-sm ${currentPage === Math.ceil(presets.length / presetsPerPage) || isGenerating ? 'bg-gray-200 text-gray-400' : 'bg-pink-100 text-pink-700 hover:bg-pink-200'}`}>下一页</button>
                         </div>
                     )}
                 </div>
@@ -799,7 +799,7 @@ const BattlePage: React.FC = () => {
 
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">上传自己的 .json 设定文件</label>
-                            <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100" />
+                            <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} disabled={isGenerating} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 disabled:opacity-50 disabled:cursor-not-allowed" />
                         </div>
 
                         <div className="mb-6">
@@ -808,7 +808,7 @@ const BattlePage: React.FC = () => {
                             </button>
                             {isPasteAreaVisible && (
                                 <div className="input-group mt-2">
-                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个或多个魔法少女/残兽的设定文件(.json)内容..." className="input-field resize-y h-32" />
+                                    <textarea value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} placeholder="在此处粘贴一个或多个魔法少女/残兽的设定文件(.json)内容..." className="input-field resize-y h-32" disabled={isGenerating} />
                                     <button onClick={handleAddFromPaste} disabled={!pastedJson.trim() || isGenerating || combatants.length >= 4} className="generate-button mt-2 mb-0">从文本添加角色</button>
                                 </div>
                             )}
@@ -822,7 +822,7 @@ const BattlePage: React.FC = () => {
                                 </button>
                                 {isScenarioPasteAreaVisible && (
                                     <div className="input-group mt-2">
-                                        <textarea value={pastedScenarioJson} onChange={(e) => setPastedScenarioJson(e.target.value)} placeholder="在此处粘贴一个情景的设定文件(.json)内容..." className="input-field resize-y h-24" />
+                                        <textarea value={pastedScenarioJson} onChange={(e) => setPastedScenarioJson(e.target.value)} placeholder="在此处粘贴一个情景的设定文件(.json)内容..." className="input-field resize-y h-24" disabled={isGenerating}/>
                                         <button onClick={handlePasteAndLoadScenario} disabled={!pastedScenarioJson.trim() || isGenerating} className="generate-button mt-2 mb-0" style={{ backgroundColor: '#8b5cf6', backgroundImage: 'linear-gradient(to right, #8b5cf6, #a78bfa)' }}>从文本加载情景</button>
                                     </div>
                                 )}
@@ -834,7 +834,7 @@ const BattlePage: React.FC = () => {
                             <div className="mb-4 p-3 bg-gray-200 rounded-lg">
                                 <div className="flex justify-between items-center m-0 top-0 right-0">
                                     <p className="font-semibold text-sm text-gray-700">已选角色 ({combatants.length}/4):</p>
-                                    <button onClick={handleClearRoster} className="text-sm text-red-500 hover:underline cursor-pointer">清空列表</button>
+                                    <button onClick={handleClearRoster} disabled={isGenerating} className="text-sm text-red-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">清空列表</button>
                                 </div>
                                 <ul className="list-disc list-inside text-sm text-gray-600 mt-2 space-y-2">
                                     {combatants.map(c => {
@@ -856,7 +856,8 @@ const BattlePage: React.FC = () => {
                                                     <select
                                                         value={c.teamId || 0}
                                                         onChange={(e) => handleTeamChange(c.filename, parseInt(e.target.value))}
-                                                        className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white"
+                                                        className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white disabled:opacity-50"
+                                                        disabled={isGenerating}
                                                     >
                                                         <option value={0}>无分队</option>
                                                         <option value={1}>队伍 1</option>
@@ -868,15 +869,16 @@ const BattlePage: React.FC = () => {
                                                 <div className="flex items-center">
                                                     {isCorrected && (
                                                         <div className="flex gap-2 mr-2">
-                                                            <button onClick={() => handleDownloadCorrectedJson(name)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">下载</button>
-                                                            <button onClick={() => handleCopyCorrectedJson(name)} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">{copiedStatus[name] ? '已复制!' : '复制'}</button>
+                                                            <button onClick={() => handleDownloadCorrectedJson(name)} disabled={isGenerating} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">下载</button>
+                                                            <button onClick={() => handleCopyCorrectedJson(name)} disabled={isGenerating} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">{copiedStatus[name] ? '已复制!' : '复制'}</button>
                                                         </div>
                                                     )}
                                                     {/* 单个删除按钮 */}
                                                     <button
-                                                        onClick={() => handleRemoveCombatant(c.filename)}
-                                                        className="w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-300"
+                                                        onClick={() => !isGenerating && handleRemoveCombatant(c.filename)}
+                                                        className={`w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold transition-opacity ${isGenerating ? 'opacity-20 cursor-not-allowed' : 'opacity-0 group-hover:opacity-100 hover:bg-red-300'}`}
                                                         aria-label={`移除 ${name}`}
+                                                        disabled={isGenerating}
                                                     >
                                                         X
                                                     </button>
@@ -912,25 +914,29 @@ const BattlePage: React.FC = () => {
                             <div className="flex items-center space-x-1 bg-gray-200 p-1 rounded-full">
                                 <button
                                     onClick={() => setBattleMode('daily')}
-                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'daily' ? 'bg-white text-green-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    disabled={isGenerating}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'daily' ? 'bg-white text-green-600 shadow' : 'text-gray-600 hover:bg-gray-300'} disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     日常模式☕
                                 </button>
                                 <button
                                     onClick={() => setBattleMode('kizuna')}
-                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'kizuna' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    disabled={isGenerating}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'kizuna' ? 'bg-white text-blue-600 shadow' : 'text-gray-600 hover:bg-gray-300'} disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     羁绊模式✨
                                 </button>
                                 <button
                                     onClick={() => setBattleMode('classic')}
-                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'classic' ? 'bg-white text-pink-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    disabled={isGenerating}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'classic' ? 'bg-white text-pink-600 shadow' : 'text-gray-600 hover:bg-gray-300'} disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     经典模式⚔️
                                 </button>
                                 <button
                                     onClick={() => setBattleMode('scenario')}
-                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'scenario' ? 'bg-white text-purple-600 shadow' : 'text-gray-600 hover:bg-gray-300'}`}
+                                    disabled={isGenerating}
+                                    className={`w-1/4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 ${battleMode === 'scenario' ? 'bg-white text-purple-600 shadow' : 'text-gray-600 hover:bg-gray-300'} disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     情景模式📜
                                 </button>
@@ -964,7 +970,8 @@ const BattlePage: React.FC = () => {
                                     type="file"
                                     accept=".json"
                                     onChange={handleScenarioFileChange}
-                                    className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                                    disabled={isGenerating}
+                                    className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                                 {scenarioFileName && (
                                     <p className="text-xs text-gray-500 mt-2">
@@ -983,7 +990,7 @@ const BattlePage: React.FC = () => {
                         {battleMode !== 'daily' && (
                             <div className="input-group">
                                 <label htmlFor="level-select" className="input-label">指定平均等级 (可选):</label>
-                                <select id="level-select" value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="input-field" style={{ cursor: 'pointer' }}>
+                                <select id="level-select" value={selectedLevel} onChange={(e) => setSelectedLevel(e.target.value)} className="input-field" style={{ cursor: 'pointer' }} disabled={isGenerating}>
                                     {battleLevels.map(level => (<option key={level.value} value={level.value}>{level.label}</option>))}
                                 </select>
                                 <p className="text-xs text-gray-500 mt-1">默认由 AI 根据角色强度自动分配，以保证战斗平衡和观赏性。</p>
@@ -1002,6 +1009,7 @@ const BattlePage: React.FC = () => {
                                     className="input-field"
                                     placeholder="输入关键词或一句话 (最多20字)"
                                     maxLength={20}
+                                    disabled={isGenerating}
                                 />
                                 <p className="text-xs text-gray-500 mt-1">尝试引导AI生成您想看的故事，例如：“在雨中相遇”、“保卫要地”、“猫咖聚会”等。</p>
                             </div>
