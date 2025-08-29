@@ -384,7 +384,7 @@ const BattlePage: React.FC = () => {
             } catch {
                 // [SRS 3.2.2] 兼容模式逻辑
                 if (item && (item.codename || item.name)) {
-                    setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。`);
+                    setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。\n建议前往 https://www.toolhelper.cn/JSON/JSONFormat 进行格式化检查。`);
                     const type = item.codename ? 'magical-girl' : 'canshou';
                     combatantToAdd = { type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true };
                 } else {
@@ -417,7 +417,9 @@ const BattlePage: React.FC = () => {
             // 合并所有文件内容为一个字符串进行处理
             await processJsonData(fileContents.join('\n'), '上传的文件');
         } catch (err) {
-            if (err instanceof Error) setError(`❌ 文件处理失败: ${err.message}`);
+            if (err instanceof Error) {
+                setError(`❌ 文件处理失败: ${err.message}\n建议前往 https://www.toolhelper.cn/JSON/JSONFormat 进行格式化检查。`);
+            }
         } finally {
             if (event.target) event.target.value = '';
         }
@@ -430,7 +432,9 @@ const BattlePage: React.FC = () => {
             await processJsonData(text, '粘贴的内容');
             setPastedJson(''); // 成功后清空文本域
         } catch (err) {
-            if (err instanceof Error) setError(`❌ 文本解析失败: ${err.message}.`);
+            if (err instanceof Error) {
+                setError(`❌ 文本解析失败: ${err.message}\n建议前往 https://www.toolhelper.cn/JSON/JSONFormat 进行格式化检查。`);
+            }
         }
     };
 
@@ -876,7 +880,7 @@ const BattlePage: React.FC = () => {
                                                             <button onClick={() => handleCopyCorrectedJson(name)} disabled={isGenerating} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 w-16">{copiedStatus[name] ? '已复制!' : '复制'}</button>
                                                         </div>
                                                     )}
-                                                    {/* 核心修改：移除 group-hover 和 opacity-0，使其始终可见 */}
+                                                    {/* 单个删除按钮 */}
                                                     <button
                                                         onClick={() => !isGenerating && handleRemoveCombatant(c.filename)}
                                                         className={`w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-300'}`}
