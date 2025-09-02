@@ -616,18 +616,9 @@ const CharacterManagerPage: React.FC = () => {
                                         <legend className="text-sm font-semibold px-2 text-gray-600">历战记录管理</legend>
                                         <div className="space-y-4">
                                             {characterData.arena_history.entries?.map((entry: any) => (
-                                                // 核心修改：将 'items-center'（垂直居中）修改为 'items-start'（垂直顶部对齐）。
-                                                // 这将允许左侧的文本块自由地向下扩展高度以容纳多行文本，而不会受到右侧按钮高度的隐性限制。
                                                 <div key={entry.id} className="flex items-start justify-between bg-gray-50 p-2 rounded">
-                                                    <p className="text-xs whitespace-normal break-words mr-4" title={entry.title}>
-                                                        <span className="font-semibold">{entry.id}:</span> {entry.title}
-                                                    </p>
-                                                    <button 
-                                                        onClick={() => handleDeleteHistoryEntry(entry.id)} 
-                                                        className="text-red-500 hover:text-red-700 text-xs font-bold px-2 flex-shrink-0"
-                                                    >
-                                                        删除
-                                                    </button>
+                                                    <p className="text-xs truncate" title={entry.title}>{entry.id}: {entry.title}</p>
+                                                    <button onClick={() => handleDeleteHistoryEntry(entry.id)} className="text-red-500 hover:text-red-700 text-xs font-bold px-2">删除</button>
                                                 </div>
                                             ))}
                                             <div className="flex flex-wrap gap-2 pt-2 border-t">
