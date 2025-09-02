@@ -89,11 +89,24 @@ const CharacterManagerPage: React.FC = () => {
     // 控制“一键替换曾用名”按钮的显示状态
     const [showNameReplaceButton, setShowNameReplaceButton] = useState(false);
 
-    // [新增 SRS 3.3] 立绘生成器相关状态
+    // [新增] 用于控制粘贴区域折叠/展开的状态，默认为折叠
+    const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+
+    // 组件加载时运行，检测设备类型以决定是否默认展开粘贴区域
+    useEffect(() => {
+        // 使用正则表达式检测用户代理字符串中是否包含常见的移动设备关键词
+        const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
+        // 如果是移动设备，则自动展开粘贴区域，优化移动端用户体验
+        if (isMobileDevice) {
+            setIsPasteAreaVisible(true);
+        }
+    }, []); // 空依赖数组 `[]` 确保此效果仅在组件首次挂载时运行一次
+
+    // [SRS 3.3] 立绘生成器相关状态
     const [isTachieVisible, setIsTachieVisible] = useState(false);
     const [tachiePrompt, setTachiePrompt] = useState('');
 
-    // [新增 SRS 3.3.3] 动态生成立绘提示词
+    // [SRS 3.3.3] 动态生成立绘提示词
     useEffect(() => {
         if (!characterData) {
             setTachiePrompt('');
@@ -587,12 +600,28 @@ const CharacterManagerPage: React.FC = () => {
                                     <input id="file-upload" type="file" accept=".json" onChange={handleFileChange} className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0" />
                                 </div>
                                 <div className="text-center my-4 text-gray-500">或</div>
-                                <div className="input-group">
-                                    <label htmlFor="paste-area" className="input-label">粘贴JSON文本内容</label>
-                                    <textarea id="paste-area" value={pastedJson} onChange={(e) => setPastedJson(e.target.value)} rows={8} className="input-field" />
-                                    <button onClick={handlePasteAndLoad} disabled={isLoading} className="generate-button mt-2">
-                                        {isLoading ? '加载中...' : '加载数据'}
+                                {/* [修改] 将原有的粘贴区域替换为可折叠的组件 */}
+                                <div className="mb-6">
+                                    <button
+                                        onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)}
+                                        className="text-purple-700 hover:underline cursor-pointer mb-2 font-semibold text-sm"
+                                    >
+                                        {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
                                     </button>
+                                    {isPasteAreaVisible && (
+                                        <div className="input-group mt-2">
+                                            <textarea
+                                                value={pastedJson}
+                                                onChange={(e) => setPastedJson(e.target.value)}
+                                                placeholder="在此处粘贴一个角色的设定文件(.json)内容..."
+                                                className="input-field resize-y h-32"
+                                                disabled={isLoading}
+                                            />
+                                            <button onClick={handlePasteAndLoad} disabled={isLoading || !pastedJson.trim()} className="generate-button mt-2 mb-0">
+                                                {isLoading ? '加载中...' : '从文本加载角色'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </>
                         ) : (
