@@ -617,8 +617,15 @@ const CharacterManagerPage: React.FC = () => {
                                         <div className="space-y-4">
                                             {characterData.arena_history.entries?.map((entry: any) => (
                                                 <div key={entry.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                                    <p className="text-xs truncate" title={entry.title}>{entry.id}: {entry.title}</p>
-                                                    <button onClick={() => handleDeleteHistoryEntry(entry.id)} className="text-red-500 hover:text-red-700 text-xs font-bold px-2">删除</button>
+                                                    <p className="text-xs whitespace-normal break-words mr-4" title={entry.title}>
+                                                        <span className="font-semibold">{entry.id}:</span> {entry.title}
+                                                    </p>
+                                                    <button 
+                                                        onClick={() => handleDeleteHistoryEntry(entry.id)} 
+                                                        className="text-red-500 hover:text-red-700 text-xs font-bold px-2 flex-shrink-0" // 添加 flex-shrink-0 防止按钮被压缩
+                                                    >
+                                                        删除
+                                                    </button>
                                                 </div>
                                             ))}
                                             <div className="flex flex-wrap gap-2 pt-2 border-t">
