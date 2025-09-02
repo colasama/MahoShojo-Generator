@@ -391,7 +391,7 @@ const CharacterManagerPage: React.FC = () => {
                             onClick={handleReplaceAllNames}
                             className="text-sm text-white bg-green-500 hover:bg-green-600 rounded-md px-3 py-1 mt-2 w-full"
                         >
-                            将文件中所有“{originalData.codename || originalData.name}”替换为“{characterData.codename || characterData.name}”
+                            点击将所有“{originalData.codename || originalData.name}”替换为“{characterData.codename || characterData.name}”
                         </button>
                     )}
                 </div>
@@ -571,7 +571,6 @@ const CharacterManagerPage: React.FC = () => {
                                         </p>
                                         <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
                                             <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">codename</code> (魔法少女) 或 <code className="bg-gray-200 px-1 rounded text-xs">name</code> (残兽) 字段。</li>
-                                            <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">appearance.colorScheme</code> (配色) 字段。</li>
                                             <li>在“历战记录管理”中<span className="font-semibold">删除</span>一条或多条历史记录。</li>
                                             <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”或“清除所有记录”</span>按钮。</li>
                                         </ul>
