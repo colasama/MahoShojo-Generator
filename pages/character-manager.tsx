@@ -14,7 +14,12 @@ const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto
 
 
 // 定义允许保持原生性的可编辑字段 (顶级键) (SRS 3.7.3)
-const NATIVE_PRESERVING_FIELDS = new Set(['codename', 'name']);
+// 这是一个路径集合，用于更精确地控制哪些字段的修改不影响原生性
+const NATIVE_PRESERVING_PATHS = new Set([
+    'codename', // 允许修改魔法少女代号
+    'name',     // 允许修改残兽名称
+    'appearance.colorScheme' // 允许修改配色方案
+]);
 
 /**
  * 辅助函数：判断一个值是否为可以遍历的普通对象（非数组、非null）。
@@ -23,6 +28,46 @@ const NATIVE_PRESERVING_FIELDS = new Set(['codename', 'name']);
  */
 const isObject = (item: any): boolean => {
     return (item && typeof item === 'object' && !Array.isArray(item));
+};
+
+/**
+ * [新增] 辅助函数：转义正则表达式特殊字符。
+ * @param str - 需要转义的字符串。
+ * @returns {string} 转义后的字符串。
+ */
+const escapeRegExp = (str: string): string => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+/**
+ * [新增] 辅助函数：递归地在数据对象中替换所有出现的旧名称。
+ * @param data - 要进行替换操作的数据对象或数组。
+ * @param oldBaseName - 原始的基础名称（不带称号）。
+ * @param newBaseName - 新的基础名称。
+ * @returns {any} 返回一个经过名称替换后的新数据对象。
+ */
+const replaceAllNamesInData = (data: any, oldBaseName: string, newBaseName: string): any => {
+    if (typeof data === 'string') {
+        // 使用正则表达式进行替换。
+        // 这个表达式会匹配 "旧基础名称" 或 "旧基础名称「称号」" 两种形式。
+        // (「[^」]+」)? 是一个捕获组，用于匹配并保留称号部分。
+        const regex = new RegExp(escapeRegExp(oldBaseName) + '(「[^」]+」)?', 'g');
+        return data.replace(regex, `${newBaseName}$1`);
+    }
+    if (Array.isArray(data)) {
+        // 如果是数组，则递归遍历数组中的每一项。
+        return data.map(item => replaceAllNamesInData(item, oldBaseName, newBaseName));
+    }
+    if (isObject(data)) {
+        // 如果是对象，则递归遍历对象的每一个值。
+        const newData: { [key: string]: any } = {};
+        for (const key in data) {
+            newData[key] = replaceAllNamesInData(data[key], oldBaseName, newBaseName);
+        }
+        return newData;
+    }
+    // 对于非字符串、数组、对象类型的值，直接返回原值。
+    return data;
 };
 
 const CharacterManagerPage: React.FC = () => {
@@ -40,6 +85,9 @@ const CharacterManagerPage: React.FC = () => {
 
     // 用于控制说明区域的显示与隐藏，默认为 true
     const [isGuideVisible, setIsGuideVisible] = useState(true);
+
+    // 控制“一键替换曾用名”按钮的显示状态
+    const [showNameReplaceButton, setShowNameReplaceButton] = useState(false);
 
     // [新增 SRS 3.3] 立绘生成器相关状态
     const [isTachieVisible, setIsTachieVisible] = useState(false);
@@ -79,6 +127,15 @@ const CharacterManagerPage: React.FC = () => {
     useEffect(() => {
         if (!originalData || !characterData || !isNative) return;
 
+        // [新增] 名称变化检测逻辑
+        const originalName = originalData.codename || originalData.name;
+        const currentName = characterData.codename || characterData.name;
+        if (originalName !== currentName) {
+            setShowNameReplaceButton(true);
+        } else {
+            setShowNameReplaceButton(false);
+        }
+
         // 一旦丧失原生性，状态不再改变
         if (hasLostNativeness) return;
 
@@ -88,55 +145,45 @@ const CharacterManagerPage: React.FC = () => {
 
         let hasBreakingChange = false;
 
-        // 1. 检查除特许字段和历战记录外的所有字段
-        for (const key in originalData) {
-            if (key === 'signature' || key === 'arena_history' || NATIVE_PRESERVING_FIELDS.has(key)) {
-                continue;
-            }
-            if (!deepEqual(originalData[key], characterData[key])) {
-                console.log(`原生性丧失：字段 '${key}' 被修改。`);
-                hasBreakingChange = true;
-                break;
-            }
-        }
+        // 递归检查函数，现在会忽略被豁免的路径
+        const checkForBreakingChanges = (originalNode: any, currentNode: any, path: string) => {
+            if (hasBreakingChange) return;
+            for (const key in originalNode) {
+                const currentPath = path ? `${path}.${key}` : key;
 
-        // 2. 单独检查 arena_history 的复杂修改规则 (SRS 3.7.3)
-        if (!hasBreakingChange && originalData.arena_history && characterData.arena_history) {
-            const originalAttrs = originalData.arena_history.attributes || {};
-            const currentAttrs = characterData.arena_history.attributes || {};
-            const originalEntries = originalData.arena_history.entries || [];
-            const currentEntries = characterData.arena_history.entries || [];
-
-            // 允许 `world_line_id` 和 `created_at` 被重置，但其他属性不允许修改
-            if (originalAttrs.sublimation_count !== currentAttrs.sublimation_count ||
-                originalAttrs.last_sublimation_at !== currentAttrs.last_sublimation_at) {
-                console.log('原生性丧失：arena_history.attributes 的核心属性被修改。');
-                hasBreakingChange = true;
-            } else {
-                // 只允许删除条目，不允许修改或新增
-                const originalEntryIds = new Set(originalEntries.map((e: any) => e.id));
-
-                if (currentEntries.length > originalEntries.length) {
-                    console.log('原生性丧失：arena_history.entries 新增了条目。');
-                    hasBreakingChange = true; // 不允许新增
-                } else {
-                    // 检查剩余的条目是否都是原始条目且未被修改
-                    for (const currentEntry of currentEntries) {
-                        if (!originalEntryIds.has(currentEntry.id)) {
-                            console.log(`原生性丧失：arena_history.entries 出现了新的ID ${currentEntry.id}。`);
-                            hasBreakingChange = true; // 出现了新的ID，说明不是删除操作
-                            break;
+                // 如果当前路径或其父路径在豁免列表中，则跳过检查
+                if (key === 'signature' || key === 'arena_history' || NATIVE_PRESERVING_PATHS.has(currentPath)) {
+                    continue;
+                }
+                
+                if (!deepEqual(originalNode[key], currentNode[key])) {
+                    // 检查历战记录的特殊规则 (只允许删除条目)
+                    if (currentPath === 'arena_history.entries') {
+                        const originalEntries = originalNode[key] || [];
+                        const currentEntries = currentNode[key] || [];
+                        if (currentEntries.length > originalEntries.length) {
+                             hasBreakingChange = true;
+                        } else {
+                            const originalIds = new Set(originalEntries.map((e: any) => e.id));
+                            for (const currentEntry of currentEntries) {
+                                if (!originalIds.has(currentEntry.id)) {
+                                    hasBreakingChange = true;
+                                    break;
+                                }
+                            }
                         }
-                        const originalEntry = originalEntries.find((e: any) => e.id === currentEntry.id);
-                        if (!deepEqual(originalEntry, currentEntry)) {
-                            console.log(`原生性丧失：arena_history.entries ID ${currentEntry.id} 的内容被修改。`);
-                            hasBreakingChange = true; // 内容被修改
-                            break;
-                        }
+                    } else {
+                        hasBreakingChange = true;
+                    }
+                    if (hasBreakingChange) {
+                        console.log(`原生性丧失：字段 '${currentPath}' 被修改。`);
+                        break;
                     }
                 }
             }
-        }
+        };
+
+        checkForBreakingChanges(originalData, characterData, '');
 
         if (hasBreakingChange) {
             setHasLostNativeness(true);
@@ -217,7 +264,35 @@ const CharacterManagerPage: React.FC = () => {
         });
     }, []);
 
-    // 递归渲染表单，增加了对数组的专门处理逻辑
+    // [新增] 一键替换所有旧名称的事件处理器
+    const handleReplaceAllNames = useCallback(() => {
+        if (!characterData || !originalData) return;
+
+        const oldName = originalData.codename || originalData.name;
+        const newName = characterData.codename || characterData.name;
+
+        // 从完整名称中提取基础名称（去除称号）
+        const oldBaseName = oldName.split('「')[0];
+        const newBaseName = newName.split('「')[0];
+
+        if (oldBaseName === newBaseName) return;
+
+        // 对当前编辑的数据和原始备份数据同时执行替换操作
+        // 这是保持原生性的关键：让 useEffect 认为除了豁免字段外，其他内容没有“意外”变化。
+        const updatedCharacterData = replaceAllNamesInData(characterData, oldBaseName, newBaseName);
+        const updatedOriginalData = replaceAllNamesInData(originalData, oldBaseName, newBaseName);
+        
+        // 更新状态
+        setCharacterData(updatedCharacterData);
+        setOriginalData(updatedOriginalData);
+
+        // 隐藏按钮并显示成功消息
+        setShowNameReplaceButton(false);
+        setMessage({ type: 'success', text: `已将所有“${oldBaseName}”替换为“${newBaseName}”！` });
+
+    }, [characterData, originalData]);
+
+    // 递归渲染表单
     const renderFormFields = (data: any, path: string = ''): React.ReactNode => {
         // 渲染顺序：基本信息 -> 外观 -> 魔装 -> 奇境 -> 繁开 -> 分析 -> 问卷 -> 历战记录
         if (!isObject(data)) return null;
@@ -310,6 +385,15 @@ const CharacterManagerPage: React.FC = () => {
                             <button onClick={handleRandomCodename} type="button" className="ml-2 px-3 py-1.5 text-xs font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600">随机</button>
                         )}
                     </div>
+                     {/* [新增] 条件渲染“一键替换”按钮 */}
+                     {showNameReplaceButton && (currentPath === 'codename' || currentPath === 'name') && (
+                        <button
+                            onClick={handleReplaceAllNames}
+                            className="text-sm text-white bg-green-500 hover:bg-green-600 rounded-md px-3 py-1 mt-2 w-full"
+                        >
+                            将文件中所有“{originalData.codename || originalData.name}”替换为“{characterData.codename || characterData.name}”
+                        </button>
+                    )}
                 </div>
             );
         });
@@ -465,6 +549,7 @@ const CharacterManagerPage: React.FC = () => {
                                         <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
                                             <li><span className="font-semibold">加载角色：</span>通过上传 <code>.json</code> 文件或直接粘贴文本内容来加载你的角色档案。</li>
                                             <li><span className="font-semibold">编辑数据：</span>可视化地查看并修改角色的各项设定，包括调整历战记录。</li>
+                                            <li><span className="font-semibold">一键换名：</span>修改名称后，可一键替换档案中所有旧名称。</li>
                                             <li><span className="font-semibold">生成立绘：</span>加载角色后，展开下方的“立绘生成”模块，可为你的角色创建立绘。</li>
                                             <li><span className="font-semibold">保存与导出：</span>完成修改后，可下载新的 <code>.json</code> 文件或将内容复制到剪贴板。</li>
                                         </ul>
@@ -486,10 +571,11 @@ const CharacterManagerPage: React.FC = () => {
                                         </p>
                                         <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
                                             <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">codename</code> (魔法少女) 或 <code className="bg-gray-200 px-1 rounded text-xs">name</code> (残兽) 字段。</li>
+                                            <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">appearance.colorScheme</code> (配色) 字段。</li>
                                             <li>在“历战记录管理”中<span className="font-semibold">删除</span>一条或多条历史记录。</li>
                                             <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”或“清除所有记录”</span>按钮。</li>
                                         </ul>
-                                        <p className="text-xs text-gray-500 mt-2">（注：新增或修改历战记录、编辑除代号/名称外的任何字段，都会导致原生性丧失。）</p>
+                                        <p className="text-xs text-gray-500 mt-2">（注：新增或修改历战记录、编辑除上述豁免字段外的任何字段，都会导致原生性丧失。）</p>
                                     </div>
                                 </div>
                             )}
