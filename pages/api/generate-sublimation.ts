@@ -8,10 +8,6 @@ import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
 import magicalGirlQuestionnaire from '../../public/questionnaire.json';
 import { config as appConfig } from '../../lib/config';
-import { webcrypto } from 'crypto';
-
-// 兼容 Edge 和 Node.js 环境的 crypto API
-const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
 
 const log = getLogger('api-gen-sublimation');
 
@@ -156,7 +152,7 @@ const createGenerationConfig = (characterData: any, language: string, userGuidan
 
 ${guidanceInstruction}
 
-## 原始角色设定 (供你参考)
+## 原始角色设定
 \`\`\`json
 ${JSON.stringify(dataForPrompt, null, 2)}
 \`\`\`
