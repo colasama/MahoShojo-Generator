@@ -67,6 +67,150 @@ body {
   margin-bottom: 30px;
 }
 
+/* ================================== */
+/* 公告栏 (Ticker) 样式       */
+/* ================================== */
+.announcement-ticker {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: rgba(26, 26, 26, 0.9); /* 深色半透明背景 */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #e0e0e0;
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem; /* 14px */
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.announcement-content {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  overflow: hidden; /* 隐藏滚动区域外的内容 */
+}
+
+.announcement-label {
+  font-weight: 600;
+  color: #f7b733; /* 醒目的黄色 */
+  padding-right: 0.75rem;
+  margin-right: 0.75rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.announcement-scroll-container {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.announcement-text {
+  display: inline-block;
+  padding-left: 100%; /* 从右侧开始滚动 */
+  animation: scroll-left 15s linear infinite;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.announcement-close-btn {
+  background: none;
+  border: none;
+  color: #a0a0a0;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: 1rem;
+  padding: 0 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.announcement-close-btn:hover {
+  color: #ffffff;
+}
+
+/* ================================== */
+/* 公告弹窗 (Modal) 样式      */
+/* ================================== */
+.announcement-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.announcement-modal-content {
+  background-color: #ffffff;
+  color: #333;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.announcement-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.announcement-modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.announcement-modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  line-height: 1;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.announcement-modal-close-btn:hover {
+  color: #000;
+}
+
+.announcement-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @layer components {
   /* 魔法少女主题样式 */
   .magic-background {
