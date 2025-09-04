@@ -7,7 +7,11 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import { NextRequest } from 'next/server';
 import { generateSignature, verifySignature } from '@/lib/signature';
 import magicalGirlQuestionnaire from '../../public/questionnaire.json';
-import { config as appConfig } from '../../lib/config'; // 导入应用配置
+import { config as appConfig } from '../../lib/config';
+import { webcrypto } from 'crypto';
+
+// 兼容 Edge 和 Node.js 环境的 crypto API
+const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
 
 const log = getLogger('api-gen-sublimation');
 
@@ -16,12 +20,11 @@ export const config = {
 };
 
 // =================================================================
-// 1. Zod Schema 定义 (SRS 3.2.2)
+// 1. Zod Schema 定义
 // =================================================================
 
-// 为 AI 返回的可变字段定义严格的 Schema，不再使用 z.any()
-// Schema for Magical Girl Sublimation
-const MagicalGirlSublimationPayloadSchema = z.object({
+// 定义了所有可能被AI修改的字段的基础Schema
+const BaseMagicalGirlSublimationPayloadSchema = z.object({
   codename: z.string().describe("角色的新代号，必须包含原始代号并在后面加上一个「称号」。例如，如果原始代号是'代号'，新代号可以是'代号「称号」'。"),
   appearance: z.object({
     outfit: z.string(),
@@ -47,8 +50,7 @@ const MagicalGirlSublimationPayloadSchema = z.object({
   userAnswers: z.array(z.string()).optional().describe("根据角色的成长，对问卷问题的全新回答。"),
 });
 
-// Schema for Canshou Sublimation
-const CanshouSublimationPayloadSchema = z.object({
+const BaseCanshouSublimationPayloadSchema = z.object({
   name: z.string().describe("残兽的新名称，必须包含原始名称并在后面加上一个「称号」。例如，如果原始名称是'名称'，新名称可以是'名称「称号」'。"),
   coreConcept: z.string(),
   coreEmotion: z.string(),
@@ -61,7 +63,9 @@ const CanshouSublimationPayloadSchema = z.object({
   origin: z.string(),
   birthEnvironment: z.string(),
   researcherNotes: z.string().describe("研究员对这次升华的补充笔记。"),
+  userAnswers: z.array(z.string()).optional().describe("根据残兽的成长，对问卷问题的全新回答。"),
 });
+
 
 // 升华事件的通用Schema
 const SublimationEventSchema = z.object({
@@ -70,32 +74,46 @@ const SublimationEventSchema = z.object({
 }).describe("描述角色如何升华的事件。");
 
 
-// 为两种角色类型分别创建完整的AI返回结果Schema
-const MagicalGirlSublimationResultSchema = z.object({
-  updatedCharacterData: MagicalGirlSublimationPayloadSchema.describe("一个JSON对象，包含所有被AI更新后的魔法少女可变字段。"),
-  sublimationEvent: SublimationEventSchema
-});
-
-const CanshouSublimationResultSchema = z.object({
-  updatedCharacterData: CanshouSublimationPayloadSchema.describe("一个JSON对象，包含所有被AI更新后的残兽可变字段。"),
-  sublimationEvent: SublimationEventSchema
-});
+/**
+ * 核心修改：动态构建Zod Schema的函数。
+ * @param baseSchema 基础的Zod Schema。
+ * @param fieldsToPreserve 一个字符串数组，包含需要从Schema中移除的字段名。
+ * @returns 返回一个新的、移除了指定字段的Zod Schema。
+ */
+const createDynamicSchema = (baseSchema: z.ZodObject<any>, fieldsToPreserve: string[]) => {
+    let dynamicSchema = baseSchema;
+    for (const field of fieldsToPreserve) {
+        if (field in baseSchema.shape) {
+            dynamicSchema = dynamicSchema.omit({ [field]: true });
+        }
+    }
+    // 无论如何，AI都需要生成一个升华事件
+    return z.object({
+        updatedCharacterData: dynamicSchema.describe("一个JSON对象，包含所有被AI更新后的可变字段。"),
+        sublimationEvent: SublimationEventSchema
+    });
+};
 
 // =================================================================
-// 2. AI Prompt 配置 (SRS 3.2.2)
+// 2. AI Prompt 配置
 // =================================================================
-const createGenerationConfig = (characterData: any, language: string, userGuidance: string | null): GenerationConfig<any, any> => {
+
+const createGenerationConfig = (characterData: any, language: string, userGuidance: string | null, fieldsToPreserve: string[]): GenerationConfig<any, any> => {
   const isMagicalGirl = !!characterData.codename;
   const characterType = isMagicalGirl ? '魔法少女' : '残兽';
   const nameField = isMagicalGirl ? 'codename' : 'name';
 
-  // 明确定义不可变字段，增强AI指令的约束力
-  const immutableFields = isMagicalGirl
+  // 明确定义不可变字段
+  let immutableFields = isMagicalGirl
     ? "`magicConstruct.name`, `wonderlandRule`, `blooming`"
     : "无";
+  
+  // 将用户选择保留的字段也加入不可变列表
+  if (fieldsToPreserve.length > 0) {
+      immutableFields += `, 以及用户指定的保留字段: \`${fieldsToPreserve.join('`, `')}\``;
+  }
 
   const promptBuilder = () => {
-    // 移除签名，避免干扰AI
     const dataForPrompt = { ...characterData };
     delete dataForPrompt.signature;
 
@@ -103,7 +121,6 @@ const createGenerationConfig = (characterData: any, language: string, userGuidan
       .map((entry: any) => `- 事件“${entry.title}”：胜利者是${entry.winner}，对我的影响是“${entry.impact}”`)
       .join('\n') || "无";
     
-    // [核心修正] 仅当角色是魔法少女时，才处理和展示问卷回答
     let userAnswersReviewSection = "";
     if (isMagicalGirl) {
         const questions = magicalGirlQuestionnaire.questions;
@@ -113,7 +130,6 @@ const createGenerationConfig = (characterData: any, language: string, userGuidan
         userAnswersReviewSection = `## 问卷回答回顾 (用于理解角色深层性格)\n${userAnswersText}`;
     }
 
-    // 根据用户引导，构建额外的指令
     let guidanceInstruction = '';
     if (userGuidance) {
       guidanceInstruction = `\n## 成长方向引导\n角色可以朝这个方向成长升华：“${userGuidance}”。请在重塑角色时将此作为最重要的参考。`;
@@ -121,7 +137,6 @@ const createGenerationConfig = (characterData: any, language: string, userGuidan
 
     return `
 # 角色成长升华任务
-
 你是一位资深的角色设定师。你的任务是为一个${characterType}角色进行“成长升华”。
 该角色经历了诸多事件，现在需要你基于其完整的设定和所有“历战记录”，对其进行一次全面的重塑和升级，以体现其成长与蜕变。
 
@@ -141,11 +156,11 @@ ${userAnswersReviewSection}
 你必须严格遵守以下规则来更新角色设定：
 
 1.  **核心身份不变**:
-    * **不可变字段**: 绝对不能修改以下字段的内容：${immutableFields}。
+    * **不可变字段**: 绝对不能修改以下字段的内容：${immutableFields}。在你的JSON输出中，**不要包含**这些字段。
     * **半可变字段**: \`${nameField}\` 字段。该字段的结构为 \`{代号/名称}\` 或 \`{代号/名称}「{称号}」\`。你 **不可** 修改 \`{代号/名称}\` 部分，但 **必须** 为其生成或更新一个4个字左右（1~8个字）的 \`{称号}\`，并以「」包裹，以体现其新状态。
 
 2.  **体现成长**:
-    * **可变字段**: 除了上述字段外，其他所有字段都可以被你重写，以反映角色从历战记录中的成长、感悟和变化。
+    * **可变字段**: 除了上述不可变字段外，其他所有字段都应该被你重写，以反映角色从历战记录中的成长、感悟和变化。
     * 请确保更新后的设定在逻辑上与角色的经历自洽，并且有创意，不得抄袭已有内容。
 
 3.  **生成升华事件**:
@@ -154,27 +169,25 @@ ${userAnswersReviewSection}
 请严格按照提供的JSON Schema格式返回结果，使用【${language}】进行内容创作。`;
   };
 
-  // 核心修改：动态选择精确的Schema
-  const schema = isMagicalGirl ? MagicalGirlSublimationResultSchema : CanshouSublimationResultSchema;
+  // 动态选择基础Schema并构建最终Schema
+  const baseSchema = isMagicalGirl ? BaseMagicalGirlSublimationPayloadSchema : BaseCanshouSublimationPayloadSchema;
+  const finalSchema = createDynamicSchema(baseSchema, fieldsToPreserve);
 
   return {
     systemPrompt: "你是一位资深的角色设定师，擅长根据角色的经历描绘其成长与蜕变。",
     temperature: 0.7,
     promptBuilder,
-    schema, // 使用动态选择的Schema
+    schema: finalSchema,
     taskName: "角色成长升华",
     maxTokens: 8192,
   };
 };
 
+
 // =================================================================
 // 3. 辅助函数
 // =================================================================
-/**
- * 检查一个值是否为可以遍历的对象（非数组、非null）。
- * @param item - 要检查的值。
- * @returns {boolean} 如果是对象则返回true，否则返回false。
- */
+
 function isObject(item: any): boolean {
     return (item && typeof item === 'object' && !Array.isArray(item));
 }
@@ -199,55 +212,6 @@ function safeDeepMerge(target: any, source: any): any {
     return output;
 }
 
-/**
- * 递归比较两个对象，找出在 source 对象中未被改变的字段路径。
- * @param original - 原始对象。
- * @param updated - AI返回的更新对象。
- * @returns {string[]} 返回一个包含未改变字段路径的字符串数组。
- */
-function findUnchangedFields(original: any, updated: any): string[] {
-    const unchangedPaths: string[] = [];
-
-    function recurse(originalNode: any, updatedNode: any, currentPath: string) {
-        // 如果原始节点不是对象，或者更新后的节点中不存在，则无法比较
-        if (!isObject(originalNode) || !isObject(updatedNode)) {
-            return;
-        }
-
-        // 遍历原始对象的所有键
-        for (const key in originalNode) {
-            // 忽略特殊字段
-            if (key === 'signature' || key === 'userAnswers' || key === 'arena_history' || key === 'isPreset') {
-                continue;
-            }
-
-            const newPath = currentPath ? `${currentPath} -> ${key}` : key;
-            const originalValue = originalNode[key];
-            const updatedValue = updatedNode[key];
-
-            // 检查更新后的值是否存在
-            if (updatedValue === undefined) {
-                // 如果AI的响应中没有这个键，我们视为“未改变”（因为它将保留原样）
-                unchangedPaths.push(newPath);
-                continue;
-            }
-
-            // 如果值是对象，则递归深入
-            if (isObject(originalValue) && isObject(updatedValue)) {
-                recurse(originalValue, updatedValue, newPath);
-            }
-            // 如果值不是对象（或一个是对象一个不是），直接比较
-            else if (JSON.stringify(originalValue) === JSON.stringify(updatedValue)) {
-                unchangedPaths.push(newPath);
-            }
-        }
-    }
-    
-    recurse(original, updated, '');
-    return unchangedPaths;
-}
-
-
 // =================================================================
 // 4. API Handler
 // =================================================================
@@ -259,11 +223,10 @@ async function handler(req: NextRequest): Promise<Response> {
 
   try {
     const body = await req.json();
-    // 从请求体中同时解构出 language、userGuidance 和 characterData
-    const { language = 'zh-CN', userGuidance = '', ...originalCharacterData } = body; 
+    const { language = 'zh-CN', userGuidance = '', fieldsToPreserve = [], ...originalCharacterData } = body; 
     const finalUserGuidance = userGuidance.trim() || null;
 
-    // 安全检查：检查用户上传的原始数据和引导文本
+    // 安全检查
     const textToCheck = extractTextForCheck(originalCharacterData) + " " + (finalUserGuidance || '');
     if ((await quickCheck(textToCheck)).hasSensitiveWords) {
         return new Response(JSON.stringify({ error: '输入内容不合规', shouldRedirect: true, reason: '上传的角色档案或引导内容包含危险符文' }), { status: 400 });
@@ -274,46 +237,26 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     const isNative = await verifySignature(originalCharacterData);
-    const generationConfig = createGenerationConfig(originalCharacterData, language, finalUserGuidance);
+    const generationConfig = createGenerationConfig(originalCharacterData, language, finalUserGuidance, fieldsToPreserve);
     
-    // --- AI 生成 ---
     const aiResult = await generateWithAI(null, generationConfig);
     const updatedDataFromAI = aiResult.updatedCharacterData;
 
-    // --- 数据整合与安全处理 (SRS 3.2.3, 3.2.4, 3.2.5, 4.1) ---
-    // 1. 创建一个原始数据的深拷贝作为最终结果的基础
-    const sublimatedData: any = JSON.parse(JSON.stringify(originalCharacterData));
+    // --- 数据整合与安全处理 ---
+    let sublimatedData: any = JSON.parse(JSON.stringify(originalCharacterData));
 
-    // 2. 找出未被AI更新的字段，用于前端提示
-    const unchangedFields = findUnchangedFields(originalCharacterData, updatedDataFromAI);
+    // 使用安全合并，将AI生成的部分覆盖到原始数据上
+    sublimatedData = safeDeepMerge(sublimatedData, updatedDataFromAI);
 
-    // 3. 【核心修正】数据净化与类型矫正，防止AI返回错误数据结构
+    // [核心修改] 找出真正被保留的字段，用于前端提示
+    const unchangedFields = fieldsToPreserve;
+
+    // 应用不可变字段规则和称号生成逻辑
     const isMagicalGirl = 'codename' in originalCharacterData;
-
-    if (!isMagicalGirl) {
-        // 残兽数据净化：处理AI可能返回的错误字段名和类型
-        if (updatedDataFromAI.codename && !updatedDataFromAI.name) {
-            log.warn("AI为残兽返回了 'codename' 而非 'name'，已自动转换。", { codename: updatedDataFromAI.codename });
-            updatedDataFromAI.name = updatedDataFromAI.codename;
-            delete updatedDataFromAI.codename;
-        }
-
-        const canshouStringKeys = Object.keys(CanshouSublimationPayloadSchema.shape);
-        for (const key of canshouStringKeys) {
-            if (Array.isArray(updatedDataFromAI[key])) {
-                log.warn(`AI为残兽字段'${key}'返回了数组，强制转换为字符串。`, { originalValue: updatedDataFromAI[key] });
-                updatedDataFromAI[key] = (updatedDataFromAI[key] as any[]).join(', ');
-            }
-        }
-    }
-
-    // 4. 安全地合并AI返回的更新
-    Object.assign(sublimatedData, safeDeepMerge(sublimatedData, updatedDataFromAI));
-
-    // 5. 应用不可变字段规则和称号生成逻辑
     let finalName: string;
+
     if (isMagicalGirl) {
-      // 确保核心字段不被AI意外修改
+      // 强制保留不可变字段
       sublimatedData.magicConstruct.name = originalCharacterData.magicConstruct.name;
       sublimatedData.wonderlandRule = originalCharacterData.wonderlandRule;
       sublimatedData.blooming = originalCharacterData.blooming;
@@ -327,10 +270,9 @@ async function handler(req: NextRequest): Promise<Response> {
         sublimatedData.codename = `${originalBaseName}「${newTitleMatch[1]}」`;
       } else {
         sublimatedData.codename = originalFullName.includes('「') ? originalFullName : `${originalBaseName}「历战」`;
-        log.warn('AI未能为魔法少女生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
       }
       finalName = sublimatedData.codename;
-    } else { // 残兽的逻辑
+    } else {
       const originalFullName = originalCharacterData.name as string;
       const originalBaseName = originalFullName.split('「')[0];
       const newNameFromAI = updatedDataFromAI.name as string;
@@ -340,14 +282,12 @@ async function handler(req: NextRequest): Promise<Response> {
         sublimatedData.name = `${originalBaseName}「${newTitleMatch[1]}」`;
       } else {
         sublimatedData.name = originalFullName.includes('「') ? originalFullName : `${originalBaseName}「历战」`;
-        log.warn('AI未能为残兽生成新称号，已执行回退逻辑。', { originalName: originalFullName, aiName: newNameFromAI });
       }
       finalName = sublimatedData.name;
     }
 
-    // 6. 更新历战记录 (SRS 3.2.4)
+    // 更新历战记录
     const oldEntries = originalCharacterData.arena_history.entries || [];
-    // 保留并过滤出之前的升华记录
     const sublimationEntries = oldEntries.filter((entry: any) => entry.type === 'sublimation');
     const lastEntryId = oldEntries.length > 0 ? Math.max(...oldEntries.map((e: any) => e.id)) : 0;
 
@@ -362,13 +302,12 @@ async function handler(req: NextRequest): Promise<Response> {
     });
     sublimatedData.arena_history.entries = sublimationEntries;
 
-    // 7. 更新历战记录属性 (SRS 3.2.5)
     const nowISO = new Date().toISOString();
     sublimatedData.arena_history.attributes.sublimation_count = (originalCharacterData.arena_history.attributes.sublimation_count || 0) + 1;
     sublimatedData.arena_history.attributes.updated_at = nowISO;
     sublimatedData.arena_history.attributes.last_sublimation_at = nowISO;
 
-    // 8. 签名处理 (SRS 4.1, updated logic)
+    // 签名处理 (SRS 4.1, updated logic)
     // 默认情况下，有引导的升华会失去原生性
     let shouldSign = isNative && !finalUserGuidance;
     // 但是，如果管理员在配置中开启了特例，则即使有引导也进行签名
@@ -382,7 +321,6 @@ async function handler(req: NextRequest): Promise<Response> {
         delete sublimatedData.signature;
     }
 
-    // 9. 构造最终的API响应体
     const finalResponse = {
         sublimatedData,
         unchangedFields
@@ -407,12 +345,9 @@ const extractTextForCheck = (data: any): string => {
     if (typeof data === 'string') {
         textContent += data + ' ';
     } else if (Array.isArray(data)) {
-        data.forEach(item => {
-            textContent += extractTextForCheck(item);
-        });
+        data.forEach(item => { textContent += extractTextForCheck(item); });
     } else if (typeof data === 'object' && data !== null) {
         for (const key in data) {
-            // 排除签名和答案存档，这些不是用户生成内容，避免误判
             if (key !== 'signature' && key !== 'userAnswers') {
                 textContent += extractTextForCheck(data[key]);
             }

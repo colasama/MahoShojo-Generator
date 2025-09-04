@@ -8,9 +8,9 @@ import MagicalGirlCard from '../components/MagicalGirlCard';
 import CanshouCard from '../components/CanshouCard';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { useCooldown } from '../lib/cooldown';
-import { config as appConfig } from '../lib/config'; // 导入应用配置
+import { config as appConfig } from '../lib/config';
 
-// 颜色处理方案，用于修复背景色问题
+// 颜色处理方案
 const MainColor = {
     Red: '红色',
     Orange: '橙色',
@@ -33,7 +33,7 @@ const gradientColors: Record<string, { first: string; second: string }> = {
     [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
 };
 
-// 递归提取对象中所有字符串值的函数，用于敏感词检查
+// 递归提取对象中所有字符串值的函数
 const extractTextForCheck = (data: any): string => {
     let textContent = '';
     if (typeof data === 'string') {
@@ -44,7 +44,6 @@ const extractTextForCheck = (data: any): string => {
         });
     } else if (typeof data === 'object' && data !== null) {
         for (const key in data) {
-            // 排除签名和答案存档，这些不是用户生成内容，避免误判
             if (key !== 'signature' && key !== 'userAnswers') {
                 textContent += extractTextForCheck(data[key]);
             }
@@ -59,6 +58,32 @@ interface SublimationResponse {
     unchangedFields: string[];
 }
 
+// [新增] 定义可配置的字段及其显示名称
+const PRESERVABLE_FIELDS_CONFIG = {
+    'magical-girl': [
+        { id: 'appearance', label: '外观' },
+        { id: 'magicConstruct', label: '魔装' },
+        { id: 'wonderlandRule', label: '奇境' },
+        { id: 'blooming', label: '繁开' },
+        { id: 'analysis', label: '分析' },
+        { id: 'userAnswers', label: '问卷答案' },
+    ],
+    'canshou': [
+        { id: 'appearance', label: '外貌形态' },
+        { id: 'coreConcept', label: '核心概念' },
+        { id: 'coreEmotion', label: '核心情感' },
+        { id: 'materialAndSkin', label: '材质表皮' },
+        { id: 'featuresAndAppendages', label: '特征附属' },
+        { id: 'attackMethod', label: '攻击方式' },
+        { id: 'specialAbility', label: '特殊能力' },
+        { id: 'origin', label: '起源' },
+        { id: 'birthEnvironment', label: '诞生环境' },
+        { id: 'researcherNotes', label: '研究员笔记' },
+        { id: 'userAnswers', label: '问卷答案' },
+    ]
+};
+
+
 const SublimationPage: React.FC = () => {
     const router = useRouter();
     const [characterData, setCharacterData] = useState<any>(null);
@@ -70,27 +95,20 @@ const SublimationPage: React.FC = () => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [pastedJson, setPastedJson] = useState('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
-    // 新增：用于存储用户引导输入的状态
     const [userGuidance, setUserGuidance] = useState('');
 
-    // 实例化 useCooldown hook，设置60秒冷却时间
+    // [新增] 用于管理高级选项的状态
+    const [fieldsToPreserve, setFieldsToPreserve] = useState<string[]>([]);
+    const [isAdvancedVisible, setIsAdvancedVisible] = useState(false);
+
     const { isCooldown, startCooldown, remainingTime } = useCooldown('sublimationCooldown', 60000);
-    // 多语言支持
     const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
     const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
 
     useEffect(() => {
-        fetch('/languages.json')
-            .then(res => res.json())
-            .then(data => setLanguages(data))
-            .catch(err => console.error("Failed to load languages:", err));
-    }, []);
-
-    useEffect(() => {
-        const isMobileDevice = /mobile|android|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(navigator.userAgent.toLowerCase());
-        if (isMobileDevice) {
-            setIsPasteAreaVisible(true);
-        }
+        fetch('/languages.json').then(res => res.json()).then(data => setLanguages(data));
+        const isMobileDevice = /mobile/i.test(navigator.userAgent);
+        if (isMobileDevice) setIsPasteAreaVisible(true);
     }, []);
 
     const processJsonData = (jsonText: string) => {
@@ -102,7 +120,16 @@ const SublimationPage: React.FC = () => {
             setCharacterData(json);
             setFileName('粘贴的内容');
             setError(null);
-            setResultData(null); // 清除旧结果
+            setResultData(null);
+            
+            // [新增] 加载角色后，根据类型设置默认的保留字段
+            const isMagicalGirl = !!json.codename;
+            if (isMagicalGirl) {
+                setFieldsToPreserve(['wonderlandRule', 'blooming']);
+            } else {
+                setFieldsToPreserve([]); // 残兽默认全部重置
+            }
+
             return true;
         } catch (err) {
             const message = err instanceof Error ? err.message : '无法解析文件。';
@@ -138,7 +165,6 @@ const SublimationPage: React.FC = () => {
     };
 
     const handleGenerate = async () => {
-        // [修改] 增加冷却检查
         if (isCooldown) {
             setError(`操作过于频繁，请等待 ${remainingTime} 秒后再试。`);
             return;
@@ -152,7 +178,6 @@ const SublimationPage: React.FC = () => {
         setResultData(null);
 
         try {
-            // 安全检查现在包括了用户引导
             const textToCheck = extractTextForCheck(characterData) + " " + userGuidance;
             if ((await quickCheck(textToCheck)).hasSensitiveWords) {
                 router.push({
@@ -165,11 +190,11 @@ const SublimationPage: React.FC = () => {
             const response = await fetch('/api/generate-sublimation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // 在请求体中加入 userGuidance
-                body: JSON.stringify({ 
-                    ...characterData, 
+                body: JSON.stringify({
+                    ...characterData,
                     language: selectedLanguage,
                     userGuidance: userGuidance.trim(),
+                    fieldsToPreserve: fieldsToPreserve, // [新增] 发送需要保留的字段列表
                 }),
             });
 
@@ -216,21 +241,52 @@ const SublimationPage: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+    const handleOptionalFieldChange = (fieldId: string) => {
+        setFieldsToPreserve(prev =>
+            prev.includes(fieldId)
+                ? prev.filter(f => f !== fieldId)
+                : [...prev, fieldId]
+        );
+    };
+
+    const applyPreset = (presetName: 'default' | 'full' | 'personality') => {
+        if (!characterData) return;
+        const isMagicalGirl = !!characterData.codename;
+        switch (presetName) {
+            case 'default':
+                setFieldsToPreserve(isMagicalGirl ? ['wonderlandRule', 'blooming'] : []);
+                break;
+            case 'full':
+                setFieldsToPreserve([]);
+                break;
+            case 'personality':
+                setFieldsToPreserve(
+                    isMagicalGirl
+                        ? ['appearance', 'magicConstruct', 'wonderlandRule', 'blooming']
+                        : ['appearance', 'materialAndSkin', 'featuresAndAppendages', 'attackMethod', 'specialAbility']
+                );
+                break;
+        }
+    };
+    
     const renderResultCard = () => {
         if (!resultData?.sublimatedData) return null;
         const data = resultData.sublimatedData;
 
-        if (data.codename) { // 魔法少女
+        if (data.codename) {
             const colorScheme = data.appearance.colorScheme || "红色、粉色";
             const mainColorName = Object.values(MainColor).find(color => colorScheme.includes(color)) || MainColor.Pink;
             const colors = gradientColors[mainColorName] || gradientColors[MainColor.Pink];
             const gradientStyle = `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
             return <MagicalGirlCard magicalGirl={data} gradientStyle={gradientStyle} onSaveImage={handleSaveImage} />;
-        } else if (data.name) { // 残兽
+        } else if (data.name) {
             return <CanshouCard canshou={data} onSaveImage={handleSaveImage} />;
         }
         return <div className="error-message">无法识别的角色类型</div>;
     };
+
+    const currentCharacterType = characterData?.codename ? 'magical-girl' : 'canshou';
+    const currentFieldsConfig = PRESERVABLE_FIELDS_CONFIG[currentCharacterType] || [];
 
     return (
         <>
@@ -252,23 +308,16 @@ const SublimationPage: React.FC = () => {
                             <ol className="list-decimal list-inside space-y-1">
                                 <li>上传一个包含【历战记录】(arena_history) 的角色设定文件 (.json)。</li>
                                 <li>AI 将会阅读角色的全部设定和所有经历。</li>
-                                <li>为你生成一个“成长之后”的全新角色设定！</li>
+                                <li>为你生成一个“成长之后”的全新角色设定！你可以在高级选项中选择保留哪些设定不被AI修改。</li>
                             </ol>
                         </div>
+
+                        {/* 文件上传与粘贴区域 */}
                         <div className="input-group">
                             <label htmlFor="character-upload" className="input-label">上传角色设定文件</label>
-                            <input
-                                id="character-upload"
-                                type="file"
-                                accept=".json"
-                                onChange={handleFileChange}
-                                className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                            />
-                            {fileName && (
-                                <p className="text-xs text-gray-500 mt-2">已加载角色: {fileName}</p>
-                            )}
+                            <input id="character-upload" type="file" accept=".json" onChange={handleFileChange} className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+                            {fileName && (<p className="text-xs text-gray-500 mt-2">已加载角色: {fileName}</p>)}
                         </div>
-
                         <div className="mb-6">
                             <button onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)} className="text-purple-700 hover:underline cursor-pointer mb-2 font-semibold">
                                 {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
@@ -281,28 +330,44 @@ const SublimationPage: React.FC = () => {
                             )}
                         </div>
 
-                        {/* 新增：成长方向引导输入框 */}
+                        {/* 成长方向引导输入框 */}
                         <div className="input-group">
                             <label htmlFor="user-guidance" className="input-label">成长方向引导 (可选)</label>
-                            <input
-                                id="user-guidance"
-                                type="text"
-                                value={userGuidance}
-                                onChange={(e) => setUserGuidance(e.target.value)}
-                                className="input-field"
-                                placeholder="输入关键词或一句话 (最多30字)"
-                                maxLength={30}
-                                disabled={isGenerating}
-                            />
-                            {/* 新增：根据配置和用户输入显示不同的提示信息 */}
+                            <input id="user-guidance" type="text" value={userGuidance} onChange={(e) => setUserGuidance(e.target.value)} className="input-field" placeholder="输入关键词或一句话 (最多30字)" maxLength={30} disabled={isGenerating} />
                             {userGuidance && appConfig.ALLOW_GUIDED_SUBLIMATION_NATIVE_SIGNING ? (
-                                <p className="text-xs text-green-700 mt-1">
-                                    ✅ 管理员已允许引导升华保留原生签名。
-                                </p>
+                                <p className="text-xs text-green-700 mt-1">✅ 管理员已允许引导升华保留原生签名。</p>
                             ) : (
-                                <p className="text-xs text-yellow-700 mt-1">
-                                    ⚠️ 注意: 提供引导将使生成的角色变为“衍生数据”，并移除其原生签名。
-                                </p>
+                                <p className="text-xs text-yellow-700 mt-1">⚠️ 注意: 提供引导将使生成的角色变为“衍生数据”，并移除其原生签名。</p>
+                            )}
+                        </div>
+
+                        {/* [新增] 高级选项UI */}
+                        <div className="input-group mt-6">
+                            <button onClick={() => setIsAdvancedVisible(!isAdvancedVisible)} className="text-sm font-semibold text-purple-700 hover:underline focus:outline-none">
+                                {isAdvancedVisible ? '▼ ' : '▶ '}高级选项：自定义升华范围
+                            </button>
+                            {isAdvancedVisible && characterData && (
+                                <div className="mt-3 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                                    <p className="text-xs text-gray-600 mb-3">勾选你希望<span className="font-bold">保留不变</span>的字段，未勾选的字段将由AI重塑。</p>
+                                    <div className="mb-4 flex flex-wrap gap-2">
+                                        <button onClick={() => applyPreset('default')} className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-full">默认</button>
+                                        <button onClick={() => applyPreset('full')} className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-full">完全重塑</button>
+                                        <button onClick={() => applyPreset('personality')} className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-full">仅心灵成长</button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                        {currentFieldsConfig.map(field => (
+                                            <label key={field.id} className="flex items-center text-sm cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={fieldsToPreserve.includes(field.id)}
+                                                    onChange={() => handleOptionalFieldChange(field.id)}
+                                                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                                />
+                                                <span className="ml-2 text-gray-700">{field.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
 
@@ -346,13 +411,12 @@ const SublimationPage: React.FC = () => {
                             {resultData.unchangedFields && resultData.unchangedFields.length > 0 && (
                                 <div className="card mt-6 bg-blue-50 border border-blue-200">
                                     <h4 className="font-bold text-blue-800 mb-2">升华报告</h4>
-                                    <p className="text-sm text-blue-700">AI 已根据角色经历更新了大部分设定，但以下字段保留原始设定：</p>
+                                    <p className="text-sm text-blue-700">AI 已根据角色经历更新设定，但以下字段保留原始设定：</p>
                                     <ul className="list-disc list-inside text-xs text-blue-600 mt-2 pl-2">
                                         {resultData.unchangedFields.map(field => <li key={field}>{field}</li>)}
                                     </ul>
                                 </div>
                             )}
-
                             {renderResultCard()}
                             <div className="card mt-6 text-center">
                                 <h3 className="text-lg font-bold text-gray-800 mb-3">操作</h3>
