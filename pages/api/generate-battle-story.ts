@@ -137,13 +137,13 @@ const filterAndFormatHistory = (
 
 
 /**
- * 根据战斗结果更新所有参战者的历战记录 (SRS 3.1.2, 3.1.4)
- * @param combatants 原始参战者数据列表（包含 isNative 标志）
+ * 根据战斗结果更新所有参战者的历战记录
+ * @param combatants 原始参战者数据列表
  * @param report 生成的战斗报告
  * @param impacts AI为每个角色生成的impact
  * @param userGuidance 用户提供的故事指引
  * @param scenario 情景模式下的情景文件
- * @param useArenaHistory 是否保留并追加到旧的历战记录
+ * @param useArenaHistory 是否需要记录本次战斗并更新历战记录
  * @returns 更新后的参战者数据列表
  */
 const updateCombatantsWithHistory = async (
@@ -152,7 +152,7 @@ const updateCombatantsWithHistory = async (
     impacts: { characterName: string; impact: string }[],
     userGuidance: string | null,
     scenario: any | null,
-    useArenaHistory: boolean // 新增参数
+    useArenaHistory: boolean
 ): Promise<any[]> => {
     const updatedCombatants = [];
     const participantNames = combatants.map(c => c.data.codename || c.data.name);
@@ -167,63 +167,58 @@ const updateCombatantsWithHistory = async (
         const characterData = JSON.parse(JSON.stringify(combatant.data));
         const characterName = characterData.codename || characterData.name;
 
-        // 核心修改：根据 useArenaHistory 决定是继承还是重置历史
-        let newHistory: ArenaHistory;
+        // 【核心修复逻辑】
+        // 只有当 useArenaHistory 为 true 时，才进行历战记录的追加和更新
+        if (useArenaHistory) {
+            let history = characterData.arena_history;
 
-        if (useArenaHistory && characterData.arena_history) {
-            // **行为 1: 继承并追加**
-            // 深拷贝现有历史，确保 entries 数组存在，并更新时间戳
-            newHistory = JSON.parse(JSON.stringify(characterData.arena_history));
-            if (!Array.isArray(newHistory.entries)) {
-                newHistory.entries = [];
+            // 如果角色原本没有历战记录，则为其创建一个新的
+            if (!history || !history.attributes || !history.entries) {
+                history = {
+                    attributes: {
+                        world_line_id: randomUUID(),
+                        created_at: nowISO,
+                        updated_at: nowISO,
+                        sublimation_count: 0,
+                        last_sublimation_at: null,
+                    },
+                    entries: [],
+                };
+            } else {
+                // 如果有，则更新时间戳
+                history.attributes.updated_at = nowISO;
             }
-            newHistory.attributes.updated_at = nowISO;
-        } else {
-            // **行为 2: 重置历史**
-            // 创建一个全新的 history 对象，只保留必要的迁越信息
-            newHistory = {
-                attributes: {
-                    world_line_id: randomUUID(), // 生成新的世界线ID
-                    created_at: nowISO,
-                    updated_at: nowISO,
-                    // 保留升华次数和最后升华时间，因为这是角色本质的成长，不应被清空
-                    sublimation_count: characterData.arena_history?.attributes?.sublimation_count || 0,
-                    last_sublimation_at: characterData.arena_history?.attributes?.last_sublimation_at || null,
+
+            const lastEntryId = history.entries.length > 0 ? history.entries[history.entries.length - 1].id : 0;
+            const characterImpact = impacts.find(i => i.characterName === characterName)?.impact || "在此次事件中获得了成长。";
+
+            const newEntry: ArenaHistoryEntry = {
+                id: lastEntryId + 1,
+                type: report.mode as ArenaHistoryEntry['type'] || 'classic',
+                title: report.headline,
+                participants: participantNames,
+                winner: report.officialReport.winner,
+                impact: characterImpact,
+                metadata: {
+                    user_guidance: userGuidance,
+                    scenario_title: scenario?.title || null,
+                    non_native_data_involved: isAnyNonNative,
                 },
-                entries: [], // 从一个空的条目列表开始
             };
+
+            history.entries.push(newEntry);
+            characterData.arena_history = history;
+
+            // 只有记录了战斗，才需要考虑重新签名
+            if (combatant.isNative) {
+                characterData.signature = await generateSignature(characterData);
+            } else {
+                delete characterData.signature;
+            }
+
         }
-
-        const lastEntryId = newHistory.entries.length > 0 ? newHistory.entries[newHistory.entries.length - 1].id : 0;
-        const characterImpact = impacts.find(i => i.characterName === characterName)?.impact || "在此次事件中获得了成长。";
-
-        // 创建新的历战记录条目
-        const newEntry: ArenaHistoryEntry = {
-            id: lastEntryId + 1,
-            type: report.mode as ArenaHistoryEntry['type'] || 'classic',
-            title: report.headline,
-            participants: participantNames,
-            winner: report.officialReport.winner,
-            impact: characterImpact,
-            metadata: {
-                user_guidance: userGuidance,
-                scenario_title: scenario?.title || null,
-                non_native_data_involved: isAnyNonNative,
-            },
-        };
-
-        // 将新条目添加到（继承的或全新的）entries 数组中
-        newHistory.entries.push(newEntry);
-        characterData.arena_history = newHistory; // 将处理后的 history 对象赋回角色数据
-
-        // 签名逻辑保持不变
-        if (combatant.isNative) {
-            // 如果原始数据是原生的（包括预设），则为更新后的数据重新生成签名
-            characterData.signature = await generateSignature(characterData);
-        } else {
-            // 如果原始数据是衍生的，则确保新数据不包含签名
-            delete characterData.signature;
-        }
+        // 如果 useArenaHistory 为 false，我们什么都不做，直接将原始的 characterData 推入
+        // 这将保持其历战记录和签名不变
 
         updatedCombatants.push(characterData);
     }
@@ -640,12 +635,15 @@ async function handler(req: NextRequest): Promise<Response> {
     };
     
     // 异步更新数据库统计，不阻塞响应
-    const updateStatsPromise = updateBattleStats(report.officialReport.winner, combatants);
-    const executionContext = (req as any).context;
-    if (executionContext?.waitUntil) {
-      executionContext.waitUntil(updateStatsPromise);
-    } else {
-      updateStatsPromise.catch(err => log.error('更新战斗统计失败（非阻塞）', err));
+    // 仅在 useArenaHistory 为 true 时更新统计数据，避免污染数据
+    if (useArenaHistory) {
+      const updateStatsPromise = updateBattleStats(report.officialReport.winner, combatants);
+      const executionContext = (req as any).context;
+      if (executionContext?.waitUntil) {
+        executionContext.waitUntil(updateStatsPromise);
+      } else {
+        updateStatsPromise.catch(err => log.error('更新战斗统计失败（非阻塞）', err));
+      }
     }
     
     // 更新所有参战者的历战记录

@@ -982,7 +982,7 @@ const BattlePage: React.FC = () => {
                                 />
                                 {scenarioFileName && (
                                     <p className="text-xs text-gray-500 mt-2">
-                                        已加载情景: {scenarioFileName}
+                                        已加载情景: <span className="font-bold text-green-600">{scenarioFileName}</span>
                                         {isScenarioNative && <span className="text-xs text-green-600 ml-1 font-semibold">(原生)</span>}
                                     </p>
                                 )}
