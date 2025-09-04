@@ -5,15 +5,32 @@
   * {
     box-sizing: border-box;
   }
-  
+
   /* 只重置基础元素的margin和padding */
-  html, body {
+  html,
+  body {
     margin: 0;
     padding: 0;
   }
-  
+
   /* 重置其他基础元素，但避免影响组件 */
-  h1, h2, h3, h4, h5, h6, p, blockquote, pre, ul, ol, li, figure, figcaption, dl, dt, dd {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  blockquote,
+  pre,
+  ul,
+  ol,
+  li,
+  figure,
+  figcaption,
+  dl,
+  dt,
+  dd {
     margin: 0;
     padding: 0;
   }
@@ -75,12 +92,14 @@ body {
   bottom: 0;
   left: 0;
   width: 100%;
-  background-color: rgba(26, 26, 26, 0.9); /* 深色半透明背景 */
+  background-color: rgba(26, 26, 26, 0.9);
+  /* 深色半透明背景 */
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: #e0e0e0;
   padding: 0.6rem 1rem;
-  font-size: 0.875rem; /* 14px */
+  font-size: 0.875rem;
+  /* 14px */
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -93,12 +112,14 @@ body {
   display: flex;
   align-items: center;
   flex-grow: 1;
-  overflow: hidden; /* 隐藏滚动区域外的内容 */
+  overflow: hidden;
+  /* 隐藏滚动区域外的内容 */
 }
 
 .announcement-label {
   font-weight: 600;
-  color: #f7b733; /* 醒目的黄色 */
+  color: #ff9dde;
+  /* 醒目的黄色 */
   padding-right: 0.75rem;
   margin-right: 0.75rem;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
@@ -114,7 +135,8 @@ body {
 
 .announcement-text {
   display: inline-block;
-  padding-left: 100%; /* 从右侧开始滚动 */
+  padding-left: 100%;
+  /* 从右侧开始滚动 */
   animation: scroll-left 15s linear infinite;
 }
 
@@ -122,6 +144,7 @@ body {
   0% {
     transform: translateX(0);
   }
+
   100% {
     transform: translateX(-100%);
   }
@@ -207,11 +230,17 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @layer components {
+
   /* 魔法少女主题样式 */
   .magic-background {
     background: linear-gradient(45deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
@@ -247,16 +276,18 @@ body {
   }
 
   @keyframes sparkle {
+
     0%,
     100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.7;
     }
   }
 
-  
+
 
   .input-group {
     margin-bottom: 20px;
@@ -398,17 +429,19 @@ body {
     opacity: 0.8;
   }
 
-@media (max-width: 600px) {
+  @media (max-width: 600px) {
     .container {
-        padding: 15px;
+      padding: 15px;
     }
+
     .card {
-        padding: 20px;
+      padding: 20px;
     }
+
     .title {
-        font-size: 1.5rem;
+      font-size: 1.5rem;
     }
-}
+  }
 
   .subtitle {
     text-align: center;
@@ -434,6 +467,7 @@ body {
       opacity: 0;
       transform: translateY(-10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -464,9 +498,11 @@ body {
     .container {
       padding: 15px;
     }
+
     .card {
       padding: 20px;
     }
+
     .title {
       font-size: 1.5rem;
     }
@@ -478,6 +514,7 @@ body {
       opacity: 0;
       transform: translateX(100px);
     }
+
     to {
       opacity: 1;
       transform: translateX(0);

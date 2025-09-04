@@ -36,7 +36,7 @@ const AnnouncementTicker: React.FC = () => {
           // 检查最新的一条公告是否已经被用户关闭
           const latestAnnouncementId = sortedData[0].id;
           const isDismissed = localStorage.getItem(`${DISMISS_KEY_PREFIX}${latestAnnouncementId}`) === 'true';
-          
+
           // 如果没被关闭，则显示公告栏
           if (!isDismissed) {
             setIsVisible(true);
@@ -74,7 +74,7 @@ const AnnouncementTicker: React.FC = () => {
     setIsModalOpen(false);
     setSelectedAnnouncement(null);
   };
-  
+
   // 如果不可见或没有公告，则不渲染任何内容
   if (!isVisible || announcements.length === 0) {
     return null;
@@ -109,11 +109,11 @@ const AnnouncementTicker: React.FC = () => {
               {/* 使用 ReactMarkdown 来渲染 Markdown 格式的公告内容 */}
               <ReactMarkdown
                 components={{
-                  h3: ({node, ...props}: any) => <h3 style={{fontSize: '1.25em', fontWeight: 'bold', margin: '1em 0'}} {...props} />,
-                  p: ({node, ...props}: any) => <p style={{marginBottom: '1em', lineHeight: 1.6}} {...props} />,
-                  ul: ({node, ...props}: any) => <ul style={{listStyle: 'disc', paddingLeft: '2em', marginBottom: '1em'}} {...props} />,
-                  li: ({node, ...props}: any) => <li style={{marginBottom: '0.5em'}} {...props} />,
-                  code: ({node, ...props}: any) => <code style={{backgroundColor: '#f0f0f0', padding: '0.2em 0.4em', borderRadius: '4px', fontSize: '0.9em'}} {...props} />
+                  h3: (props: any) => <h3 style={{ fontSize: '1.25em', fontWeight: 'bold', margin: '1em 0' }} {...props} />,
+                  p: (props: any) => <p style={{ marginBottom: '1em', lineHeight: 1.6 }} {...props} />,
+                  ul: (props: any) => <ul style={{ listStyle: 'disc', paddingLeft: '2em', marginBottom: '1em' }} {...props} />,
+                  li: (props: any) => <li style={{ marginBottom: '0.5em' }} {...props} />,
+                  code: (props: any) => <code style={{ backgroundColor: '#f0f0f0', padding: '0.2em 0.4em', borderRadius: '4px', fontSize: '0.9em' }} {...props} />
                 }}
               >
                 {selectedAnnouncement.content}
