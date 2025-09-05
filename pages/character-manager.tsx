@@ -277,7 +277,7 @@ const CharacterManagerPage: React.FC = () => {
         });
     }, []);
 
-    // [新增] 一键替换所有旧名称的事件处理器
+    // 一键替换所有旧名称的事件处理器
     const handleReplaceAllNames = useCallback(() => {
         if (!characterData || !originalData) return;
 
@@ -290,17 +290,13 @@ const CharacterManagerPage: React.FC = () => {
 
         if (oldBaseName === newBaseName) return;
 
-        // 对当前编辑的数据和原始备份数据同时执行替换操作
-        // 这是保持原生性的关键：让 useEffect 认为除了豁免字段外，其他内容没有“意外”变化。
+        // 只对当前正在编辑的数据执行替换操作
         const updatedCharacterData = replaceAllNamesInData(characterData, oldBaseName, newBaseName);
-        const updatedOriginalData = replaceAllNamesInData(originalData, oldBaseName, newBaseName);
         
-        // 更新状态
+        // 更新当前编辑的角色数据状态
         setCharacterData(updatedCharacterData);
-        setOriginalData(updatedOriginalData);
 
-        // 隐藏按钮并显示成功消息
-        setShowNameReplaceButton(false);
+        // 显示成功消息
         setMessage({ type: 'success', text: `已将所有“${oldBaseName}”替换为“${newBaseName}”！` });
 
     }, [characterData, originalData]);
