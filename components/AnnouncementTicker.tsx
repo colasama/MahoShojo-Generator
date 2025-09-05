@@ -7,6 +7,8 @@ interface Announcement {
   date: string;
   title: string;
   content: string;
+  publisher?: string;
+  pinned?: boolean;
 }
 
 // 本地存储中用于标记公告已关闭的键名
@@ -32,9 +34,15 @@ const AnnouncementTicker: React.FC = () => {
       .then(res => res.json())
       .then((data: Announcement[]) => {
         if (data && data.length > 0) {
-          // 按日期降序排序，最新的公告在最前面
-          const sortedData = data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setAnnouncements(sortedData);
+          // 置顶排序逻辑
+          const sortedData = data.sort((a, b) => {
+            // 1. 置顶的公告优先级最高
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            
+            // 2. 如果置顶状态相同，则按日期降序排列
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          });
 
           // 检查最新的一条公告是否已经被用户关闭
           const latestAnnouncementId = sortedData[0].id;
@@ -51,6 +59,7 @@ const AnnouncementTicker: React.FC = () => {
 
   /**
    * 关闭公告栏的处理函数
+   * 这会将最新公告的ID存入localStorage，以便下次不再显示
    */
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation(); // 阻止事件冒泡，避免触发打开弹窗
@@ -106,7 +115,10 @@ const AnnouncementTicker: React.FC = () => {
         <div className="announcement-content">
           <span className="announcement-label">公告</span>
           <div className="announcement-scroll-container">
-            <p className="announcement-text">{announcements[0].title}</p>
+            <p className="announcement-text">
+              {announcements[0].pinned && '📌 '}
+              {announcements[0].title}
+            </p>
           </div>
         </div>
         <button onClick={handleDismiss} className="announcement-close-btn" aria-label="关闭公告">
@@ -123,10 +135,18 @@ const AnnouncementTicker: React.FC = () => {
               // --- 公告详情视图 ---
               <>
                 <div className="announcement-modal-header">
-                  <h2 className="announcement-modal-title">{selectedAnnouncement.title}</h2>
+                  <h2 className="announcement-modal-title">
+                    {selectedAnnouncement.pinned && '📌 '}
+                    {selectedAnnouncement.title}
+                  </h2>
                   <button onClick={handleCloseModal} className="announcement-modal-close-btn" aria-label="关闭详情">
                     ×
                   </button>
+                </div>
+                {/* 在详情页顶部显示发布者和日期 */}
+                <div className="announcement-metadata">
+                  <span>发布于: {selectedAnnouncement.date}</span>
+                  {selectedAnnouncement.publisher && <span>发布者: {selectedAnnouncement.publisher}</span>}
                 </div>
                 <div className="announcement-modal-body">
                   <ReactMarkdown
@@ -164,8 +184,16 @@ const AnnouncementTicker: React.FC = () => {
                       className="announcement-list-item"
                       onClick={() => handleSelectAnnouncement(announcement)}
                     >
-                      <span className="announcement-list-date">{announcement.date}</span>
-                      <span className="announcement-list-title">{announcement.title}</span>
+                      <div className="announcement-list-item-content">
+                        <span className="announcement-list-title">
+                          {announcement.pinned && '📌 '}
+                          {announcement.title}
+                        </span>
+                        <div className="announcement-list-item-meta">
+                          <span>{announcement.date}</span>
+                          {announcement.publisher && <span>{announcement.publisher}</span>}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
