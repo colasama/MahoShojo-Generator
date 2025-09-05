@@ -31,7 +31,7 @@ const isObject = (item: any): boolean => {
 };
 
 /**
- * [新增] 辅助函数：转义正则表达式特殊字符。
+ * 辅助函数：转义正则表达式特殊字符。
  * @param str - 需要转义的字符串。
  * @returns {string} 转义后的字符串。
  */
@@ -40,7 +40,7 @@ const escapeRegExp = (str: string): string => {
 };
 
 /**
- * [新增] 辅助函数：递归地在数据对象中替换所有出现的旧名称。
+ * 辅助函数：递归地在数据对象中替换所有出现的旧名称。
  * @param data - 要进行替换操作的数据对象或数组。
  * @param oldBaseName - 原始的基础名称（不带称号）。
  * @param newBaseName - 新的基础名称。
@@ -89,7 +89,7 @@ const CharacterManagerPage: React.FC = () => {
     // 控制“一键替换曾用名”按钮的显示状态
     const [showNameReplaceButton, setShowNameReplaceButton] = useState(false);
 
-    // [新增] 用于控制粘贴区域折叠/展开的状态，默认为折叠
+    // 用于控制粘贴区域折叠/展开的状态，默认为折叠
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
 
     // 组件加载时运行，检测设备类型以决定是否默认展开粘贴区域
@@ -136,41 +136,62 @@ const CharacterManagerPage: React.FC = () => {
 
     }, [characterData]);
 
-    // 核心逻辑：追踪数据变化以判断原生性是否丧失 (SRS 3.7.3)
+    /**
+     * 专门用于控制“一键替换名称”按钮的显示逻辑。
+     * 这个 Hook 不关心角色是否为原生，只关心名称字段是否发生了变化。
+     * 这样就解决了非原生角色无法显示此按钮的问题。
+     */
     useEffect(() => {
-        if (!originalData || !characterData || !isNative) return;
+        // 确保原始数据和当前编辑数据都存在
+        if (!originalData || !characterData) {
+            setShowNameReplaceButton(false);
+            return;
+        }
 
-        // 名称变化检测逻辑
+        // 获取原始名称和当前名称
         const originalName = originalData.codename || originalData.name;
         const currentName = characterData.codename || characterData.name;
+        
+        // 如果名称发生了变化，则显示替换按钮，否则隐藏
         if (originalName !== currentName) {
             setShowNameReplaceButton(true);
         } else {
             setShowNameReplaceButton(false);
         }
+    }, [characterData, originalData]); // 依赖项只包含 characterData 和 originalData
 
-        // 一旦丧失原生性，状态不再改变
+
+    /**
+     * 现在只负责追踪“原生性”是否因核心数据被修改而丧失。
+     * 移除了原有的名称比较和按钮显示逻辑，使其职责更单一、逻辑更清晰。
+     */
+    useEffect(() => {
+        // 这个 Hook 的核心前提是角色必须是原生的，如果不是，则无需执行任何逻辑
+        if (!originalData || !characterData || !isNative) return;
+
+        // 一旦原生性丧失，状态就不再改变，以防止不必要的重复计算
         if (hasLostNativeness) return;
 
+        // 定义一个深度比较函数，用于判断两个值是否完全相同
         const deepEqual = (obj1: any, obj2: any): boolean => {
             return JSON.stringify(obj1) === JSON.stringify(obj2);
         };
 
         let hasBreakingChange = false;
 
-        // 递归检查函数，现在会忽略被豁免的路径
+        // 递归检查函数，会忽略被豁免的路径
         const checkForBreakingChanges = (originalNode: any, currentNode: any, path: string) => {
             if (hasBreakingChange) return;
             for (const key in originalNode) {
                 const currentPath = path ? `${path}.${key}` : key;
 
-                // 如果当前路径或其父路径在豁免列表中，则跳过检查
+                // 如果当前路径或其父路径在豁免列表中（如 'codename'），或字段本身就是签名/历战记录，则跳过检查
                 if (key === 'signature' || key === 'arena_history' || NATIVE_PRESERVING_PATHS.has(currentPath)) {
                     continue;
                 }
                 
                 if (!deepEqual(originalNode[key], currentNode[key])) {
-                    // 检查历战记录的特殊规则 (只允许删除条目)
+                    // 历战记录有特殊规则：只允许删除条目，不允许新增或修改
                     if (currentPath === 'arena_history.entries') {
                         const originalEntries = originalNode[key] || [];
                         const currentEntries = currentNode[key] || [];
@@ -186,6 +207,7 @@ const CharacterManagerPage: React.FC = () => {
                             }
                         }
                     } else {
+                        // 对于其他非豁免字段，任何修改都会导致原生性丧失
                         hasBreakingChange = true;
                     }
                     if (hasBreakingChange) {
@@ -204,6 +226,7 @@ const CharacterManagerPage: React.FC = () => {
         }
 
     }, [characterData, originalData, isNative, hasLostNativeness]);
+
 
     // 加载和处理JSON数据
     const processJsonData = async (jsonText: string) => {
@@ -398,7 +421,7 @@ const CharacterManagerPage: React.FC = () => {
                             <button onClick={handleRandomCodename} type="button" className="ml-2 px-3 py-1.5 text-xs font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600">随机</button>
                         )}
                     </div>
-                     {/* [新增] 条件渲染“一键替换”按钮 */}
+                     {/* 条件渲染“一键替换”按钮 */}
                      {showNameReplaceButton && (currentPath === 'codename' || currentPath === 'name') && (
                         <button
                             onClick={handleReplaceAllNames}
@@ -600,7 +623,7 @@ const CharacterManagerPage: React.FC = () => {
                                     <input id="file-upload" type="file" accept=".json" onChange={handleFileChange} className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0" />
                                 </div>
                                 <div className="text-center my-4 text-gray-500">或</div>
-                                {/* [修改] 将原有的粘贴区域替换为可折叠的组件 */}
+                                {/* 可折叠的粘贴区域 */}
                                 <div className="mb-6">
                                     <button
                                         onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)}
