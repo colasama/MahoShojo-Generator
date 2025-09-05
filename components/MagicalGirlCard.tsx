@@ -123,9 +123,7 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
             <div><strong>形态：</strong>{magicalGirl.magicConstruct.form}</div>
             <div><strong>基本能力：</strong></div>
             <ul style={{ marginLeft: '1rem', marginTop: '0.5rem' }}>
-              {/* [健壮性修复]
-                问题：如果 magicalGirl.magicConstruct.basicAbilities 是字符串而非数组，调用 .map() 会导致应用崩溃。
-                修复：在使用 .map() 之前，使用 Array.isArray() 检查确保它是一个数组。如果不是，则不渲染任何列表项，避免崩溃。
+              {/* 在使用 .map() 之前，使用 Array.isArray() 检查确保它是一个数组。如果不是，则不渲染任何列表项，避免崩溃。
               */}
               {Array.isArray(magicalGirl.magicConstruct.basicAbilities) && magicalGirl.magicConstruct.basicAbilities.map((ability: string, index: number) => (
                 <li key={index}>• {ability}</li>
@@ -153,9 +151,8 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
             <div><strong>繁开魔装名：</strong>{magicalGirl.blooming.name}</div>
             <div><strong>进化能力：</strong></div>
             <ul style={{ marginLeft: '1rem', marginTop: '0.5rem' }}>
-              {/* [健壮性修复]
-                问题：这是导致崩溃的直接原因。如果 magicalGirl.blooming.evolvedAbilities 是字符串，.map() 会抛出 TypeError。
-                修复：与上方相同，在使用 .map() 前进行 Array.isArray() 检查，确保代码的鲁棒性。
+              {/*如果 magicalGirl.blooming.evolvedAbilities 是字符串，.map() 会抛出 TypeError。
+                因此，在使用 .map() 前进行 Array.isArray() 检查，确保代码的鲁棒性。
               */}
               {Array.isArray(magicalGirl.blooming.evolvedAbilities) && magicalGirl.blooming.evolvedAbilities.map((ability: string, index: number) => (
                 <li key={index}>• {ability}</li>
@@ -174,9 +171,7 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
             <div><strong>性格分析：</strong>{magicalGirl.analysis.personalityAnalysis}</div>
             <div><strong>能力推理：</strong>{magicalGirl.analysis.abilityReasoning}</div>
             <div><strong>核心特征：</strong>
-              {/* [健壮性修复]
-                问题：如果 magicalGirl.analysis.coreTraits 是字符串而非数组，调用 .join() 同样会导致应用崩溃。
-                修复：使用三元运算符进行判断。如果是数组，则正常 join；如果不是，则直接显示该字符串或不显示，避免错误。
+              {/* 使用三元运算符进行判断。如果是数组，则正常 join；如果不是，则直接显示该字符串或不显示，避免错误。
               */}
               {Array.isArray(magicalGirl.analysis.coreTraits) 
                 ? magicalGirl.analysis.coreTraits.join('、') 
