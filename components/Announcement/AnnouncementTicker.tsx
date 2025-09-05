@@ -153,10 +153,10 @@ const AnnouncementTicker: React.FC = () => {
                 </div>
               </>
             ) : (
-              // 历史公告列表视图
+              // 公告列表视图
               <>
                 <div className="flex justify-between items-center p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-semibold text-gray-900">历史公告</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">公告</h2>
                   <button
                     onClick={handleCloseModal}
                     className="text-gray-400 hover:text-gray-900 text-3xl leading-none transition-colors"
