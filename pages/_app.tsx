@@ -6,7 +6,7 @@ import '@/styles/blue-theme.css';
 import '@/styles/gradient-buttons.css';
 import { GoogleAnalytics } from '@next/third-parties/google';
 // 1. 引入新组件
-import AnnouncementTicker from '@/components/AnnouncementTicker';
+import AnnouncementTicker from '@/components/Announcement/AnnouncementTicker';
 
 // 如果需要统计，请取消注释并安装 @vercel/analytics
 // import { Analytics } from "@vercel/analytics/next";
