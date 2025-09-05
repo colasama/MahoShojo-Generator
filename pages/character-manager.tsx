@@ -140,17 +140,33 @@ const CharacterManagerPage: React.FC = () => {
     useEffect(() => {
         if (!originalData || !characterData || !isNative) return;
 
-        // [新增] 名称变化检测逻辑
+        // 名称变化检测逻辑
         const originalName = originalData.codename || originalData.name;
         const currentName = characterData.codename || characterData.name;
-        if (originalName !== currentName) {
-            setShowNameReplaceButton(true);
-        } else {
-            setShowNameReplaceButton(false);
-        }
+        // if (originalName !== currentName) {
+        //     setShowNameReplaceButton(true);
+        // } else {
+        //     setShowNameReplaceButton(false);
+        // }
 
         // 一旦丧失原生性，状态不再改变
-        if (hasLostNativeness) return;
+        // if (hasLostNativeness) return;
+
+        // --- 调试代码 ---
+        // 目的：检查原始名称和当前名称是否被正确获取，以及它们的比较结果。
+        console.log("【调试】名称变化检测:", {
+            "原始名称 (originalData)": originalName,
+            "当前名称 (characterData)": currentName,
+            "是否不同 (originalName !== currentName)": originalName !== currentName
+        });
+        // --- 调试代码结束 ---
+
+        // [临时修改] 为了调试，我们现在让按钮在加载数据后就一直显示
+        // 之前的逻辑是: if (originalName !== currentName) { setShowNameReplaceButton(true); } else { setShowNameReplaceButton(false); }
+        setShowNameReplaceButton(true);
+        // [修改结束] =======================================================
+
+        if (!isNative || hasLostNativeness) return; // 如果不是原生或已丧失原生性，则跳过后续检查
 
         const deepEqual = (obj1: any, obj2: any): boolean => {
             return JSON.stringify(obj1) === JSON.stringify(obj2);
@@ -290,13 +306,17 @@ const CharacterManagerPage: React.FC = () => {
 
         if (oldBaseName === newBaseName) return;
 
-        // 只对当前正在编辑的数据执行替换操作
+        // 对当前编辑的数据和原始备份数据同时执行替换操作
+        // 这是保持原生性的关键：让 useEffect 认为除了豁免字段外，其他内容没有“意外”变化。
         const updatedCharacterData = replaceAllNamesInData(characterData, oldBaseName, newBaseName);
+        const updatedOriginalData = replaceAllNamesInData(originalData, oldBaseName, newBaseName);
         
-        // 更新当前编辑的角色数据状态
+        // 更新状态
         setCharacterData(updatedCharacterData);
+        setOriginalData(updatedOriginalData);
 
-        // 显示成功消息
+        // 隐藏按钮并显示成功消息
+        // setShowNameReplaceButton(false);
         setMessage({ type: 'success', text: `已将所有“${oldBaseName}”替换为“${newBaseName}”！` });
 
     }, [characterData, originalData]);
