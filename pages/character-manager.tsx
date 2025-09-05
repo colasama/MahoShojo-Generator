@@ -143,30 +143,14 @@ const CharacterManagerPage: React.FC = () => {
         // 名称变化检测逻辑
         const originalName = originalData.codename || originalData.name;
         const currentName = characterData.codename || characterData.name;
-        // if (originalName !== currentName) {
-        //     setShowNameReplaceButton(true);
-        // } else {
-        //     setShowNameReplaceButton(false);
-        // }
+        if (originalName !== currentName) {
+            setShowNameReplaceButton(true);
+        } else {
+            setShowNameReplaceButton(false);
+        }
 
         // 一旦丧失原生性，状态不再改变
-        // if (hasLostNativeness) return;
-
-        // --- 调试代码 ---
-        // 目的：检查原始名称和当前名称是否被正确获取，以及它们的比较结果。
-        console.log("【调试】名称变化检测:", {
-            "原始名称 (originalData)": originalName,
-            "当前名称 (characterData)": currentName,
-            "是否不同 (originalName !== currentName)": originalName !== currentName
-        });
-        // --- 调试代码结束 ---
-
-        // [临时修改] 为了调试，我们现在让按钮在加载数据后就一直显示
-        // 之前的逻辑是: if (originalName !== currentName) { setShowNameReplaceButton(true); } else { setShowNameReplaceButton(false); }
-        setShowNameReplaceButton(true);
-        // [修改结束] =======================================================
-
-        if (!isNative || hasLostNativeness) return; // 如果不是原生或已丧失原生性，则跳过后续检查
+        if (hasLostNativeness) return;
 
         const deepEqual = (obj1: any, obj2: any): boolean => {
             return JSON.stringify(obj1) === JSON.stringify(obj2);
@@ -316,7 +300,7 @@ const CharacterManagerPage: React.FC = () => {
         setOriginalData(updatedOriginalData);
 
         // 隐藏按钮并显示成功消息
-        // setShowNameReplaceButton(false);
+        setShowNameReplaceButton(false);
         setMessage({ type: 'success', text: `已将所有“${oldBaseName}”替换为“${newBaseName}”！` });
 
     }, [characterData, originalData]);
