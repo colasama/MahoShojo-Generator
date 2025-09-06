@@ -97,10 +97,6 @@
       "meaning": "Impatience"
     },
     {
-      "name": "月桂",
-      "meaning": "Glory"
-    },
-    {
       "name": "秋海棠",
       "meaning": "Beware, a fanciful nature"
     },
@@ -1127,6 +1123,46 @@
     {
       "name": "仙人掌",
       "meaning": "Endurance"
+    },
+    {
+      "name": "金木犀",
+      "meaning": "高洁、谦虚"
+    },
+    {
+      "name": "石楠花",
+      "meaning": "庄严、孤独"
+    },
+    {
+      "name": "橘花",
+      "meaning": "高洁、隐逸、长寿、吉祥"
+    },
+    {
+      "name": "橙花",
+      "meaning": "纯真的爱"
+    },
+    {
+      "name": "荔枝花",
+      "meaning": "美好的承诺"
+    },
+    {
+      "name": "桂花",
+      "meaning": "收获、高尚"
+    },
+    {
+      "name": "迎春花",
+      "meaning": "希望、新生"
+    },
+    {
+      "name": "龙舌兰",
+      "meaning": "为爱不惜一切"
+    },
+    {
+      "name": "菖蒲",
+      "meaning": "幸福"
+    },
+    {
+      "name": "酢浆草",
+      "meaning": "璀璨的心、绝不舍弃你"
     }
   ]
 }
