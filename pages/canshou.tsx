@@ -371,7 +371,7 @@ const CanshouPage: React.FC = () => {
                 <button onClick={handleNext} disabled={submitting || isCooldown || !currentAnswer.trim()} className="generate-button">
                   {isCooldown ? `冷却中 (${remainingTime}s)` : submitting ? '生成中...' : isLastQuestion ? '生成档案' : '下一题'}
                 </button>
-
+                a
                 {/* 多语言支持 */}
                 <div className="my-4 bg-gray-100 rounded-lg p-3">
                   <button
