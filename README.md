@@ -128,23 +128,9 @@ npm run start
 - [ ] 将系统通用化，模块化
 
 
-## 后续工作笔记
+## 星标情况
 
-可以在每一场战斗完成后，允许用户获取参战的所有魔法少女的新设定文件。设定文件中还会保存魔法少女的历次战斗记录，包括战斗报告标题、参战者、胜利者。
-
-然后在竞技场生成战斗时，如果设定文件内容中包含战斗记录，则将其一并提供给AI。这样，就可以使得用户过往的战斗影响未来的战斗，实现历战养成机制了。
-
-1. 在每位参战魔法少女的设定文件里增加一个 battle_history 数组字段。每场战斗结束后，向该数组追加一个战斗记录对象，例如：
-
-```
-{
-  "title": "【震撼】“花级”翠雀降临！“芽级”白玫逆风而上，昔日师徒竞技场上演情感与力量的悲歌！",
-  "participants": ["翠雀", "白玫"],
-  "winner": "翠雀"
-}
-```
-
-2. 生成战斗时读取历史记录并传给AI：在 generate-battle-story 里加载所有参战者的设定文件，如果 battle_history 存在，就将这些信息一起拼接到 prompt 中，作为 AI 生成的上下文，让它能参考过往的对战历史。
+[![Star History Chart](https://api.star-history.com/svg?repos=colasama/MahoShojo-Generator&type=Date)](https://www.star-history.com/#colasama/MahoShojo-Generator&Date)
 
 ## 🧡 致谢
 <div align="center">
