@@ -84,6 +84,11 @@ body {
   margin-bottom: 30px;
 }
 
+/* 当公告栏显示时，为页面主体增加底部内边距，防止遮挡 */
+body.announcement-visible {
+  padding-bottom: 50px; /* 这个值约等于公告栏的高度 */
+}
+
 
 @keyframes fadeIn {
   from {
