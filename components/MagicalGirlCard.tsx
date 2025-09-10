@@ -54,10 +54,21 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
   const resultRef = useRef<HTMLDivElement>(null);
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
+  /**
+   * 【核心修改】
+   * 替换原有的 handleSaveImage 函数。
+   * 新的函数包含了与 BattleReportCard 相同的逻辑：
+   * 1. 在截图时隐藏按钮，显示 Logo。
+   * 2. 区分移动端和桌面端设备。
+   * - 移动端：调用 onSaveImage 回调，由父组件弹出图片模态框供用户长按保存。
+   * - 桌面端：直接触发 PNG 文件的下载。
+   * 3. 提供了更完善的错误处理，确保在失败时也能恢复UI。
+   */
   const handleSaveImage = async () => {
     if (!resultRef.current) return;
 
     try {
+      // 截图前隐藏按钮和显示Logo
       const saveButton = resultRef.current.querySelector('.save-button') as HTMLElement;
       const logoPlaceholder = resultRef.current.querySelector('.logo-placeholder') as HTMLElement;
 
@@ -68,17 +79,36 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
         scale: 1,
       });
 
+      // 截图后恢复按钮和隐藏Logo
       if (saveButton) saveButton.style.display = 'block';
       if (logoPlaceholder) logoPlaceholder.style.display = 'none';
 
       const imgElement = await result.toPng();
       const imageUrl = imgElement.src;
 
-      if (onSaveImage) {
-        onSaveImage(imageUrl);
+      // 检测设备类型以提供最佳保存体验
+      const isMobileDevice = /Mobi/i.test(window.navigator.userAgent);
+
+      if (isMobileDevice) {
+        // 在移动端，调用回调函数以显示弹窗供用户长按保存
+        if (onSaveImage) {
+          onSaveImage(imageUrl);
+        }
+      } else {
+        // 在桌面端，直接触发文件下载
+        const downloadLink = document.createElement('a');
+        downloadLink.href = imageUrl;
+        // 使用代号并清理特殊字符作为文件名
+        const sanitizedTitle = magicalGirl.codename.replace(/[^a-z0-9\u4e00-\u9fa5]/gi, '_');
+        downloadLink.download = `魔法少女_${sanitizedTitle}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
       }
-    } catch {
+    } catch (err) {
       alert('生成图片失败，请重试');
+      console.error("Image generation failed:", err);
+      // 确保在出错时也恢复按钮
       const saveButton = resultRef.current?.querySelector('.save-button') as HTMLElement;
       const logoPlaceholder = resultRef.current?.querySelector('.logo-placeholder') as HTMLElement;
 

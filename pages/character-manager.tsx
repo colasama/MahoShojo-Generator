@@ -8,6 +8,11 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
 import TachieGenerator from '../components/TachieGenerator';
+// 【新增】导入卡片组件和颜色配置
+import MagicalGirlCard from '../components/MagicalGirlCard';
+import CanshouCard from '../components/CanshouCard';
+import { MainColor } from '../lib/main-color';
+
 
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
@@ -70,6 +75,18 @@ const replaceAllNamesInData = (data: any, oldBaseName: string, newBaseName: stri
     return data;
 };
 
+// 【新增】定义渐变色，用于魔法少女卡片背景
+const gradientColors: Record<string, { first: string; second: string }> = {
+    [MainColor.Red]: { first: '#ff6b6b', second: '#ee5a6f' },
+    [MainColor.Orange]: { first: '#ff922b', second: '#ffa94d' },
+    [MainColor.Cyan]: { first: '#22b8cf', second: '#66d9e8' },
+    [MainColor.Blue]: { first: '#5c7cfa', second: '#748ffc' },
+    [MainColor.Purple]: { first: '#9775fa', second: '#b197fc' },
+    [MainColor.Pink]: { first: '#ff9a9e', second: '#fecfef' },
+    [MainColor.Yellow]: { first: '#f59f00', second: '#fcc419' },
+    [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
+};
+
 const CharacterManagerPage: React.FC = () => {
     const router = useRouter();
     const [pastedJson, setPastedJson] = useState('');
@@ -82,6 +99,9 @@ const CharacterManagerPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'info' | 'error' | 'success', text: string } | null>(null);
     const [copiedStatus, setCopiedStatus] = useState(false);
+    // 【新增】图片保存模态框的状态
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
 
     // 用于控制说明区域的显示与隐藏，默认为 true
     const [isGuideVisible, setIsGuideVisible] = useState(true);
@@ -556,6 +576,16 @@ const CharacterManagerPage: React.FC = () => {
         }
     };
 
+    /**
+     * 【新增】处理图片保存的回调函数。
+     * 当在移动设备上点击卡片保存按钮时，此函数会被调用。
+     * @param imageUrl - 由卡片组件生成的图片Data URL。
+     */
+    const handleSaveImageCallback = (imageUrl: string) => {
+        setSavedImageUrl(imageUrl);
+        setShowImageModal(true);
+    };
+
     return (
         <>
             <Head>
@@ -704,6 +734,33 @@ const CharacterManagerPage: React.FC = () => {
                             </div>
                         )}
                     </div>
+                    
+                    {/* 【新增】角色卡片预览与生成区域 */}
+                    {characterData && !isLoading && (
+                        <div className="card mt-6">
+                            <h3 className="text-xl font-bold text-gray-800 text-center mb-4">
+                                角色卡片预览与生成
+                            </h3>
+                            {characterData.codename ? (
+                                <MagicalGirlCard
+                                    magicalGirl={characterData}
+                                    gradientStyle={(() => {
+                                        const colorScheme = characterData.appearance?.colorScheme || "粉色";
+                                        const mainColorName = Object.values(MainColor).find(color => colorScheme.includes(color)) || MainColor.Pink;
+                                        const colors = gradientColors[mainColorName] || gradientColors[MainColor.Pink];
+                                        return `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
+                                    })()}
+                                    onSaveImage={handleSaveImageCallback}
+                                />
+                            ) : (
+                                <CanshouCard
+                                    canshou={characterData}
+                                    onSaveImage={handleSaveImageCallback}
+                                />
+                            )}
+                        </div>
+                    )}
+
                     <div className="card mt-6">
                         <button
                             onClick={() => setIsTachieVisible(!isTachieVisible)}
@@ -722,6 +779,17 @@ const CharacterManagerPage: React.FC = () => {
                         <Link href="/" className="footer-link">返回首页</Link>
                     </div>
                 </div>
+
+                {/* 【新增】用于移动端长按保存的图片模态框 */}
+                {showImageModal && savedImageUrl && (
+                    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setShowImageModal(false)}>
+                        <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative p-4" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => setShowImageModal(false)} className="absolute top-2 right-2 text-3xl text-gray-600 hover:text-gray-900">&times;</button>
+                            <p className="text-center text-sm text-gray-600 mb-2">📱 长按图片保存到相册</p>
+                            <img src={savedImageUrl} alt="角色卡片" className="w-full h-auto rounded-lg" />
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );
