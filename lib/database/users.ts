@@ -54,7 +54,6 @@ export async function getUserByAuthKey(authKey: string): Promise<any> {
   }
 }
 
-// 验证用户登录
 export async function verifyUserLogin(username: string, authKey: string): Promise<any> {
   try {
     const result = await queryFromD1(

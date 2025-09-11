@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import { createUser, getUserByUsername } from '@/lib/d1';
 import { verifyTurnstileToken } from '@/lib/turnstile';
+import { quickCheck } from '@/lib/sensitive-word-filter';
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,10 +13,10 @@ export default async function handler(
   }
 
   try {
-    const { username, code, turnstileToken } = req.body;
+    const { username, turnstileToken } = req.body;
 
-    if (!username || !code || !turnstileToken) {
-      return res.status(400).json({ error: '用户名、验证码和安全验证不能为空' });
+    if (!username || !turnstileToken) {
+      return res.status(400).json({ error: '用户名和安全验证不能为空' });
     }
 
     // 验证 Turnstile token
@@ -26,6 +27,19 @@ export default async function handler(
 
     if (username.length < 2 || username.length > 20) {
       return res.status(400).json({ error: '用户名长度必须在2-20个字符之间' });
+    }
+
+    // 验证用户名是否包含敏感词
+    try {
+      const sensitiveCheck = await quickCheck(username);
+      if (sensitiveCheck.hasSensitiveWords) {
+        return res.status(400).json({ 
+          error: `用户名包含不当内容，请重新输入` 
+        });
+      }
+    } catch (error) {
+      console.error('Sensitive word check failed:', error);
+      // 敏感词检查失败时继续执行，但记录错误
     }
 
     // 检查用户名是否已存在

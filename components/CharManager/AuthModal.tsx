@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import TurnstileWidget, { TurnstileRef } from '../Turnstile';
+import { quickCheck } from '@/lib/sensitive-word-filter';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (username: string, authKey: string, turnstileToken: string) => Promise<void>;
-  onRegister: (username: string, code: string, turnstileToken: string) => Promise<void>;
+  onRegister: (username: string, turnstileToken: string) => Promise<void>;
   authMessage: { type: 'error' | 'success', text: string } | null;
   generatedAuthKey: string | null;
 }
@@ -19,20 +20,58 @@ export default function AuthModal({
   generatedAuthKey
 }: AuthModalProps) {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authForm, setAuthForm] = useState({ username: '', code: '', authKey: '' });
+  const [authForm, setAuthForm] = useState({ username: '', authKey: '' });
   const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [usernameError, setUsernameError] = useState<string>('');
   const turnstileRef = useRef<TurnstileRef>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 重置表单当模态框关闭时
   useEffect(() => {
     if (!isOpen) {
-      setAuthForm({ username: '', code: '', authKey: '' });
+      setAuthForm({ username: '', authKey: '' });
       setTurnstileToken('');
+      setUsernameError('');
       setAuthMode('login');
       setIsSubmitting(false);
     }
   }, [isOpen]);
+
+  // 验证用户名
+  const validateUsername = async (username: string) => {
+    if (!username.trim()) {
+      setUsernameError('');
+      return;
+    }
+
+    if (username.length < 2 || username.length > 20) {
+      setUsernameError('用户名长度必须在2-20个字符之间');
+      return;
+    }
+
+    try {
+      const sensitiveCheck = await quickCheck(username);
+      if (sensitiveCheck.hasSensitiveWords) {
+        setUsernameError('用户名包含不当内容，请重新输入');
+        return;
+      }
+      setUsernameError('');
+    } catch (error) {
+      console.error('Username validation failed:', error);
+      setUsernameError('');
+    }
+  };
+
+  // 处理用户名输入变化
+  const handleUsernameChange = (value: string) => {
+    setAuthForm({ ...authForm, username: value });
+    // 注册模式下才需要验证敏感词
+    if (authMode === 'register') {
+      validateUsername(value);
+    } else {
+      setUsernameError('');
+    }
+  };
 
   // 监听认证消息变化
   useEffect(() => {
@@ -53,15 +92,20 @@ export default function AuthModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!turnstileToken) {
       return; // Turnstile验证必须完成
+    }
+
+    // 注册模式下检查用户名错误
+    if (authMode === 'register' && usernameError) {
+      return;
     }
 
     setIsSubmitting(true);
     try {
       if (authMode === 'register') {
-        await onRegister(authForm.username, authForm.code, turnstileToken);
+        await onRegister(authForm.username, turnstileToken);
       } else {
         await onLogin(authForm.username, authForm.authKey, turnstileToken);
       }
@@ -73,7 +117,8 @@ export default function AuthModal({
 
   const switchMode = () => {
     setAuthMode(authMode === 'login' ? 'register' : 'login');
-    setAuthForm({ username: '', code: '', authKey: '' });
+    setAuthForm({ username: '', authKey: '' });
+    setUsernameError('');
     setTurnstileToken(''); // 重置turnstile token
     turnstileRef.current?.reset(); // 重置turnstile组件
   };
@@ -97,9 +142,8 @@ export default function AuthModal({
         </h2>
 
         {authMessage && (
-          <div className={`mb-4 p-3 rounded-md text-sm ${
-            authMessage.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-          }`}>
+          <div className={`mb-4 p-3 rounded-md text-sm ${authMessage.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+            }`}>
             {authMessage.text}
           </div>
         )}
@@ -134,38 +178,32 @@ export default function AuthModal({
             <input
               type="text"
               value={authForm.username}
-              onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
-              className="input-field"
+              onChange={(e) => handleUsernameChange(e.target.value)}
+              className={`input-field ${usernameError ? 'border-red-300 focus:border-red-500' : ''}`}
               placeholder="请输入用户名"
               required
             />
+            {usernameError && (
+              <p className="mt-1 text-sm text-red-600">{usernameError}</p>
+            )}
           </div>
 
           {authMode === 'register' ? (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                验证码
-              </label>
-              <input
-                type="text"
-                value={authForm.code}
-                onChange={(e) => setAuthForm({ ...authForm, code: e.target.value })}
-                className="input-field"
-                placeholder="请输入6位验证码"
-                maxLength={6}
-                required
-              />
+              <p className="text-sm text-gray-600 mb-4">
+                注册完成后将生成唯一的登录密钥，请妥善保管。
+              </p>
             </div>
           ) : (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 登录密钥
               </label>
-              <textarea
+              <input
                 value={authForm.authKey}
+                type="password"
                 onChange={(e) => setAuthForm({ ...authForm, authKey: e.target.value })}
                 className="input-field"
-                rows={3}
                 placeholder="请输入您的登录密钥"
                 required
               />
@@ -182,8 +220,8 @@ export default function AuthModal({
 
           <button
             type="submit"
-            disabled={!turnstileToken || isSubmitting}
-            className={`w-full generate-button ${(!turnstileToken || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!turnstileToken || isSubmitting || (authMode === 'register' && !!usernameError)}
+            className={`w-full generate-button ${(!turnstileToken || isSubmitting || (authMode === 'register' && !!usernameError)) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isSubmitting ? '验证中...' : (authMode === 'login' ? '登录' : '注册')}
           </button>

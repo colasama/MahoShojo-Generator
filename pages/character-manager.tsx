@@ -129,9 +129,9 @@ const CharacterManagerPage: React.FC = () => {
     }, [isAuthenticated]);
 
     // 处理注册
-    const handleRegister = async (username: string, code: string, turnstileToken: string) => {
+    const handleRegister = async (username: string, turnstileToken: string) => {
         setAuthMessage(null);
-        const result = await register(username, code, turnstileToken);
+        const result = await register(username, turnstileToken);
         if (result.success && result.authKey) {
             setGeneratedAuthKey(result.authKey);
             setAuthMessage({ type: 'success', text: '注册成功！请复制并保存您的登录密钥。' });
