@@ -61,9 +61,6 @@ interface RandomCombatantPlaceholder {
   filename: string; // 用于UI显示
 }
 
-// 修改：让 Combatant 类型可以包含真实角色或占位符
-type Combatant = (CombatantData | RandomCombatantPlaceholder) & { teamId?: number };
-
 // 定义参战者的数据结构
 interface CombatantData {
     type: 'magical-girl' | 'canshou';
@@ -71,9 +68,11 @@ interface CombatantData {
     filename: string; // 用于UI显示和去重
     isValid: boolean; // 用于标记是否为原生设定
     isPreset: boolean; // 标记是否为预设角色
-    teamId?: number; // 为分队功能添加可选的teamId
     isNonStandard?: boolean; // 标记是否为非规范格式
 }
+
+// 修改：让 Combatant 类型可以包含真实角色或占位符
+type Combatant = (CombatantData | RandomCombatantPlaceholder) & { teamId?: number };
 
 // 定义故事/战斗模式类型
 type BattleMode = 'classic' | 'kizuna' | 'daily' | 'scenario';
@@ -275,7 +274,7 @@ const BattlePage: React.FC = () => {
     };
 
     // 统一处理添加参战者
-    const addCombatant = (combatant: Combatant) => {
+    const addCombatant = (combatant: CombatantData) => { // 注意：这里只接收 CombatantData
         if (combatants.length >= 4) {
             setError('最多只能选择 4 位参战者。');
             return;
@@ -285,8 +284,8 @@ const BattlePage: React.FC = () => {
     };
 
     // 处理选择预设
-    const handleRemoveCombatant = (filename: string) => {
-        setCombatants(prev => prev.filter(c => c.filename !== filename));
+    const handleRemoveCombatant = (key: string) => { // key 现在可以是 filename 或 id
+        setCombatants(prev => prev.filter(c => ('id' in c ? c.id : c.filename) !== key));
     };
 
     const handleSelectPreset = async (preset: Preset) => {
@@ -362,10 +361,10 @@ const BattlePage: React.FC = () => {
             throw new Error(`队伍将超出4人上限！`);
         }
 
-        const loadedCombatants: Combatant[] = [];
+        const loadedCombatants: CombatantData[] = [];
 
         for (const item of dataArray) {
-            let combatantToAdd: Combatant | null = null;
+            let combatantToAdd: CombatantData | null = null;
             const itemName = item.codename || item.name || sourceName;
 
             try {
@@ -491,7 +490,7 @@ const BattlePage: React.FC = () => {
     };
 
     const handleDownloadCorrectedJson = (codename: string) => {
-        const combatant = combatants.find(c => (c.data.codename || c.data.name) === codename);
+        const combatant = combatants.find(c => !('id' in c) && (c.data.codename || c.data.name) === codename) as CombatantData | undefined;
         if (!combatant) return;
         const jsonData = JSON.stringify(combatant.data, null, 2);
         const blob = new Blob([jsonData], { type: 'application/json' });
@@ -506,7 +505,7 @@ const BattlePage: React.FC = () => {
     };
 
     const handleCopyCorrectedJson = (codename: string) => {
-        const combatant = combatants.find(c => (c.data.codename || c.data.name) === codename);
+        const combatant = combatants.find(c => !('id' in c) && (c.data.codename || c.data.name) === codename) as CombatantData | undefined;
         if (!combatant) return;
         const jsonData = JSON.stringify(combatant.data, null, 2);
         navigator.clipboard.writeText(jsonData).then(() => {
@@ -618,7 +617,7 @@ const BattlePage: React.FC = () => {
 
         try {
             // --- 【新增】处理随机角色占位符 ---
-            let finalCombatants = [...combatants];
+            let finalCombatants: Combatant[] = [...combatants];
             const placeholders = combatants.filter(c => 'id' in c) as RandomCombatantPlaceholder[];
 
             if (placeholders.length > 0) {
@@ -647,7 +646,7 @@ const BattlePage: React.FC = () => {
             }
 
             // 安全检查（使用处理后的 finalCombatants）
-            const combatantsForCheck = (finalCombatants as CombatantData[]).map(c => c.data);
+            const combatantsForCheck = (finalCombatants.filter(c => 'data' in c) as CombatantData[]).map(c => c.data);
             if (await checkSensitiveWords(JSON.stringify(combatantsForCheck))) return;
             if (userGuidance && (await checkSensitiveWords(userGuidance))) return;
             if (scenarioContent && (await checkSensitiveWords(JSON.stringify(scenarioContent)))) return;
@@ -668,7 +667,7 @@ const BattlePage: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     // 使用 finalCombatants
-                    combatants: (finalCombatants as CombatantData[]).map(c => ({
+                    combatants: (finalCombatants.filter(c => 'data' in c) as CombatantData[]).map(c => ({
                         type: c.type,
                         data: c.data,
                         isNative: c.isValid,
@@ -723,7 +722,7 @@ const BattlePage: React.FC = () => {
 
             // 用返回的最新角色数据更新当前页面的参战者状态
             setCombatants(prev =>
-                (prev as CombatantData[]).map(oldCombatant => {
+                (prev.filter(c => 'data' in c) as CombatantData[]).map(oldCombatant => {
                     const updatedData = result.updatedCombatants.find(
                         uc => (uc.codename || uc.name) === (oldCombatant.data.codename || oldCombatant.data.name)
                     );
@@ -731,7 +730,6 @@ const BattlePage: React.FC = () => {
                 })
             );
 
-            setNewsReport(result.report);
             startCooldown();
         } catch (err) {
             // 现在的 catch 块可以捕获到更明确的错误信息
@@ -883,7 +881,6 @@ const BattlePage: React.FC = () => {
                                     <p className="font-semibold text-sm text-gray-700">已选角色 ({combatants.length}/4):</p>
                                     <button onClick={handleClearRoster} disabled={isGenerating} className="text-sm text-red-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">清空列表</button>
                                 </div>
-                                {/* 新增：添加随机角色按钮 */}
                                 <div className="flex gap-2 mt-3">
                                     <button
                                         onClick={() => {
@@ -926,7 +923,7 @@ const BattlePage: React.FC = () => {
                                     {combatants.map(c => {
                                         // 类型守卫，判断是真实角色数据还是占位符
                                         const isPlaceholder = 'id' in c;
-                                        const filename = isPlaceholder ? c.id : c.filename;
+                                        const key = isPlaceholder ? c.id : c.filename;
                                         const name = isPlaceholder ? c.filename : (c.data.codename || c.data.name);
                                         const typeDisplay = isPlaceholder 
                                             ? (c.type === 'random-magical-girl' ? '(随机魔法少女)' : '(随机残兽)')
@@ -934,7 +931,7 @@ const BattlePage: React.FC = () => {
                                         const isCorrected = !isPlaceholder && correctedFiles[name];
 
                                         return (
-                                            <li key={filename} className="flex justify-between items-center group">
+                                            <li key={key} className="flex justify-between items-center group">
                                                 <div className="flex items-center flex-grow">
                                                     <span className="truncate mr-2" title={name}>
                                                         {name}
@@ -948,7 +945,7 @@ const BattlePage: React.FC = () => {
                                                     {!isPlaceholder && (
                                                         <select
                                                             value={c.teamId || 0}
-                                                            onChange={(e) => handleTeamChange(filename, parseInt(e.target.value))}
+                                                            onChange={(e) => handleTeamChange(c.filename, parseInt(e.target.value))}
                                                             className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white disabled:opacity-50"
                                                             disabled={isGenerating}
                                                         >
@@ -969,7 +966,7 @@ const BattlePage: React.FC = () => {
                                                     )}
                                                     {/* 单个删除按钮 */}
                                                     <button
-                                                        onClick={() => !isGenerating && handleRemoveCombatant(filename)}
+                                                        onClick={() => !isGenerating && handleRemoveCombatant(key)}
                                                         className={`w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-300'}`}
                                                         aria-label={`移除 ${name}`}
                                                         disabled={isGenerating}
@@ -982,12 +979,13 @@ const BattlePage: React.FC = () => {
                                     })}
                                 </ul>
                                 {/* --- 历战记录超限提示 --- */}
-                                {combatants.some(c => c.data.arena_history?.entries?.length > 20) && (
+                                {combatants.some(c => 'data' in c && c.data.arena_history?.entries?.length > 20) && (
                                     <div className="mt-3 text-xs text-gray-500">
                                         <p>
                                             ⚠️ 注意：
                                             {combatants
-                                                .filter(c => c.data.arena_history?.entries?.length > 20)
+                                                .filter((c): c is CombatantData => 'data' in c && !!c.data.arena_history?.entries)
+                                                .filter(c => c.data.arena_history.entries.length > 20)
                                                 .map(c => `“${c.data.codename || c.data.name}”(${c.data.arena_history.entries.length}条) `)
                                                 .join('、')
                                             }
