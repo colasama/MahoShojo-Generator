@@ -54,8 +54,18 @@ const battleLevels = [
     { value: '花级', label: '花级 🌺' },
 ];
 
+// 新增：定义随机角色占位符的类型
+interface RandomCombatantPlaceholder {
+  type: 'random-magical-girl' | 'random-canshou';
+  id: string; // 使用唯一ID作为key
+  filename: string; // 用于UI显示
+}
+
+// 修改：让 Combatant 类型可以包含真实角色或占位符
+type Combatant = (CombatantData | RandomCombatantPlaceholder) & { teamId?: number };
+
 // 定义参战者的数据结构
-interface Combatant {
+interface CombatantData {
     type: 'magical-girl' | 'canshou';
     data: any;
     filename: string; // 用于UI显示和去重
@@ -607,16 +617,45 @@ const BattlePage: React.FC = () => {
         setUpdatedCombatants([]); // 清空上次的结果
 
         try {
-            // 安全检查
-            const combatantsForCheck = combatants.map(c => c.data);
+            // --- 【新增】处理随机角色占位符 ---
+            let finalCombatants = [...combatants];
+            const placeholders = combatants.filter(c => 'id' in c) as RandomCombatantPlaceholder[];
+
+            if (placeholders.length > 0) {
+                setError('正在生成随机角色...'); // 提示用户
+                const randomCharacterPromises = placeholders.map(p =>
+                    fetch(`/api/generate-random-character?type=${p.type.replace('random-', '')}`)
+                        .then(res => res.ok ? res.json() : Promise.reject(new Error(`随机${p.filename}生成失败`)))
+                );
+                
+                const generatedCharacters = await Promise.all(randomCharacterPromises);
+
+                // 将生成的角色数据转换为 CombatantData 格式
+                const newCombatants: CombatantData[] = generatedCharacters.map((data, i) => ({
+                    type: data.codename ? 'magical-girl' : 'canshou',
+                    data,
+                    filename: `${placeholders[i].filename} - ${data.codename || data.name}`,
+                    isValid: true, // 随机生成的角色视为原生
+                    isPreset: false,
+                    isNonStandard: false,
+                }));
+
+                // 替换掉占位符
+                finalCombatants = combatants.filter(c => !('id' in c));
+                finalCombatants.push(...newCombatants);
+                setCombatants(finalCombatants); // 更新UI以显示新生成的角色
+            }
+
+            // 安全检查（使用处理后的 finalCombatants）
+            const combatantsForCheck = (finalCombatants as CombatantData[]).map(c => c.data);
             if (await checkSensitiveWords(JSON.stringify(combatantsForCheck))) return;
             if (userGuidance && (await checkSensitiveWords(userGuidance))) return;
             if (scenarioContent && (await checkSensitiveWords(JSON.stringify(scenarioContent)))) return;
 
             // 构造分队信息
             const teams: { [key: number]: string[] } = {};
-            combatants.forEach(c => {
-                if (c.teamId) {
+            finalCombatants.forEach(c => {
+                if ('data' in c && c.teamId) { // 确保是 CombatantData
                     if (!teams[c.teamId]) {
                         teams[c.teamId] = [];
                     }
@@ -628,7 +667,8 @@ const BattlePage: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    combatants: combatants.map(c => ({
+                    // 使用 finalCombatants
+                    combatants: (finalCombatants as CombatantData[]).map(c => ({
                         type: c.type,
                         data: c.data,
                         isNative: c.isValid,
@@ -681,9 +721,9 @@ const BattlePage: React.FC = () => {
             setNewsReport(result.report);
             setUpdatedCombatants(result.updatedCombatants);
 
-            // 关键：用返回的最新角色数据更新当前页面的参战者状态 (SRS 3.1.4)
+            // 用返回的最新角色数据更新当前页面的参战者状态
             setCombatants(prev =>
-                prev.map(oldCombatant => {
+                (prev as CombatantData[]).map(oldCombatant => {
                     const updatedData = result.updatedCombatants.find(
                         uc => (uc.codename || uc.name) === (oldCombatant.data.codename || oldCombatant.data.name)
                     );
@@ -843,35 +883,82 @@ const BattlePage: React.FC = () => {
                                     <p className="font-semibold text-sm text-gray-700">已选角色 ({combatants.length}/4):</p>
                                     <button onClick={handleClearRoster} disabled={isGenerating} className="text-sm text-red-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">清空列表</button>
                                 </div>
+                                {/* 新增：添加随机角色按钮 */}
+                                <div className="flex gap-2 mt-3">
+                                    <button
+                                        onClick={() => {
+                                            if (combatants.length >= 4) {
+                                                setError('最多只能选择 4 位参战者。');
+                                                return;
+                                            }
+                                            const newPlaceholder: RandomCombatantPlaceholder = {
+                                                type: 'random-magical-girl',
+                                                id: `random-mg-${Date.now()}`,
+                                                filename: '随机魔法少女',
+                                            };
+                                            setCombatants(prev => [...prev, newPlaceholder]);
+                                        }}
+                                        disabled={isGenerating || combatants.length >= 4}
+                                        className="text-xs flex-1 bg-pink-100 text-pink-700 px-3 py-1.5 rounded-lg hover:bg-pink-200 disabled:opacity-50"
+                                    >
+                                        + 添加随机魔法少女
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (combatants.length >= 4) {
+                                                setError('最多只能选择 4 位参战者。');
+                                                return;
+                                            }
+                                            const newPlaceholder: RandomCombatantPlaceholder = {
+                                                type: 'random-canshou',
+                                                id: `random-cs-${Date.now()}`,
+                                                filename: '随机残兽',
+                                            };
+                                            setCombatants(prev => [...prev, newPlaceholder]);
+                                        }}
+                                        disabled={isGenerating || combatants.length >= 4}
+                                        className="text-xs flex-1 bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                                    >
+                                        + 添加随机残兽
+                                    </button>
+                                </div>
                                 <ul className="list-disc list-inside text-sm text-gray-600 mt-2 space-y-2">
                                     {combatants.map(c => {
-                                        const name = c.data.codename || c.data.name;
-                                        const typeDisplay = c.type === 'magical-girl' ? '(魔法少女)' : '(残兽)';
-                                        const isCorrected = correctedFiles[name];
+                                        // 类型守卫，判断是真实角色数据还是占位符
+                                        const isPlaceholder = 'id' in c;
+                                        const filename = isPlaceholder ? c.id : c.filename;
+                                        const name = isPlaceholder ? c.filename : (c.data.codename || c.data.name);
+                                        const typeDisplay = isPlaceholder 
+                                            ? (c.type === 'random-magical-girl' ? '(随机魔法少女)' : '(随机残兽)')
+                                            : (c.type === 'magical-girl' ? '(魔法少女)' : '(残兽)');
+                                        const isCorrected = !isPlaceholder && correctedFiles[name];
+
                                         return (
-                                            <li key={c.filename} className="flex justify-between items-center group">
+                                            <li key={filename} className="flex justify-between items-center group">
                                                 <div className="flex items-center flex-grow">
                                                     <span className="truncate mr-2" title={name}>
                                                         {name}
                                                         <span className="text-xs text-gray-500 ml-1">{typeDisplay}</span>
-                                                        {c.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
-                                                        {c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
+                                                        {!isPlaceholder && c.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
+                                                        {!isPlaceholder && c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
                                                         {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
-                                                        {c.isNonStandard && <span className="text-xs text-orange-500 ml-1 font-semibold">(非规范格式)</span>}
+                                                        {!isPlaceholder && c.isNonStandard && <span className="text-xs text-orange-500 ml-1 font-semibold">(非规范格式)</span>}
                                                     </span>
-                                                    {/* 分队选择器 */}
-                                                    <select
-                                                        value={c.teamId || 0}
-                                                        onChange={(e) => handleTeamChange(c.filename, parseInt(e.target.value))}
-                                                        className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white disabled:opacity-50"
-                                                        disabled={isGenerating}
-                                                    >
-                                                        <option value={0}>无分队</option>
-                                                        <option value={1}>队伍 1</option>
-                                                        <option value={2}>队伍 2</option>
-                                                        <option value={3}>队伍 3</option>
-                                                        <option value={4}>队伍 4</option>
-                                                    </select>
+                                                    {/* 分队选择器 (占位符不可分队) */}
+                                                    {!isPlaceholder && (
+                                                        <select
+                                                            value={c.teamId || 0}
+                                                            onChange={(e) => handleTeamChange(filename, parseInt(e.target.value))}
+                                                            className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white disabled:opacity-50"
+                                                            disabled={isGenerating}
+                                                        >
+                                                            <option value={0}>无分队</option>
+                                                            <option value={1}>队伍 1</option>
+                                                            <option value={2}>队伍 2</option>
+                                                            <option value={3}>队伍 3</option>
+                                                            <option value={4}>队伍 4</option>
+                                                        </select>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center">
                                                     {isCorrected && (
@@ -882,7 +969,7 @@ const BattlePage: React.FC = () => {
                                                     )}
                                                     {/* 单个删除按钮 */}
                                                     <button
-                                                        onClick={() => !isGenerating && handleRemoveCombatant(c.filename)}
+                                                        onClick={() => !isGenerating && handleRemoveCombatant(filename)}
                                                         className={`w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-300'}`}
                                                         aria-label={`移除 ${name}`}
                                                         disabled={isGenerating}

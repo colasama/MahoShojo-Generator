@@ -128,6 +128,8 @@ const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails; answers
 
 const LOCAL_STORAGE_KEY = 'magicalGirlAnswersDraft'; // 定义本地存储的键
 
+const [isGenerating, setIsGenerating] = useState(false);
+
 const DetailsPage: React.FC = () => {
   const router = useRouter();
   const [questions, setQuestions] = useState<string[]>([]);
@@ -453,14 +455,38 @@ const DetailsPage: React.FC = () => {
                   你在魔法少女道路上的潜力和表现将会如何？<br />
                   <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>本测试设定来源于小说《下班，然后变成魔法少女》</p>
                 </div>
-                <button
-                  onClick={handleStartQuestionnaire}
-                  className="generate-button text-lg"
-                  style={{ marginBottom: '0rem' }}
-                >
-                  开始回答
-                </button>
-
+                {/* 修改开始 */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <button
+                    onClick={handleStartQuestionnaire}
+                    className="generate-button text-lg flex-1"
+                  >
+                    开始回答问卷
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsGenerating(true); // 使用 isGenerating 状态
+                      setError(null);
+                      try {
+                        const res = await fetch('/api/generate-random-character?type=magical-girl');
+                        if (!res.ok) throw new Error('随机生成失败');
+                        const data = await res.json();
+                        setMagicalGirlDetails(data);
+                        setShowIntroduction(false); // 直接进入结果展示
+                      } catch (err) {
+                        setError('随机生成失败，请稍后再试。');
+                      } finally {
+                        setIsGenerating(false);
+                      }
+                    }}
+                    disabled={isGenerating}
+                    className="generate-button text-lg flex-1"
+                    style={{ background: 'linear-gradient(to right, #22c55e, #16a34a)' }}
+                  >
+                    {isGenerating ? '生成中...' : '快速随机生成'}
+                  </button>
+                </div>
+                {/* 修改结束 */}
                 {/* 返回首页链接 */}
                 <div className="text-center" style={{ marginTop: '2rem' }}>
                   <button

@@ -310,7 +310,31 @@ const CanshouPage: React.FC = () => {
 
             {showIntroduction ? (
               <div className="text-center">
-                <button onClick={() => setShowIntroduction(false)} className="generate-button text-lg">开始调查</button>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onClick={() => setShowIntroduction(false)} className="generate-button text-lg flex-1">开始调查</button>
+                    <button
+                        onClick={async () => {
+                            setSubmitting(true); // 使用 submitting 状态
+                            setError(null);
+                            try {
+                                const res = await fetch('/api/generate-random-character?type=canshou');
+                                if (!res.ok) throw new Error('随机生成失败');
+                                const data = await res.json();
+                                setCanshouDetails(data);
+                                setShowIntroduction(false);
+                            } catch (err) {
+                                setError('随机生成失败，请稍后再试。');
+                            } finally {
+                                setSubmitting(false);
+                            }
+                        }}
+                        disabled={submitting}
+                        className="generate-button text-lg flex-1"
+                        style={{ background: 'linear-gradient(to right, #7e22ce, #a855f7)' }}
+                    >
+                        {submitting ? '生成中...' : '快速随机生成'}
+                    </button>
+                </div>
                 <div className="mt-8">
                   <Link href="/" className="footer-link">返回首页</Link>
                 </div>
