@@ -594,6 +594,25 @@ const BattlePage: React.FC = () => {
         return false;
     }
 
+    // [v0.3.0 FR-4] 处理随机判定器概率变化的函数
+    const handleProbabilityChange = (id: string, value: string) => {
+        const newProbability = parseInt(value, 10);
+        // 如果输入无效（例如为空），则暂时不更新或设为默认值，这里我们等待一个有效数字
+        if (isNaN(newProbability)) {
+            // 可以选择在这里处理空输入的情况，例如暂时不清空
+            return;
+        }
+        
+        // 确保概率值在 1 到 100 之间
+        const clampedValue = Math.max(1, Math.min(100, newProbability));
+
+        setAdjudicationEvents(prevEvents =>
+            prevEvents.map(event =>
+                event.id === id ? { ...event, probability: clampedValue } : event
+            )
+        );
+    };
+
     // 处理生成按钮点击事件
     const handleGenerate = async () => {
         if (isCooldown) {
@@ -1150,54 +1169,55 @@ const BattlePage: React.FC = () => {
                         {/* [FR-4] 随机判定器 UI */}
                         <div className="input-group">
                             <h3 className="input-label">🎲 随机判定器 (可选)</h3>
-                            {adjudicationEvents.map((adj, index) => (
-                                <div key={adj.id} className="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
-                                    <input
-                                        type="text"
-                                        value={adj.event}
-                                        onChange={(e) => {
-                                            const newEvents = [...adjudicationEvents];
-                                            newEvents[index].event = e.target.value;
-                                            setAdjudicationEvents(newEvents);
-                                        }}
-                                        placeholder="输入需要判定的事件"
-                                        maxLength={60}
-                                        className="input-field flex-grow !my-0"
-                                    />
-                                    <div className="flex items-center gap-2 w-40">
+                            {adjudicationEvents.map((adj) => (
+                                <div key={adj.id} className="p-3 bg-gray-100 rounded-lg mb-3">
+                                    {/* 第一行：事件描述和删除按钮 */}
+                                    <div className="flex items-center justify-between gap-3">
+                                        <input
+                                            type="text"
+                                            value={adj.event}
+                                            onChange={(e) => {
+                                                const newEvents = [...adjudicationEvents];
+                                                const target = newEvents.find(event => event.id === adj.id);
+                                                if (target) {
+                                                    target.event = e.target.value;
+                                                    setAdjudicationEvents(newEvents);
+                                                }
+                                            }}
+                                            placeholder="输入需要判定的事件（最多60字）"
+                                            maxLength={60}
+                                            className="input-field flex-grow !my-0"
+                                        />
+                                        <button
+                                            onClick={() => setAdjudicationEvents(adjudicationEvents.filter(e => e.id !== adj.id))}
+                                            className="text-red-500 hover:text-red-700 font-bold p-1 rounded-full hover:bg-red-100 flex-shrink-0"
+                                            aria-label="删除此事件"
+                                        >
+                                            &times;
+                                        </button>
+                                    </div>
+                                    {/* 第二行：概率滑块和数字输入 */}
+                                    <div className="flex items-center gap-3 mt-2">
                                         <input
                                             type="range"
                                             min="1"
                                             max="100"
                                             value={adj.probability}
-                                            onChange={(e) => {
-                                                const newEvents = [...adjudicationEvents];
-                                                newEvents[index].probability = parseInt(e.target.value, 10);
-                                                setAdjudicationEvents(newEvents);
-                                            }}
-                                            className="w-full"
+                                            onChange={(e) => handleProbabilityChange(adj.id, e.target.value)}
+                                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                                         />
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="100"
-                                            value={adj.probability}
-                                            onChange={(e) => {
-                                                const newEvents = [...adjudicationEvents];
-                                                const value = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1));
-                                                newEvents[index].probability = value;
-                                                setAdjudicationEvents(newEvents);
-                                            }}
-                                            className="input-field w-16 !my-0 text-center"
-                                        />
-                                        <span className="text-sm font-mono">%</span>
+                                        <div className="relative w-24 flex-shrink-0">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="100"
+                                                value={adj.probability}
+                                                onChange={(e) => handleProbabilityChange(adj.id, e.target.value)}
+                                                className="input-field !my-0 w-full text-center pr-6"
+                                            />
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">%</span>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={() => setAdjudicationEvents(adjudicationEvents.filter(e => e.id !== adj.id))}
-                                        className="text-red-500 hover:text-red-700 font-bold"
-                                    >
-                                        &times;
-                                    </button>
                                 </div>
                             ))}
                             <button
