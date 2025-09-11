@@ -128,8 +128,6 @@ const SaveJsonButton: React.FC<{ magicalGirlDetails: MagicalGirlDetails; answers
 
 const LOCAL_STORAGE_KEY = 'magicalGirlAnswersDraft'; // 定义本地存储的键
 
-const [isGenerating, setIsGenerating] = useState(false);
-
 const DetailsPage: React.FC = () => {
   const router = useRouter();
   const [questions, setQuestions] = useState<string[]>([]);
@@ -149,6 +147,7 @@ const DetailsPage: React.FC = () => {
   const [bulkAnswers, setBulkAnswers] = useState(''); // 用于"一键填充"的textarea
   const [showLanguageSection, setShowLanguageSection] = useState(false); // 控制生成语言区域的折叠状态
   const [showBulkFillSection, setShowBulkFillSection] = useState(false); // 控制一键填充区域的折叠状态
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // 多语言支持
   const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
