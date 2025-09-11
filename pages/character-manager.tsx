@@ -8,6 +8,10 @@ import { quickCheck } from '@/lib/sensitive-word-filter';
 import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
 import TachieGenerator from '../components/TachieGenerator';
+// 【新增】导入卡片组件和颜色配置
+import MagicalGirlCard from '../components/MagicalGirlCard';
+import CanshouCard from '../components/CanshouCard';
+import { MainColor } from '../lib/main-color';
 import { useAuth } from '@/lib/useAuth';
 import { dataCardApi } from '@/lib/auth';
 
@@ -78,6 +82,18 @@ const replaceAllNamesInData = (data: any, oldBaseName: string, newBaseName: stri
     return data;
 };
 
+// 【新增】定义渐变色，用于魔法少女卡片背景
+const gradientColors: Record<string, { first: string; second: string }> = {
+    [MainColor.Red]: { first: '#ff6b6b', second: '#ee5a6f' },
+    [MainColor.Orange]: { first: '#ff922b', second: '#ffa94d' },
+    [MainColor.Cyan]: { first: '#22b8cf', second: '#66d9e8' },
+    [MainColor.Blue]: { first: '#5c7cfa', second: '#748ffc' },
+    [MainColor.Purple]: { first: '#9775fa', second: '#b197fc' },
+    [MainColor.Pink]: { first: '#ff9a9e', second: '#fecfef' },
+    [MainColor.Yellow]: { first: '#f59f00', second: '#fcc419' },
+    [MainColor.Green]: { first: '#51cf66', second: '#8ce99a' }
+};
+
 const CharacterManagerPage: React.FC = () => {
     const router = useRouter();
     const { user, loading: authLoading, isAuthenticated, register, login, logout } = useAuth();
@@ -107,6 +123,9 @@ const CharacterManagerPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'info' | 'error' | 'success', text: string } | null>(null);
     const [copiedStatus, setCopiedStatus] = useState(false);
+    // 【新增】图片保存模态框的状态
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
 
     // 用于控制说明区域的显示与隐藏，默认为 true
     const [isGuideVisible, setIsGuideVisible] = useState(true);
@@ -473,7 +492,16 @@ const CharacterManagerPage: React.FC = () => {
             let current = newData;
             const keys = path.split('.');
             for (let i = 0; i < keys.length - 1; i++) {
-                current = current[keys[i]] = current[keys[i]] || {};
+                const key = keys[i];
+                const nextKey = keys[i + 1];
+                const isNextKeyNumeric = !isNaN(parseInt(nextKey, 10));
+                
+                if (isNextKeyNumeric && !Array.isArray(current[key])) {
+                    current[key] = [];
+                } else if (!isNextKeyNumeric && !isObject(current[key])) {
+                    current[key] = {};
+                }
+                current = current[key];
             }
             current[keys[keys.length - 1]] = value;
             return newData;
@@ -508,7 +536,95 @@ const CharacterManagerPage: React.FC = () => {
 
     }, [characterData, originalData]);
 
+
+    // 【v0.3.0 新增】渲染内嵌随机事件的编辑器
+    const renderAdjudicationEventsEditor = () => {
+        // 从角色数据中获取事件数组，如果不存在则默认为空数组
+        const events = characterData.adjudicationEvents || [];
+    
+        // 添加新事件的处理函数
+        const handleAddEvent = () => {
+            const newEvent = { event: '', probability: 50 };
+            // 更新角色数据状态，将新事件添加到数组末尾
+            handleFieldChange('adjudicationEvents', [...events, newEvent]);
+        };
+    
+        // 删除事件的处理函数
+        const handleDeleteEvent = (index: number) => {
+            // 创建一个新数组，其中不包含指定索引的事件
+            const newEvents = events.filter((_: any, i: number) => i !== index);
+            // 更新角色数据状态
+            handleFieldChange('adjudicationEvents', newEvents);
+        };
+    
+        // 渲染UI
+        return (
+            <fieldset className="border border-gray-300 p-4 rounded-lg mt-4">
+                <legend className="text-sm font-semibold px-2 text-gray-600">🎲 内嵌随机事件管理</legend>
+                <div className="space-y-4">
+                    {events.map((event: any, index: number) => (
+                        <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            {/* 事件描述输入框 */}
+                            <div className="flex items-center justify-between gap-2">
+                                <label htmlFor={`adj-event-${index}`} className="text-xs font-medium text-gray-600 flex-shrink-0">事件描述</label>
+                                <button
+                                    onClick={() => handleDeleteEvent(index)}
+                                    className="text-red-500 hover:text-red-700 font-bold p-1 text-lg leading-none rounded-full hover:bg-red-100"
+                                    aria-label="删除此事件"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                            <textarea
+                                id={`adj-event-${index}`}
+                                value={event.event}
+                                onChange={(e) => handleFieldChange(`adjudicationEvents.${index}.event`, e.target.value)}
+                                placeholder="输入需要判定的事件（最多60字）"
+                                maxLength={60}
+                                rows={2}
+                                className="input-field mt-1"
+                            />
+                            {/* 成功率输入框 */}
+                            <div className="flex items-center gap-3 mt-2">
+                                <label htmlFor={`adj-prob-${index}`} className="text-xs font-medium text-gray-600">成功率</label>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="100"
+                                    value={event.probability}
+                                    onChange={(e) => handleFieldChange(`adjudicationEvents.${index}.probability`, parseInt(e.target.value, 10))}
+                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                />
+                                <div className="relative w-24 flex-shrink-0">
+                                    <input
+                                        type="number"
+                                        id={`adj-prob-${index}`}
+                                        min="1"
+                                        max="100"
+                                        value={event.probability}
+                                        onChange={(e) => handleFieldChange(`adjudicationEvents.${index}.probability`, parseInt(e.target.value, 10))}
+                                        className="input-field !my-0 w-full text-center pr-6"
+                                    />
+                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {/* 添加事件按钮 */}
+                    <button
+                        type="button"
+                        onClick={handleAddEvent}
+                        className="text-sm text-blue-600 hover:underline mt-2"
+                    >
+                        + 添加随机事件
+                    </button>
+                </div>
+            </fieldset>
+        );
+    };
+
     // 递归渲染表单
+// 【修正】渲染表单的递归函数，移除了未被使用的变量以修复ESLint报错
     const renderFormFields = (data: any, path: string = ''): React.ReactNode => {
         // 渲染顺序：基本信息 -> 外观 -> 魔装 -> 奇境 -> 繁开 -> 分析 -> 问卷 -> 历战记录
         if (!isObject(data)) return null;
@@ -529,27 +645,23 @@ const CharacterManagerPage: React.FC = () => {
 
         return sortedKeys.map(key => {
             const currentPath = path ? `${path}.${key}` : key;
-            if (key === 'signature' || key === 'isPreset' || key === 'arena_history') return null;
+            // 过滤掉不应在表单中编辑的字段
+            if (key === 'signature' || key === 'isPreset' || key === 'arena_history' || key === 'adjudicationEvents') return null;
 
             const value = data[key];
 
-            // [新增] 专门处理数组类型的逻辑
+            // 专门处理数组类型的逻辑
             if (Array.isArray(value)) {
                 // 判断是否为字符串数组，这是我们主要支持编辑的类型
                 const isStringArray = value.every(item => typeof item === 'string');
                 if (isStringArray) {
-                    const handleArrayChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                        // 将文本域内容按换行符分割，变回数组，从而保持数据类型正确
-                        const newArray = e.target.value.split('\n');
-                        handleFieldChange(currentPath, newArray);
-                    };
                     return (
                         <div key={currentPath} className="mt-4">
                             <label htmlFor={currentPath} className="block text-sm font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1')}</label>
                             <textarea
                                 id={currentPath}
                                 value={value.join('\n')}
-                                onChange={handleArrayChange}
+                                onChange={(e) => handleFieldChange(currentPath, e.target.value.split('\n'))}
                                 rows={Math.max(3, value.length)} // 动态调整高度
                                 className="input-field"
                                 placeholder="每行输入一个项目"
@@ -583,19 +695,14 @@ const CharacterManagerPage: React.FC = () => {
                 );
             }
 
-            // 处理字符串和其他原始类型的逻辑
-            const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-                handleFieldChange(currentPath, e.target.value);
-            };
-
             return (
                 <div key={currentPath}>
                     <label htmlFor={currentPath} className="block text-sm font-medium text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1')}</label>
                     <div className="mt-1 flex items-center">
                         {typeof value === 'string' && value.length > 80 ?
-                            <textarea id={currentPath} value={value as string} onChange={handleChange} rows={3} className="input-field" />
+                            <textarea id={currentPath} value={value as string} onChange={(e) => handleFieldChange(currentPath, e.target.value)} rows={3} className="input-field" />
                             :
-                            <input type="text" id={currentPath} value={value as any} onChange={handleChange} className="input-field" />
+                            <input type="text" id={currentPath} value={value as any} onChange={(e) => handleFieldChange(currentPath, e.target.value)} className="input-field" />
                         }
                         {currentPath === 'codename' && (
                             <button onClick={handleRandomCodename} type="button" className="ml-2 px-3 py-1.5 text-xs font-semibold text-white bg-pink-500 rounded-lg hover:bg-pink-600">随机</button>
@@ -736,6 +843,16 @@ const CharacterManagerPage: React.FC = () => {
         }
     };
 
+    /**
+     * 【新增】处理图片保存的回调函数。
+     * 当在移动设备上点击卡片保存按钮时，此函数会被调用。
+     * @param imageUrl - 由卡片组件生成的图片Data URL。
+     */
+    const handleSaveImageCallback = (imageUrl: string) => {
+        setSavedImageUrl(imageUrl);
+        setShowImageModal(true);
+    };
+
     return (
         <>
             <Head>
@@ -806,7 +923,7 @@ const CharacterManagerPage: React.FC = () => {
                                         <h4 className="font-semibold text-gray-800">核心功能：</h4>
                                         <ul className="list-disc list-inside space-y-1 mt-1 pl-2">
                                             <li><span className="font-semibold">加载角色：</span>通过上传 <code>.json</code> 文件或直接粘贴文本内容来加载你的角色档案。</li>
-                                            <li><span className="font-semibold">编辑数据：</span>可视化地查看并修改角色的各项设定，包括调整历战记录。</li>
+                                            <li><span className="font-semibold">编辑数据：</span>可视化地查看并修改角色的各项设定，包括调整历战记录和新增的“内嵌随机事件”。</li>
                                             <li><span className="font-semibold">一键换名：</span>修改名称后，可一键替换档案中所有旧名称。</li>
                                             <li><span className="font-semibold">生成立绘：</span>加载角色后，展开下方的“立绘生成”模块，可为你的角色创建立绘。</li>
                                             <li><span className="font-semibold">保存与导出：</span>完成修改后，可下载新的 <code>.json</code> 文件或将内容复制到剪贴板。</li>
@@ -831,6 +948,7 @@ const CharacterManagerPage: React.FC = () => {
                                             <li>修改角色的 <code className="bg-gray-200 px-1 rounded text-xs">codename</code> (魔法少女) 或 <code className="bg-gray-200 px-1 rounded text-xs">name</code> (残兽) 字段。</li>
                                             <li>在“历战记录管理”中<span className="font-semibold">删除</span>一条或多条历史记录。</li>
                                             <li>在“历战记录管理”中点击<span className="font-semibold">“重置属性”或“清除所有记录”</span>按钮。</li>
+                                            <li><span className="font-semibold">添加、编辑或删除</span>内嵌的随机事件。</li>
                                         </ul>
                                         <p className="text-xs text-gray-500 mt-2">（注：新增或修改历战记录、编辑除上述豁免字段外的任何字段，都会导致原生性丧失。）</p>
                                     </div>
@@ -897,6 +1015,8 @@ const CharacterManagerPage: React.FC = () => {
                                     </div>
                                 )}
 
+                                {/* 【v0.3.0 新增】调用内嵌随机事件编辑器 */}
+                                {renderAdjudicationEventsEditor()}
                                 {/* 历战记录管理模块 - 只对角色数据显示 */}
                                 {!isScenarioData(characterData) && characterData.arena_history && (
                                     <fieldset className="border border-gray-300 p-4 rounded-lg mt-4">
@@ -948,6 +1068,33 @@ const CharacterManagerPage: React.FC = () => {
                             </div>
                         )}
                     </div>
+                    
+                    {/* 【新增】角色卡片预览与生成区域 */}
+                    {characterData && !isLoading && (
+                        <div className="card mt-6">
+                            <h3 className="text-xl font-bold text-gray-800 text-center mb-4">
+                                角色卡片预览与生成
+                            </h3>
+                            {characterData.codename ? (
+                                <MagicalGirlCard
+                                    magicalGirl={characterData}
+                                    gradientStyle={(() => {
+                                        const colorScheme = characterData.appearance?.colorScheme || "粉色";
+                                        const mainColorName = Object.values(MainColor).find(color => colorScheme.includes(color)) || MainColor.Pink;
+                                        const colors = gradientColors[mainColorName] || gradientColors[MainColor.Pink];
+                                        return `linear-gradient(135deg, ${colors.first} 0%, ${colors.second} 100%)`;
+                                    })()}
+                                    onSaveImage={handleSaveImageCallback}
+                                />
+                            ) : (
+                                <CanshouCard
+                                    canshou={characterData}
+                                    onSaveImage={handleSaveImageCallback}
+                                />
+                            )}
+                        </div>
+                    )}
+
                     {/* 立绘生成 - 只对角色数据显示 */}
                     {!isScenarioData(characterData) && (
                         <div className="card mt-6">
@@ -969,6 +1116,17 @@ const CharacterManagerPage: React.FC = () => {
                         <Link href="/" className="footer-link">返回首页</Link>
                     </div>
                 </div>
+
+                {/* 【新增】用于移动端长按保存的图片模态框 */}
+                {showImageModal && savedImageUrl && (
+                    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setShowImageModal(false)}>
+                        <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-auto relative p-4" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => setShowImageModal(false)} className="absolute top-2 right-2 text-3xl text-gray-600 hover:text-gray-900">&times;</button>
+                            <p className="text-center text-sm text-gray-600 mb-2">📱 长按图片保存到相册</p>
+                            <img src={savedImageUrl} alt="角色卡片" className="w-full h-auto rounded-lg" />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* 认证模态框 */}

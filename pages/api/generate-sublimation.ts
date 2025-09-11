@@ -247,6 +247,14 @@ async function handler(req: NextRequest): Promise<Response> {
     // 1. 创建原始数据的深拷贝作为基础
     const sublimatedData: any = JSON.parse(JSON.stringify(originalCharacterData));
 
+    // 1.1 确保 templateId 存在
+    if (!sublimatedData.templateId) {
+        sublimatedData.templateId = sublimatedData.codename 
+            ? "魔法少女/心之花/魔法少女（问卷生成）" 
+            : "魔法少女/心之花/残兽（问卷生成）";
+        log.info('为旧版角色数据补充了 templateId');
+    }
+
     // 2. 将AI生成的新数据安全地合并到这个副本上
     // safeDeepMerge会递归地合并对象，确保不会丢失嵌套结构
     Object.assign(sublimatedData, safeDeepMerge(sublimatedData, updatedDataFromAI));

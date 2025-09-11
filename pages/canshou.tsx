@@ -6,6 +6,7 @@ import { useCooldown } from '../lib/cooldown';
 import Link from 'next/link';
 import CanshouCard, { CanshouDetails } from '../components/CanshouCard';
 import { CANSHOU_LORE } from '../lib/canshou-lore';
+import { generateRandomCanshou } from '../lib/random-character-generator';
 
 // 定义问卷和问题的类型
 interface Question {
@@ -310,7 +311,31 @@ const CanshouPage: React.FC = () => {
 
             {showIntroduction ? (
               <div className="text-center">
-                <button onClick={() => setShowIntroduction(false)} className="generate-button text-lg">开始调查</button>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onClick={() => setShowIntroduction(false)} className="generate-button text-lg flex-1">开始调查</button>
+                    <button
+                        onClick={() => { // 移除 async
+                            setSubmitting(true);
+                            setError(null);
+                            try {
+                                // 直接同步调用，移除 await
+                                const data = generateRandomCanshou();
+                                setCanshouDetails(data);
+                                setShowIntroduction(false);
+                            } catch (err) {
+                                console.error('随机生成失败: ', err);
+                                setError('随机生成失败，请稍后再试。');
+                            } finally {
+                                setSubmitting(false);
+                            }
+                        }}
+                        disabled={submitting}
+                        className="generate-button text-lg flex-1"
+                        style={{ background: 'linear-gradient(to right, #7e22ce, #a855f7)' }}
+                    >
+                        {submitting ? '生成中...' : '快速随机生成'}
+                    </button>
+                </div>
                 <div className="mt-8">
                   <Link href="/" className="footer-link">返回首页</Link>
                 </div>
@@ -371,7 +396,6 @@ const CanshouPage: React.FC = () => {
                 <button onClick={handleNext} disabled={submitting || isCooldown || !currentAnswer.trim()} className="generate-button">
                   {isCooldown ? `冷却中 (${remainingTime}s)` : submitting ? '生成中...' : isLastQuestion ? '生成档案' : '下一题'}
                 </button>
-                a
                 {/* 多语言支持 */}
                 <div className="my-4 bg-gray-100 rounded-lg p-3">
                   <button

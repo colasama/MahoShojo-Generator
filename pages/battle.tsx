@@ -12,6 +12,7 @@ import { StatsData } from './api/get-stats';
 import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
 import { ArenaHistory } from '../types/arena';
+import { generateRandomMagicalGirl, generateRandomCanshou } from '../lib/random-character-generator';
 
 interface UpdatedCombatantData {
     codename?: string;
@@ -54,19 +55,41 @@ const battleLevels = [
     { value: '花级', label: '花级 🌺' },
 ];
 
+// 新增：定义随机角色占位符的类型
+interface RandomCombatantPlaceholder {
+  type: 'random-magical-girl' | 'random-canshou';
+  id: string; // 使用唯一ID作为key
+  filename: string; // 用于UI显示
+}
+
 // 定义参战者的数据结构
-interface Combatant {
+interface CombatantData {
     type: 'magical-girl' | 'canshou';
     data: any;
     filename: string; // 用于UI显示和去重
     isValid: boolean; // 用于标记是否为原生设定
     isPreset: boolean; // 标记是否为预设角色
-    teamId?: number; // 为分队功能添加可选的teamId
     isNonStandard?: boolean; // 标记是否为非规范格式
 }
 
+// 修改：让 Combatant 类型可以包含真实角色或占位符
+type Combatant = (CombatantData | RandomCombatantPlaceholder) & { teamId?: number };
+
 // 定义故事/战斗模式类型
 type BattleMode = 'classic' | 'kizuna' | 'daily' | 'scenario';
+
+// [FR-4] 新增：随机判定器事件和结果的类型
+interface AdjudicationEvent {
+    id: string;
+    event: string;
+    probability: number;
+}
+interface AdjudicationResult {
+    event: string;
+    probability: number;
+    roll: number;
+    result: '大成功' | '困难成功' | '成功' | '失败' | '大失败';
+}
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
@@ -125,7 +148,7 @@ const BattlePage: React.FC = () => {
     // 模式状态
     const [battleMode, setBattleMode] = useState<BattleMode>('classic');
 
-    // [新增 SRS 3.4] 语言选择状态
+    // 语言选择状态
     const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
     const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
 
@@ -138,6 +161,11 @@ const BattlePage: React.FC = () => {
 
     // 用于存储从API返回的、更新了历战记录的角色数据
     const [updatedCombatants, setUpdatedCombatants] = useState<any[]>([]);
+
+    // [v0.3.0 FR-4 & FR-5] 新增功能状态
+    const [adjudicationEvents, setAdjudicationEvents] = useState<AdjudicationEvent[]>([]);
+    const [adjudicationResults, setAdjudicationResults] = useState<AdjudicationResult[] | null>(null);
+    const [storyLength, setStoryLength] = useState('default');
 
     // 加载语言列表
     useEffect(() => {
@@ -265,7 +293,7 @@ const BattlePage: React.FC = () => {
     };
 
     // 统一处理添加参战者
-    const addCombatant = (combatant: Combatant) => {
+    const addCombatant = (combatant: CombatantData) => { // 注意：这里只接收 CombatantData
         if (combatants.length >= 4) {
             setError('最多只能选择 4 位参战者。');
             return;
@@ -275,8 +303,8 @@ const BattlePage: React.FC = () => {
     };
 
     // 处理选择预设
-    const handleRemoveCombatant = (filename: string) => {
-        setCombatants(prev => prev.filter(c => c.filename !== filename));
+    const handleRemoveCombatant = (key: string) => { // key 现在可以是 filename 或 id
+        setCombatants(prev => prev.filter(c => ('id' in c ? c.id : c.filename) !== key));
     };
 
     const handleSelectPreset = async (preset: Preset) => {
@@ -325,80 +353,65 @@ const BattlePage: React.FC = () => {
     const processJsonData = async (jsonText: string, sourceName: string) => {
         // [SRS 3.2.2] 兼容性加载核心逻辑
         let parsedData;
-        let isPotentiallyMalformed = false;
-        try {
-            parsedData = JSON.parse(jsonText);
-        } catch (e) {
-            // 如果直接解析失败，尝试修复并解析为数组 (处理多个JSON对象粘在一起的情况)
-            try {
-                const sanitizedText = `[${jsonText.trim().replace(/}\s*{/g, '},{')}]`;
-                parsedData = JSON.parse(sanitizedText);
-            } catch (finalError) {
-                // 如果修复后仍然失败，但满足最低要求（包含name/codename），则标记为非规范
-                const nameMatch = jsonText.match(/"(codename|name)"\s*:\s*"([^"]+)"/);
-                if (nameMatch && nameMatch[2]) {
-                    parsedData = [{ rawText: jsonText, name: nameMatch[2], codename: nameMatch[2] }];
-                    isPotentiallyMalformed = true;
-                    console.error("非规范内容，但满足最低要求:", e);
-                } else {
-                    throw new Error(`JSON.parse: ${finalError instanceof Error ? finalError.message : String(finalError)}`);
-                }
-            }
-        }
+      try {
+          parsedData = JSON.parse(jsonText);
+      } catch {
+          const sanitizedText = `[${jsonText.trim().replace(/}\s*{/g, '},{')}]`;
+          parsedData = JSON.parse(sanitizedText);
+      }
 
-        const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+      const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
 
-        if (dataArray.length > (4 - combatants.length)) {
-            throw new Error(`队伍将超出4人上限！`);
-        }
+      if (dataArray.length > (4 - combatants.length)) {
+          throw new Error(`队伍将超出4人上限！`);
+      }
 
-        const loadedCombatants: Combatant[] = [];
+      const loadedCombatants: CombatantData[] = [];
+      const newAdjudicationEvents: AdjudicationEvent[] = [];
 
-        for (const item of dataArray) {
-            let combatantToAdd: Combatant | null = null;
-            const itemName = item.codename || item.name || sourceName;
+      for (const item of dataArray) {
+          const itemName = item.codename || item.name || sourceName;
+          try {
+              const type: 'magical-girl' | 'canshou' = item.codename ? 'magical-girl' : 'canshou';
+              if (!item.codename && !item.name) throw new Error('缺少 "codename" 或 "name" 字段。');
+              
+              const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
+              if (!validationResult.success) throw new Error("标准验证失败");
 
-            try {
-                if (isPotentiallyMalformed || typeof item !== 'object') {
-                    // 如果是潜在的格式错误或不是对象，直接进入兼容模式逻辑
-                    throw new Error("Standard validation skipped for potentially malformed data.");
-                }
+              const verificationResponse = await fetch('/api/verify-origin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+              const { isValid } = await verificationResponse.json();
 
-                let type: 'magical-girl' | 'canshou';
-                if (item.codename) type = 'magical-girl';
-                else if (item.name) type = 'canshou';
-                else throw new Error('缺少必需的 "codename" 或 "name" 字段。');
+              loadedCombatants.push({ type, data: item, filename: itemName, isValid, isPreset: false, isNonStandard: false });
+              
+              // [FR-4] 检查并加载内嵌的随机判定事件
+              if (Array.isArray(item.adjudicationEvents)) {
+                  item.adjudicationEvents.forEach((event: any) => {
+                      if (event.event && event.probability) {
+                          // 兼容小数和百分比
+                          const probability = event.probability <= 1 ? event.probability * 100 : event.probability;
+                          newAdjudicationEvents.push({
+                              id: `char-event-${Date.now()}-${Math.random()}`,
+                              event: String(event.event),
+                              probability: Math.round(Math.max(1, Math.min(100, probability))),
+                          });
+                      }
+                  });
+              }
 
-                const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
-
-                if (!validationResult.success) {
-                    // 标准验证失败，进入兼容模式检查
-                    throw new Error("Standard validation failed.");
-                }
-
-                const verificationResponse = await fetch('/api/verify-origin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-                const { isValid } = await verificationResponse.json();
-
-                combatantToAdd = { type, data: item, filename: itemName, isValid, isPreset: false, isNonStandard: false };
-
-            } catch {
-                // [SRS 3.2.2] 兼容模式逻辑
-                if (item && (item.codename || item.name)) {
-                    setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。\n建议前往 https://www.toolhelper.cn/JSON/JSONFormat 进行格式化检查。`);
-                    const type = item.codename ? 'magical-girl' : 'canshou';
-                    combatantToAdd = { type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true };
-                } else {
-                    // 如果连最低要求都不满足，则抛出最终错误
-                    throw new Error(`文件 "${itemName}" 格式不规范，缺少必需的 "codename" 或 "name" 字段。`);
-                }
-            }
-
-            if (combatantToAdd) {
-                loadedCombatants.push(combatantToAdd);
-            }
-        }
-
-        setCombatants(prev => [...prev, ...loadedCombatants]);
+          } catch {
+              if (item && (item.codename || item.name)) {
+                  setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。`);
+                  const type = item.codename ? 'magical-girl' : 'canshou';
+                  loadedCombatants.push({ type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true });
+              } else {
+                  throw new Error(`文件 "${itemName}" 格式不规范，缺少必需的 "codename" 或 "name" 字段。`);
+              }
+          }
+      }
+      setCombatants(prev => [...prev, ...loadedCombatants]);
+      if (newAdjudicationEvents.length > 0) {
+          setAdjudicationEvents(prev => [...prev, ...newAdjudicationEvents]);
+      }
     };
 
 
@@ -481,7 +494,7 @@ const BattlePage: React.FC = () => {
     };
 
     const handleDownloadCorrectedJson = (codename: string) => {
-        const combatant = combatants.find(c => (c.data.codename || c.data.name) === codename);
+        const combatant = combatants.find(c => !('id' in c) && (c.data.codename || c.data.name) === codename) as CombatantData | undefined;
         if (!combatant) return;
         const jsonData = JSON.stringify(combatant.data, null, 2);
         const blob = new Blob([jsonData], { type: 'application/json' });
@@ -496,7 +509,7 @@ const BattlePage: React.FC = () => {
     };
 
     const handleCopyCorrectedJson = (codename: string) => {
-        const combatant = combatants.find(c => (c.data.codename || c.data.name) === codename);
+        const combatant = combatants.find(c => !('id' in c) && (c.data.codename || c.data.name) === codename) as CombatantData | undefined;
         if (!combatant) return;
         const jsonData = JSON.stringify(combatant.data, null, 2);
         navigator.clipboard.writeText(jsonData).then(() => {
@@ -582,6 +595,25 @@ const BattlePage: React.FC = () => {
         return false;
     }
 
+    // [v0.3.0 FR-4] 处理随机判定器概率变化的函数
+    const handleProbabilityChange = (id: string, value: string) => {
+        const newProbability = parseInt(value, 10);
+        // 如果输入无效（例如为空），则暂时不更新或设为默认值，这里我们等待一个有效数字
+        if (isNaN(newProbability)) {
+            // 可以选择在这里处理空输入的情况，例如暂时不清空
+            return;
+        }
+        
+        // 确保概率值在 1 到 100 之间
+        const clampedValue = Math.max(1, Math.min(100, newProbability));
+
+        setAdjudicationEvents(prevEvents =>
+            prevEvents.map(event =>
+                event.id === id ? { ...event, probability: clampedValue } : event
+            )
+        );
+    };
+
     // 处理生成按钮点击事件
     const handleGenerate = async () => {
         if (isCooldown) {
@@ -605,18 +637,66 @@ const BattlePage: React.FC = () => {
         setError(null);
         setNewsReport(null);
         setUpdatedCombatants([]); // 清空上次的结果
+        setAdjudicationResults(null); // 清空上次的判定结果
 
         try {
-            // 安全检查
-            const combatantsForCheck = combatants.map(c => c.data);
+            // [FR-4] 执行随机判定
+            let adjudicationResultsForAPI: AdjudicationResult[] | null = null;
+            if (adjudicationEvents.length > 0) {
+                const results = adjudicationEvents.map(adj => {
+                    const roll = Math.floor(Math.random() * 100) + 1;
+                    let result: AdjudicationResult['result'];
+                    if (roll <= 5) result = '大成功';
+                    else if (roll <= adj.probability / 2) result = '困难成功';
+                    else if (roll <= adj.probability) result = '成功';
+                    else if (roll >= 95) result = '大失败';
+                    else result = '失败';
+                    return { event: adj.event, probability: adj.probability, roll, result };
+                });
+                setAdjudicationResults(results); // 更新UI显示
+                adjudicationResultsForAPI = results;
+            }
+
+            // --- 处理随机角色占位符 ---
+            let finalCombatants: Combatant[] = [...combatants];
+            const placeholders = combatants.filter((c): c is RandomCombatantPlaceholder => 'id' in c);
+
+            if (placeholders.length > 0) {
+                setError('正在生成随机角色...'); // 提示用户
+                // 同步调用客户端生成函数
+                const generatedCharacters = placeholders.map(p => {
+                    if (p.type === 'random-magical-girl') {
+                        return generateRandomMagicalGirl();
+                    }
+                    return generateRandomCanshou();
+                });
+
+                // 将生成的角色数据转换为 CombatantData 格式
+                const newCombatants: CombatantData[] = generatedCharacters.map((data, i) => ({
+                    type: data.codename ? 'magical-girl' : 'canshou',
+                    data,
+                    filename: `${placeholders[i].filename} - ${data.codename || data.name}`,
+                    isValid: true, // 随机生成的角色视为原生
+                    isPreset: false,
+                    isNonStandard: false,
+                }));
+
+                // 替换掉占位符
+                const existingCombatants = combatants.filter(c => !('id' in c));
+                finalCombatants = [...existingCombatants, ...newCombatants];
+                setCombatants(finalCombatants); // 更新UI以显示新生成的角色
+            }
+
+            // 安全检查（使用处理后的 finalCombatants）
+            const combatantsForCheck = (finalCombatants.filter(c => 'data' in c) as CombatantData[]).map(c => c.data);
             if (await checkSensitiveWords(JSON.stringify(combatantsForCheck))) return;
             if (userGuidance && (await checkSensitiveWords(userGuidance))) return;
             if (scenarioContent && (await checkSensitiveWords(JSON.stringify(scenarioContent)))) return;
 
             // 构造分队信息
             const teams: { [key: number]: string[] } = {};
-            combatants.forEach(c => {
-                if (c.teamId) {
+            finalCombatants.forEach(c => {
+                if ('data' in c && c.teamId) { // 确保是 CombatantData
                     if (!teams[c.teamId]) {
                         teams[c.teamId] = [];
                     }
@@ -628,7 +708,8 @@ const BattlePage: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    combatants: combatants.map(c => ({
+                    // 使用 finalCombatants
+                    combatants: (finalCombatants.filter(c => 'data' in c) as CombatantData[]).map(c => ({
                         type: c.type,
                         data: c.data,
                         isNative: c.isValid,
@@ -640,7 +721,9 @@ const BattlePage: React.FC = () => {
                     scenario: scenarioContent, // 发送情景内容
                     teams: Object.keys(teams).length > 0 ? teams : undefined, // 发送分队信息
                     language: selectedLanguage,
-                    useArenaHistory: useArenaHistory, // 新增：传递是否使用历战记录的选项
+                    useArenaHistory: useArenaHistory, // 传递是否使用历战记录的选项
+                    adjudicationResults: adjudicationResultsForAPI,
+                    storyLength: storyLength,
                 }),
             });
 
@@ -681,9 +764,9 @@ const BattlePage: React.FC = () => {
             setNewsReport(result.report);
             setUpdatedCombatants(result.updatedCombatants);
 
-            // 关键：用返回的最新角色数据更新当前页面的参战者状态 (SRS 3.1.4)
+            // 用返回的最新角色数据更新当前页面的参战者状态
             setCombatants(prev =>
-                prev.map(oldCombatant => {
+                (prev.filter(c => 'data' in c) as CombatantData[]).map(oldCombatant => {
                     const updatedData = result.updatedCombatants.find(
                         uc => (uc.codename || uc.name) === (oldCombatant.data.codename || oldCombatant.data.name)
                     );
@@ -691,7 +774,6 @@ const BattlePage: React.FC = () => {
                 })
             );
 
-            setNewsReport(result.report);
             startCooldown();
         } catch (err) {
             // 现在的 catch 块可以捕获到更明确的错误信息
@@ -705,7 +787,7 @@ const BattlePage: React.FC = () => {
         }
     };
 
-    // 修复：为情景模式添加按钮文本
+    // 为情景模式添加按钮文本
     const getButtonText = () => {
         if (isCooldown) return `记者赶稿中...请等待 ${remainingTime} 秒`;
         if (isGenerating) {
@@ -843,35 +925,81 @@ const BattlePage: React.FC = () => {
                                     <p className="font-semibold text-sm text-gray-700">已选角色 ({combatants.length}/4):</p>
                                     <button onClick={handleClearRoster} disabled={isGenerating} className="text-sm text-red-500 hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">清空列表</button>
                                 </div>
+                                <div className="flex gap-2 mt-3">
+                                    <button
+                                        onClick={() => {
+                                            if (combatants.length >= 4) {
+                                                setError('最多只能选择 4 位参战者。');
+                                                return;
+                                            }
+                                            const newPlaceholder: RandomCombatantPlaceholder = {
+                                                type: 'random-magical-girl',
+                                                id: `random-mg-${Date.now()}`,
+                                                filename: '随机魔法少女',
+                                            };
+                                            setCombatants(prev => [...prev, newPlaceholder]);
+                                        }}
+                                        disabled={isGenerating || combatants.length >= 4}
+                                        className="text-xs flex-1 bg-pink-100 text-pink-700 px-3 py-1.5 rounded-lg hover:bg-pink-200 disabled:opacity-50"
+                                    >
+                                        + 添加随机魔法少女
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (combatants.length >= 4) {
+                                                setError('最多只能选择 4 位参战者。');
+                                                return;
+                                            }
+                                            const newPlaceholder: RandomCombatantPlaceholder = {
+                                                type: 'random-canshou',
+                                                id: `random-cs-${Date.now()}`,
+                                                filename: '随机残兽',
+                                            };
+                                            setCombatants(prev => [...prev, newPlaceholder]);
+                                        }}
+                                        disabled={isGenerating || combatants.length >= 4}
+                                        className="text-xs flex-1 bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                                    >
+                                        + 添加随机残兽
+                                    </button>
+                                </div>
                                 <ul className="list-disc list-inside text-sm text-gray-600 mt-2 space-y-2">
                                     {combatants.map(c => {
-                                        const name = c.data.codename || c.data.name;
-                                        const typeDisplay = c.type === 'magical-girl' ? '(魔法少女)' : '(残兽)';
-                                        const isCorrected = correctedFiles[name];
+                                        // 类型守卫，判断是真实角色数据还是占位符
+                                        const isPlaceholder = 'id' in c;
+                                        const key = isPlaceholder ? c.id : c.filename;
+                                        const name = isPlaceholder ? c.filename : (c.data.codename || c.data.name);
+                                        const typeDisplay = isPlaceholder 
+                                            ? (c.type === 'random-magical-girl' ? '(随机魔法少女)' : '(随机残兽)')
+                                            : (c.type === 'magical-girl' ? '(魔法少女)' : '(残兽)');
+                                        const isCorrected = !isPlaceholder && correctedFiles[name];
+
                                         return (
-                                            <li key={c.filename} className="flex justify-between items-center group">
+                                            <li key={key} className="flex justify-between items-center group">
                                                 <div className="flex items-center flex-grow">
                                                     <span className="truncate mr-2" title={name}>
                                                         {name}
                                                         <span className="text-xs text-gray-500 ml-1">{typeDisplay}</span>
-                                                        {c.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
-                                                        {c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
+                                                        {!isPlaceholder && c.isPreset && <span className="text-xs text-purple-600 ml-1">(预设)</span>}
+                                                        {!isPlaceholder && c.isValid && <span className="text-xs text-green-600 ml-1">(原生)</span>}
                                                         {isCorrected && <span className="text-xs text-yellow-600 ml-2">(格式已修正)</span>}
-                                                        {c.isNonStandard && <span className="text-xs text-orange-500 ml-1 font-semibold">(非规范格式)</span>}
+                                                        {!isPlaceholder && c.isNonStandard && <span className="text-xs text-orange-500 ml-1 font-semibold">(非规范格式)</span>}
                                                     </span>
-                                                    {/* 分队选择器 */}
-                                                    <select
-                                                        value={c.teamId || 0}
-                                                        onChange={(e) => handleTeamChange(c.filename, parseInt(e.target.value))}
-                                                        className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white disabled:opacity-50"
-                                                        disabled={isGenerating}
-                                                    >
-                                                        <option value={0}>无分队</option>
-                                                        <option value={1}>队伍 1</option>
-                                                        <option value={2}>队伍 2</option>
-                                                        <option value={3}>队伍 3</option>
-                                                        <option value={4}>队伍 4</option>
-                                                    </select>
+                                                    {/* 分队选择器 (占位符不可分队) */}
+                                                    {!isPlaceholder && (
+                                                        <select
+                                                            value={c.teamId || 0}
+                                                            onChange={(e) => handleTeamChange(c.filename, parseInt(e.target.value))}
+                                                            className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white disabled:opacity-50"
+                                                            disabled={isGenerating}
+                                                        >
+                                                            <option value={0}>无分队</option>
+                                                            <option value={1}>队伍 1</option>
+                                                            <option value={2}>队伍 2</option>
+                                                            <option value={3}>队伍 3</option>
+                                                            <option value={4}>队伍 4</option>
+                                                        </select>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center">
                                                     {isCorrected && (
@@ -882,7 +1010,7 @@ const BattlePage: React.FC = () => {
                                                     )}
                                                     {/* 单个删除按钮 */}
                                                     <button
-                                                        onClick={() => !isGenerating && handleRemoveCombatant(c.filename)}
+                                                        onClick={() => !isGenerating && handleRemoveCombatant(key)}
                                                         className={`w-5 h-5 bg-red-200 text-red-700 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-300'}`}
                                                         aria-label={`移除 ${name}`}
                                                         disabled={isGenerating}
@@ -895,12 +1023,13 @@ const BattlePage: React.FC = () => {
                                     })}
                                 </ul>
                                 {/* --- 历战记录超限提示 --- */}
-                                {combatants.some(c => c.data.arena_history?.entries?.length > 20) && (
+                                {combatants.some(c => 'data' in c && c.data.arena_history?.entries?.length > 20) && (
                                     <div className="mt-3 text-xs text-gray-500">
                                         <p>
                                             ⚠️ 注意：
                                             {combatants
-                                                .filter(c => c.data.arena_history?.entries?.length > 20)
+                                                .filter((c): c is CombatantData => 'data' in c && !!c.data.arena_history?.entries)
+                                                .filter(c => c.data.arena_history.entries.length > 20)
                                                 .map(c => `“${c.data.codename || c.data.name}”(${c.data.arena_history.entries.length}条) `)
                                                 .join('、')
                                             }
@@ -1031,13 +1160,92 @@ const BattlePage: React.FC = () => {
                                     value={userGuidance}
                                     onChange={(e) => setUserGuidance(e.target.value)}
                                     className="input-field"
-                                    placeholder="输入关键词或一句话 (最多20字)"
-                                    maxLength={20}
+                                    placeholder="输入关键词或一句话 (最多50字)"
+                                    maxLength={50}
                                     disabled={isGenerating}
                                 />
                                 <p className="text-xs text-gray-500 mt-1">尝试引导AI生成您想看的故事，例如：“在雨中相遇”、“保卫要地”、“猫咖聚会”等。</p>
                             </div>
                         )}
+
+                        {/* [FR-4] 随机判定器 UI */}
+                        <div className="input-group">
+                            <h3 className="input-label">🎲 随机判定器 (可选)</h3>
+                            {adjudicationEvents.map((adj) => (
+                                <div key={adj.id} className="p-3 bg-gray-100 rounded-lg mb-3">
+                                    {/* 第一行：事件描述和删除按钮 */}
+                                    <div className="flex items-center justify-between gap-3">
+                                        <input
+                                            type="text"
+                                            value={adj.event}
+                                            onChange={(e) => {
+                                                const newEvents = [...adjudicationEvents];
+                                                const target = newEvents.find(event => event.id === adj.id);
+                                                if (target) {
+                                                    target.event = e.target.value;
+                                                    setAdjudicationEvents(newEvents);
+                                                }
+                                            }}
+                                            placeholder="输入需要判定的事件（最多60字）"
+                                            maxLength={60}
+                                            className="input-field flex-grow !my-0"
+                                        />
+                                        <button
+                                            onClick={() => setAdjudicationEvents(adjudicationEvents.filter(e => e.id !== adj.id))}
+                                            className="text-red-500 hover:text-red-700 font-bold p-1 rounded-full hover:bg-red-100 flex-shrink-0"
+                                            aria-label="删除此事件"
+                                        >
+                                            &times;
+                                        </button>
+                                    </div>
+                                    {/* 第二行：概率滑块和数字输入 */}
+                                    <div className="flex items-center gap-3 mt-2">
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="100"
+                                            value={adj.probability}
+                                            onChange={(e) => handleProbabilityChange(adj.id, e.target.value)}
+                                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <div className="relative w-24 flex-shrink-0">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="100"
+                                                value={adj.probability}
+                                                onChange={(e) => handleProbabilityChange(adj.id, e.target.value)}
+                                                className="input-field !my-0 w-full text-center pr-6"
+                                            />
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            <button
+                                onClick={() => setAdjudicationEvents([...adjudicationEvents, { id: `manual-${Date.now()}`, event: '', probability: 50 }])}
+                                className="text-sm text-blue-600 hover:underline mt-2"
+                            >
+                                + 添加判定事件
+                            </button>
+                        </div>
+                        
+                        {/* [FR-5] 字数选择 UI */}
+                        <div className="input-group">
+                            <label className="input-label">期望字数</label>
+                            <div className="flex flex-wrap gap-2">
+                                {[{v: 'default', l: '默认'}, {v: 'short', l: '简短(300+)'}, {v: 'standard', l: '标准(600+)'}, {v: 'detailed', l: '详细(1000+)'}, {v: 'long', l: '长篇(2000+)'}].map(opt => (
+                                    <button
+                                        key={opt.v}
+                                        onClick={() => setStoryLength(opt.v)}
+                                        disabled={isGenerating}
+                                        className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${storyLength === opt.v ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                    >
+                                        {opt.l}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
                         {/*语言选择下拉菜单*/}
                         <div className="input-group">
@@ -1069,8 +1277,37 @@ const BattlePage: React.FC = () => {
                         >
                             {getButtonText()}
                         </button>
+                        <div className="text-center mt-3">
+                            <a 
+                                href="https://qun.qq.com/universal-share/share?ac=1&busi_data=eyJncm91cENvZGUiOiIxMDU5ODMwOTUyIiwidG9rZW4iOiJNUFN6UVpBRVZNNU9COWpBa21DU1lxczRObXhiKy9kSzEvbHhOcnNpT1RBZUVVU3dtZ2hUQjJVNGtuYk5ISDhrIiwidWluIjoiMTAxOTcyNzcxMCJ9&data=DxfxSXDeGY3mgLKqoTGEoHkfqpums19TEW8Alu5Ikc3uCmV0O8YkLVLyRTMOp61VjFN387-7QL8-j2AFHUX2QXq525oXb8rl0lNhm0K453Q&svctype=5&tempid=h5_group_info" 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-sm text-blue-600 hover:underline font-semibold"
+                            >
+                                点击加入QQ交流群
+                            </a>
+                        </div>
                         {error && <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${error.startsWith('❌') ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{error}</div>}
                     </div>
+
+                    {/* [FR-4] 判定结果展示 */}
+                    {adjudicationResults && (
+                        <div className="card mt-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-3">🎲 随机判定结果</h3>
+                            <div className="space-y-2">
+                                {adjudicationResults.map((res, index) => (
+                                    <div key={index} className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                                        <p className="font-semibold text-gray-700">事件: {res.event}</p>
+                                        <p className="text-gray-600">
+                                            判定结果: <span className={`font-bold ${
+                                                res.result.includes('成功') ? 'text-green-600' : 'text-red-600'
+                                            }`}>{res.result}</span> (掷出 {res.roll} / 设定 {res.probability})
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {newsReport && (
                         <BattleReportCard

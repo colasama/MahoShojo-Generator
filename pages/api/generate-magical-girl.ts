@@ -91,12 +91,16 @@ async function handler(
   try {
     const magicalGirlData = await generateMagicalGirlWithAI(name.trim(), language);
 
-    // 为数据生成签名
-    const signature = await generateSignature(magicalGirlData);
+    // 为数据生成签名，并添加模板ID
+    const dataToSign = {
+        ...magicalGirlData,
+        templateId: "魔法少女/心之花/魔法少女（名字生成）", // 添加模板ID
+    };
+    const signature = await generateSignature(dataToSign);
 
     // 将签名附加到最终结果中
     const finalResult = {
-        ...magicalGirlData,
+        ...dataToSign,
         signature: signature
     };
 

@@ -18,11 +18,14 @@ const AnnouncementTicker: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
+// 组件加载时执行的副作用
   useEffect(() => {
+    // 异步获取公告数据
     fetch('/announcements.json')
       .then(res => res.json())
       .then((data: Announcement[]) => {
         if (data && data.length > 0) {
+          // 按日期降序排序，最新的公告在最前面
           const sortedData = data.sort((a, b) => {
             if (a.pinned && !b.pinned) return -1;
             if (!a.pinned && b.pinned) return 1;
@@ -31,20 +34,33 @@ const AnnouncementTicker: React.FC = () => {
 
           setAnnouncements(sortedData);
 
+          // 检查最新的一条公告是否已经被用户关闭
           const latestAnnouncementId = sortedData[0].id;
           const isDismissed = localStorage.getItem(`${DISMISS_KEY_PREFIX}${latestAnnouncementId}`) === 'true';
-
+          
+          // 如果没被关闭，则显示公告栏，并为body添加class
           if (!isDismissed) {
             setIsVisible(true);
+            document.body.classList.add('announcement-visible');
           }
         }
       })
       .catch(err => console.error("加载公告失败:", err));
-  }, []);
+    
+    // 组件卸载时，确保移除class
+    return () => {
+        document.body.classList.remove('announcement-visible');
+    };
+  }, []); // 空依赖数组确保此 effect 仅在组件挂载时运行一次
 
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  /**
+   * 关闭公告栏的处理函数
+   * 这会将最新公告的ID存入localStorage，以便下次不再显示
+   */
+  const handleDismiss = () => {
     setIsVisible(false);
+    // 隐藏时，从body移除class
+    document.body.classList.remove('announcement-visible');
     if (announcements.length > 0) {
       const latestAnnouncementId = announcements[0].id;
       localStorage.setItem(`${DISMISS_KEY_PREFIX}${latestAnnouncementId}`, 'true');

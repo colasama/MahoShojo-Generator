@@ -8,6 +8,7 @@ import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import Link from 'next/link';
 import TachieGenerator from '../components/TachieGenerator';
+import { generateRandomMagicalGirl } from '../lib/random-character-generator';
 
 interface Questionnaire {
   questions: string[];
@@ -147,6 +148,7 @@ const DetailsPage: React.FC = () => {
   const [bulkAnswers, setBulkAnswers] = useState(''); // 用于"一键填充"的textarea
   const [showLanguageSection, setShowLanguageSection] = useState(false); // 控制生成语言区域的折叠状态
   const [showBulkFillSection, setShowBulkFillSection] = useState(false); // 控制一键填充区域的折叠状态
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // 多语言支持
   const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
@@ -453,14 +455,38 @@ const DetailsPage: React.FC = () => {
                   你在魔法少女道路上的潜力和表现将会如何？<br />
                   <p style={{ fontSize: '0.8rem', marginTop: '1rem', color: '#999', fontStyle: 'italic' }}>本测试设定来源于小说《下班，然后变成魔法少女》</p>
                 </div>
-                <button
-                  onClick={handleStartQuestionnaire}
-                  className="generate-button text-lg"
-                  style={{ marginBottom: '0rem' }}
-                >
-                  开始回答
-                </button>
-
+                {/* 修改开始 */}
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <button
+                    onClick={handleStartQuestionnaire}
+                    className="generate-button text-lg flex-1"
+                  >
+                    开始回答问卷
+                  </button>
+                  <button
+                      onClick={() => {
+                          setIsGenerating(true);
+                          setError(null);
+                          try {
+                              // 直接同步调用，移除 await
+                              const data = generateRandomMagicalGirl();
+                              setMagicalGirlDetails(data);
+                              setShowIntroduction(false);
+                          } catch (err) {
+                              console.error('随机生成失败: ', err);
+                              setError('随机生成失败，请稍后再试。');
+                          } finally {
+                              setIsGenerating(false);
+                          }
+                      }}
+                      disabled={isGenerating}
+                      className="generate-button text-lg flex-1"
+                      style={{ background: 'linear-gradient(to right, #22c55e, #16a34a)' }}
+                  >
+                      {isGenerating ? '生成中...' : '快速随机生成'}
+                  </button>
+                </div>
+                {/* 修改结束 */}
                 {/* 返回首页链接 */}
                 <div className="text-center" style={{ marginTop: '2rem' }}>
                   <button
