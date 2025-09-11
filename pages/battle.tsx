@@ -1177,7 +1177,20 @@ const BattlePage: React.FC = () => {
                                             }}
                                             className="w-full"
                                         />
-                                        <span className="text-xs font-mono w-10 text-right">{adj.probability}%</span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="100"
+                                            value={adj.probability}
+                                            onChange={(e) => {
+                                                const newEvents = [...adjudicationEvents];
+                                                const value = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1));
+                                                newEvents[index].probability = value;
+                                                setAdjudicationEvents(newEvents);
+                                            }}
+                                            className="input-field w-16 !my-0 text-center"
+                                        />
+                                        <span className="text-sm font-mono">%</span>
                                     </div>
                                     <button
                                         onClick={() => setAdjudicationEvents(adjudicationEvents.filter(e => e.id !== adj.id))}
