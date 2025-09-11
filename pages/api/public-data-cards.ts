@@ -13,7 +13,7 @@ export default async function handler(req: Request): Promise<Response> {
   try {
     const url = new URL(req.url);
     const type = url.searchParams.get('type'); // 'character' or 'scenario'
-    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const limit = parseInt(url.searchParams.get('limit') || '12');
     const offset = parseInt(url.searchParams.get('offset') || '0');
 
     // 获取公开数据卡，如果指定了类型则过滤

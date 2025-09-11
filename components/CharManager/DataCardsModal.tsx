@@ -1,6 +1,7 @@
 import React from 'react';
 import DataCard from '../DataCard';
 import EditCardForm from './EditCardForm';
+import { config } from '@/lib/config';
 
 interface DataCardsModalProps {
   isOpen: boolean;
@@ -51,7 +52,12 @@ export default function DataCardsModal({
         >
           ×
         </button>
-        <h2 className="text-xl font-bold mb-4 pr-8">我的数据卡</h2>
+        <div className="flex justify-between items-center mb-4 pr-8">
+          <h2 className="text-xl font-bold">我的数据卡</h2>
+          <div className="text-sm text-gray-600">
+            {dataCards.length}/{config.DEFAULT_DATA_CARD_CAPACITY}
+          </div>
+        </div>
 
         {dataCards.length === 0 ? (
           <p className="text-gray-500 text-center py-8">暂无数据卡</p>

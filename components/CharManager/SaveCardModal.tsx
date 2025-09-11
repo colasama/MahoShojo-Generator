@@ -1,4 +1,5 @@
 import React from 'react';
+import { config } from '@/lib/config';
 
 interface SaveCardModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface SaveCardModalProps {
   onPublicChange: (value: boolean) => void;
   error: string | null;
   isSaving?: boolean;
+  currentCardCount?: number;
 }
 
 export default function SaveCardModal({
@@ -25,7 +27,8 @@ export default function SaveCardModal({
   onDescriptionChange,
   onPublicChange,
   error,
-  isSaving = false
+  isSaving = false,
+  currentCardCount = 0
 }: SaveCardModalProps) {
   if (!isOpen) return null;
 
@@ -39,7 +42,24 @@ export default function SaveCardModal({
         >
           ×
         </button>
-        <h2 className="text-xl font-bold mb-4 pr-8">保存数据卡</h2>
+        <div className="flex justify-between items-center mb-4 pr-8">
+          <h2 className="text-xl font-bold">保存数据卡</h2>
+          <div className="text-sm text-gray-600">
+            {currentCardCount}/{config.DEFAULT_DATA_CARD_CAPACITY}
+          </div>
+        </div>
+
+        {/* 容量警告 */}
+        {currentCardCount >= config.DEFAULT_DATA_CARD_CAPACITY && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+            ⚠️ 数据卡数量已达上限（{config.DEFAULT_DATA_CARD_CAPACITY}个），请先删除部分数据卡
+          </div>
+        )}
+        {currentCardCount >= config.DEFAULT_DATA_CARD_CAPACITY - 5 && currentCardCount < config.DEFAULT_DATA_CARD_CAPACITY && (
+          <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded-md text-sm">
+            ⚠️ 数据卡容量即将用完（{currentCardCount}/{config.DEFAULT_DATA_CARD_CAPACITY}）
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
@@ -101,10 +121,10 @@ export default function SaveCardModal({
           <div className="flex gap-2">
             <button
               onClick={onSave}
-              disabled={!name.trim() || isSaving}
-              className={`flex-1 generate-button ${(!name.trim() || isSaving) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!name.trim() || isSaving || currentCardCount >= config.DEFAULT_DATA_CARD_CAPACITY}
+              className={`flex-1 generate-button ${(!name.trim() || isSaving || currentCardCount >= config.DEFAULT_DATA_CARD_CAPACITY) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {isSaving ? '保存中...' : '保存'}
+              {isSaving ? '保存中...' : (currentCardCount >= config.DEFAULT_DATA_CARD_CAPACITY ? '容量已满' : '保存')}
             </button>
             <button
               onClick={onClose}

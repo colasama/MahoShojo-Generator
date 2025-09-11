@@ -7,6 +7,7 @@ import { useRouter } from 'next/router';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
+import { config } from '@/lib/config';
 import TachieGenerator from '../components/TachieGenerator';
 // 【新增】导入卡片组件和颜色配置
 import MagicalGirlCard from '../components/MagicalGirlCard';
@@ -886,7 +887,7 @@ const CharacterManagerPage: React.FC = () => {
                                                 onClick={() => setShowDataCardsModal(true)}
                                                 className="px-3 py-1 text-sm bg-pink-600 text-white rounded hover:bg-pink-700"
                                             >
-                                                我的数据卡 ({userDataCards.length})
+                                                我的数据卡 ({userDataCards.length}/{config.DEFAULT_DATA_CARD_CAPACITY})
                                             </button>
                                             <button
                                                 onClick={logout}
@@ -1181,6 +1182,7 @@ const CharacterManagerPage: React.FC = () => {
                 onPublicChange={(value) => setNewCardForm({ ...newCardForm, isPublic: value })}
                 error={saveCardError}
                 isSaving={isSavingCard}
+                currentCardCount={userDataCards.length}
             />
         </>
     );

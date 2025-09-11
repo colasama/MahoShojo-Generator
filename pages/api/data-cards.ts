@@ -5,6 +5,7 @@ import {
   updateDataCard, 
   deleteDataCard 
 } from '@/lib/d1';
+import { config } from '@/lib/config';
 
 export const runtime = 'edge';
 
@@ -66,6 +67,17 @@ export default async function handler(req: Request): Promise<Response> {
         if (type !== 'character' && type !== 'scenario') {
           return new Response(JSON.stringify({ error: '无效的数据卡类型' }), {
             status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // 检查用户数据卡数量限制
+        const existingCards = await getUserDataCards(userId);
+        if (existingCards.length >= config.DEFAULT_DATA_CARD_CAPACITY) {
+          return new Response(JSON.stringify({ 
+            error: `数据卡数量已达上限（${config.DEFAULT_DATA_CARD_CAPACITY}个），请删除部分数据卡后再试` 
+          }), {
+            status: 429, // Too Many Requests
             headers: { 'Content-Type': 'application/json' }
           });
         }
