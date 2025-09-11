@@ -77,6 +77,19 @@ type Combatant = (CombatantData | RandomCombatantPlaceholder) & { teamId?: numbe
 // 定义故事/战斗模式类型
 type BattleMode = 'classic' | 'kizuna' | 'daily' | 'scenario';
 
+// [FR-4] 新增：随机判定器事件和结果的类型
+interface AdjudicationEvent {
+    id: string;
+    event: string;
+    probability: number;
+}
+interface AdjudicationResult {
+    event: string;
+    probability: number;
+    roll: number;
+    result: '大成功' | '困难成功' | '成功' | '失败' | '大失败';
+}
+
 const BattlePage: React.FC = () => {
     const router = useRouter();
     // 统一存储所有参战者
@@ -134,7 +147,7 @@ const BattlePage: React.FC = () => {
     // 模式状态
     const [battleMode, setBattleMode] = useState<BattleMode>('classic');
 
-    // [新增 SRS 3.4] 语言选择状态
+    // 语言选择状态
     const [languages, setLanguages] = useState<{ code: string; name: string }[]>([]);
     const [selectedLanguage, setSelectedLanguage] = useState('zh-CN');
 
@@ -147,6 +160,11 @@ const BattlePage: React.FC = () => {
 
     // 用于存储从API返回的、更新了历战记录的角色数据
     const [updatedCombatants, setUpdatedCombatants] = useState<any[]>([]);
+
+    // [v0.3.0 FR-4 & FR-5] 新增功能状态
+    const [adjudicationEvents, setAdjudicationEvents] = useState<AdjudicationEvent[]>([]);
+    const [adjudicationResults, setAdjudicationResults] = useState<AdjudicationResult[] | null>(null);
+    const [storyLength, setStoryLength] = useState('default');
 
     // 加载语言列表
     useEffect(() => {
@@ -334,80 +352,65 @@ const BattlePage: React.FC = () => {
     const processJsonData = async (jsonText: string, sourceName: string) => {
         // [SRS 3.2.2] 兼容性加载核心逻辑
         let parsedData;
-        let isPotentiallyMalformed = false;
-        try {
-            parsedData = JSON.parse(jsonText);
-        } catch (e) {
-            // 如果直接解析失败，尝试修复并解析为数组 (处理多个JSON对象粘在一起的情况)
-            try {
-                const sanitizedText = `[${jsonText.trim().replace(/}\s*{/g, '},{')}]`;
-                parsedData = JSON.parse(sanitizedText);
-            } catch (finalError) {
-                // 如果修复后仍然失败，但满足最低要求（包含name/codename），则标记为非规范
-                const nameMatch = jsonText.match(/"(codename|name)"\s*:\s*"([^"]+)"/);
-                if (nameMatch && nameMatch[2]) {
-                    parsedData = [{ rawText: jsonText, name: nameMatch[2], codename: nameMatch[2] }];
-                    isPotentiallyMalformed = true;
-                    console.error("非规范内容，但满足最低要求:", e);
-                } else {
-                    throw new Error(`JSON.parse: ${finalError instanceof Error ? finalError.message : String(finalError)}`);
-                }
-            }
-        }
+      try {
+          parsedData = JSON.parse(jsonText);
+      } catch {
+          const sanitizedText = `[${jsonText.trim().replace(/}\s*{/g, '},{')}]`;
+          parsedData = JSON.parse(sanitizedText);
+      }
 
-        const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+      const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
 
-        if (dataArray.length > (4 - combatants.length)) {
-            throw new Error(`队伍将超出4人上限！`);
-        }
+      if (dataArray.length > (4 - combatants.length)) {
+          throw new Error(`队伍将超出4人上限！`);
+      }
 
-        const loadedCombatants: CombatantData[] = [];
+      const loadedCombatants: CombatantData[] = [];
+      const newAdjudicationEvents: AdjudicationEvent[] = [];
 
-        for (const item of dataArray) {
-            let combatantToAdd: CombatantData | null = null;
-            const itemName = item.codename || item.name || sourceName;
+      for (const item of dataArray) {
+          const itemName = item.codename || item.name || sourceName;
+          try {
+              let type: 'magical-girl' | 'canshou' = item.codename ? 'magical-girl' : 'canshou';
+              if (!item.codename && !item.name) throw new Error('缺少 "codename" 或 "name" 字段。');
+              
+              const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
+              if (!validationResult.success) throw new Error("标准验证失败");
 
-            try {
-                if (isPotentiallyMalformed || typeof item !== 'object') {
-                    // 如果是潜在的格式错误或不是对象，直接进入兼容模式逻辑
-                    throw new Error("Standard validation skipped for potentially malformed data.");
-                }
+              const verificationResponse = await fetch('/api/verify-origin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+              const { isValid } = await verificationResponse.json();
 
-                let type: 'magical-girl' | 'canshou';
-                if (item.codename) type = 'magical-girl';
-                else if (item.name) type = 'canshou';
-                else throw new Error('缺少必需的 "codename" 或 "name" 字段。');
+              loadedCombatants.push({ type, data: item, filename: itemName, isValid, isPreset: false, isNonStandard: false });
+              
+              // [FR-4] 检查并加载内嵌的随机判定事件
+              if (Array.isArray(item.adjudicationEvents)) {
+                  item.adjudicationEvents.forEach((event: any) => {
+                      if (event.event && event.probability) {
+                          // 兼容小数和百分比
+                          const probability = event.probability <= 1 ? event.probability * 100 : event.probability;
+                          newAdjudicationEvents.push({
+                              id: `char-event-${Date.now()}-${Math.random()}`,
+                              event: String(event.event),
+                              probability: Math.round(Math.max(1, Math.min(100, probability))),
+                          });
+                      }
+                  });
+              }
 
-                const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
-
-                if (!validationResult.success) {
-                    // 标准验证失败，进入兼容模式检查
-                    throw new Error("Standard validation failed.");
-                }
-
-                const verificationResponse = await fetch('/api/verify-origin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-                const { isValid } = await verificationResponse.json();
-
-                combatantToAdd = { type, data: item, filename: itemName, isValid, isPreset: false, isNonStandard: false };
-
-            } catch {
-                // [SRS 3.2.2] 兼容模式逻辑
-                if (item && (item.codename || item.name)) {
-                    setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。\n建议前往 https://www.toolhelper.cn/JSON/JSONFormat 进行格式化检查。`);
-                    const type = item.codename ? 'magical-girl' : 'canshou';
-                    combatantToAdd = { type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true };
-                } else {
-                    // 如果连最低要求都不满足，则抛出最终错误
-                    throw new Error(`文件 "${itemName}" 格式不规范，缺少必需的 "codename" 或 "name" 字段。`);
-                }
-            }
-
-            if (combatantToAdd) {
-                loadedCombatants.push(combatantToAdd);
-            }
-        }
-
-        setCombatants(prev => [...prev, ...loadedCombatants]);
+          } catch {
+              if (item && (item.codename || item.name)) {
+                  setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。`);
+                  const type = item.codename ? 'magical-girl' : 'canshou';
+                  loadedCombatants.push({ type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true });
+              } else {
+                  throw new Error(`文件 "${itemName}" 格式不规范，缺少必需的 "codename" 或 "name" 字段。`);
+              }
+          }
+      }
+      setCombatants(prev => [...prev, ...loadedCombatants]);
+      if (newAdjudicationEvents.length > 0) {
+          setAdjudicationEvents(prev => [...prev, ...newAdjudicationEvents]);
+      }
     };
 
 
@@ -614,11 +617,29 @@ const BattlePage: React.FC = () => {
         setError(null);
         setNewsReport(null);
         setUpdatedCombatants([]); // 清空上次的结果
+        setAdjudicationResults(null); // 清空上次的判定结果
 
         try {
-            // --- 【新增】处理随机角色占位符 ---
+            // [FR-4] 执行随机判定
+            let adjudicationResultsForAPI: AdjudicationResult[] | null = null;
+            if (adjudicationEvents.length > 0) {
+                const results = adjudicationEvents.map(adj => {
+                    const roll = Math.floor(Math.random() * 100) + 1;
+                    let result: AdjudicationResult['result'];
+                    if (roll <= 5) result = '大成功';
+                    else if (roll <= adj.probability / 2) result = '困难成功';
+                    else if (roll <= adj.probability) result = '成功';
+                    else if (roll >= 95) result = '大失败';
+                    else result = '失败';
+                    return { event: adj.event, probability: adj.probability, roll, result };
+                });
+                setAdjudicationResults(results); // 更新UI显示
+                adjudicationResultsForAPI = results;
+            }
+
+            // --- 处理随机角色占位符 ---
             let finalCombatants: Combatant[] = [...combatants];
-            const placeholders = combatants.filter(c => 'id' in c) as RandomCombatantPlaceholder[];
+            const placeholders = combatants.filter((c): c is RandomCombatantPlaceholder => 'id' in c);
 
             if (placeholders.length > 0) {
                 setError('正在生成随机角色...'); // 提示用户
@@ -640,8 +661,8 @@ const BattlePage: React.FC = () => {
                 }));
 
                 // 替换掉占位符
-                finalCombatants = combatants.filter(c => !('id' in c));
-                finalCombatants.push(...newCombatants);
+                const existingCombatants = combatants.filter(c => !('id' in c));
+                finalCombatants = [...existingCombatants, ...newCombatants];
                 setCombatants(finalCombatants); // 更新UI以显示新生成的角色
             }
 
@@ -679,7 +700,9 @@ const BattlePage: React.FC = () => {
                     scenario: scenarioContent, // 发送情景内容
                     teams: Object.keys(teams).length > 0 ? teams : undefined, // 发送分队信息
                     language: selectedLanguage,
-                    useArenaHistory: useArenaHistory, // 新增：传递是否使用历战记录的选项
+                    useArenaHistory: useArenaHistory, // 传递是否使用历战记录的选项
+                    adjudicationResults: adjudicationResultsForAPI,
+                    storyLength: storyLength,
                 }),
             });
 
@@ -1116,13 +1139,78 @@ const BattlePage: React.FC = () => {
                                     value={userGuidance}
                                     onChange={(e) => setUserGuidance(e.target.value)}
                                     className="input-field"
-                                    placeholder="输入关键词或一句话 (最多20字)"
-                                    maxLength={20}
+                                    placeholder="输入关键词或一句话 (最多50字)"
+                                    maxLength={50}
                                     disabled={isGenerating}
                                 />
                                 <p className="text-xs text-gray-500 mt-1">尝试引导AI生成您想看的故事，例如：“在雨中相遇”、“保卫要地”、“猫咖聚会”等。</p>
                             </div>
                         )}
+
+                        {/* [FR-4] 随机判定器 UI */}
+                        <div className="input-group">
+                            <h3 className="input-label">🎲 随机判定器 (可选)</h3>
+                            {adjudicationEvents.map((adj, index) => (
+                                <div key={adj.id} className="flex items-center gap-2 mb-2 p-2 bg-gray-100 rounded-md">
+                                    <input
+                                        type="text"
+                                        value={adj.event}
+                                        onChange={(e) => {
+                                            const newEvents = [...adjudicationEvents];
+                                            newEvents[index].event = e.target.value;
+                                            setAdjudicationEvents(newEvents);
+                                        }}
+                                        placeholder="输入需要判定的事件"
+                                        maxLength={60}
+                                        className="input-field flex-grow !my-0"
+                                    />
+                                    <div className="flex items-center gap-2 w-40">
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="100"
+                                            value={adj.probability}
+                                            onChange={(e) => {
+                                                const newEvents = [...adjudicationEvents];
+                                                newEvents[index].probability = parseInt(e.target.value, 10);
+                                                setAdjudicationEvents(newEvents);
+                                            }}
+                                            className="w-full"
+                                        />
+                                        <span className="text-xs font-mono w-10 text-right">{adj.probability}%</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setAdjudicationEvents(adjudicationEvents.filter(e => e.id !== adj.id))}
+                                        className="text-red-500 hover:text-red-700 font-bold"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            ))}
+                            <button
+                                onClick={() => setAdjudicationEvents([...adjudicationEvents, { id: `manual-${Date.now()}`, event: '', probability: 50 }])}
+                                className="text-sm text-blue-600 hover:underline mt-2"
+                            >
+                                + 添加判定事件
+                            </button>
+                        </div>
+                        
+                        {/* [FR-5] 字数选择 UI */}
+                        <div className="input-group">
+                            <label className="input-label">期望字数</label>
+                            <div className="flex flex-wrap gap-2">
+                                {[{v: 'default', l: '默认'}, {v: 'short', l: '简短(300+)'}, {v: 'standard', l: '标准(600+)'}, {v: 'detailed', l: '详细(1000+)'}, {v: 'long', l: '长篇(2000+)'}].map(opt => (
+                                    <button
+                                        key={opt.v}
+                                        onClick={() => setStoryLength(opt.v)}
+                                        disabled={isGenerating}
+                                        className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${storyLength === opt.v ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                    >
+                                        {opt.l}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
                         {/*语言选择下拉菜单*/}
                         <div className="input-group">
@@ -1166,6 +1254,25 @@ const BattlePage: React.FC = () => {
                         </div>
                         {error && <div className={`p-4 rounded-md my-4 text-sm whitespace-pre-wrap ${error.startsWith('❌') ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{error}</div>}
                     </div>
+
+                    {/* [FR-4] 判定结果展示 */}
+                    {adjudicationResults && (
+                        <div className="card mt-6">
+                            <h3 className="text-lg font-bold text-gray-800 mb-3">🎲 随机判定结果</h3>
+                            <div className="space-y-2">
+                                {adjudicationResults.map((res, index) => (
+                                    <div key={index} className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                                        <p className="font-semibold text-gray-700">事件: {res.event}</p>
+                                        <p className="text-gray-600">
+                                            判定结果: <span className={`font-bold ${
+                                                res.result.includes('成功') ? 'text-green-600' : 'text-red-600'
+                                            }`}>{res.result}</span> (掷出 {res.roll} / 设定 {res.probability})
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {newsReport && (
                         <BattleReportCard
