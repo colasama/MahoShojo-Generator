@@ -11,6 +11,7 @@ interface SaveCardModalProps {
   onDescriptionChange: (value: string) => void;
   onPublicChange: (value: boolean) => void;
   error: string | null;
+  isSaving?: boolean;
 }
 
 export default function SaveCardModal({
@@ -23,7 +24,8 @@ export default function SaveCardModal({
   onNameChange,
   onDescriptionChange,
   onPublicChange,
-  error
+  error,
+  isSaving = false
 }: SaveCardModalProps) {
   if (!isOpen) return null;
 
@@ -57,6 +59,7 @@ export default function SaveCardModal({
               className="input-field"
               placeholder="请输入数据卡名称"
               maxLength={50}
+              disabled={isSaving}
             />
           </div>
 
@@ -71,6 +74,7 @@ export default function SaveCardModal({
               rows={3}
               placeholder="请输入数据卡描述"
               maxLength={50}
+              disabled={isSaving}
             />
           </div>
 
@@ -81,6 +85,7 @@ export default function SaveCardModal({
               checked={isPublic}
               onChange={(e) => onPublicChange(e.target.checked)}
               className="w-4 h-4 text-purple-600 rounded"
+              disabled={isSaving}
             />
             <label htmlFor="newCardPublic" className="text-sm text-gray-700">
               设为公开（其他用户可见）
@@ -96,14 +101,15 @@ export default function SaveCardModal({
           <div className="flex gap-2">
             <button
               onClick={onSave}
-              disabled={!name.trim()}
-              className="flex-1 generate-button"
+              disabled={!name.trim() || isSaving}
+              className={`flex-1 generate-button ${(!name.trim() || isSaving) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              保存
+              {isSaving ? '保存中...' : '保存'}
             </button>
             <button
               onClick={onClose}
-              className="flex-1 generate-button"
+              disabled={isSaving}
+              className={`flex-1 generate-button ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
               style={{
                 background: 'white',
                 backgroundImage: 'none',

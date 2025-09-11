@@ -96,6 +96,7 @@ const CharacterManagerPage: React.FC = () => {
     const [showSaveCardModal, setShowSaveCardModal] = useState(false);
     const [newCardForm, setNewCardForm] = useState({ name: '', description: '', isPublic: false });
     const [saveCardError, setSaveCardError] = useState<string | null>(null);
+    const [isSavingCard, setIsSavingCard] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const cardsPerPage = 12;
 
@@ -129,9 +130,9 @@ const CharacterManagerPage: React.FC = () => {
     }, [isAuthenticated, loadUserDataCards]);
 
     // 处理注册
-    const handleRegister = async (username: string, turnstileToken: string) => {
+    const handleRegister = async (username: string, email: string, turnstileToken: string) => {
         setAuthMessage(null);
-        const result = await register(username, turnstileToken);
+        const result = await register(username, email, turnstileToken);
         if (result.success && result.authKey) {
             setGeneratedAuthKey(result.authKey);
             setAuthMessage({ type: 'success', text: '注册成功！请复制并保存您的登录密钥。' });
@@ -178,24 +179,30 @@ const CharacterManagerPage: React.FC = () => {
             return;
         }
 
+        setIsSavingCard(true);
         setSaveCardError(null);
-        const type = characterData.codename ? 'character' : 'scenario';
-        const result = await dataCardApi.createCard(
-            type,
-            newCardForm.name,
-            newCardForm.description,
-            characterData,
-            newCardForm.isPublic
-        );
+        
+        try {
+            const type = characterData.codename ? 'character' : 'scenario';
+            const result = await dataCardApi.createCard(
+                type,
+                newCardForm.name,
+                newCardForm.description,
+                characterData,
+                newCardForm.isPublic
+            );
 
-        if (result.success) {
-            setMessage({ type: 'success', text: `数据卡保存成功！${newCardForm.isPublic ? '（公开）' : '（私有）'}` });
-            setShowSaveCardModal(false);
-            setNewCardForm({ name: '', description: '', isPublic: false });
-            setSaveCardError(null);
-            loadUserDataCards();
-        } else {
-            setSaveCardError(result.error || '保存失败');
+            if (result.success) {
+                setMessage({ type: 'success', text: `数据卡保存成功！${newCardForm.isPublic ? '（公开）' : '（私有）'}` });
+                setShowSaveCardModal(false);
+                setNewCardForm({ name: '', description: '', isPublic: false });
+                setSaveCardError(null);
+                loadUserDataCards();
+            } else {
+                setSaveCardError(result.error || '保存失败');
+            }
+        } finally {
+            setIsSavingCard(false);
         }
     };
 
@@ -563,7 +570,7 @@ const CharacterManagerPage: React.FC = () => {
                             <input type="text" id={currentPath} value={value as any} onChange={handleChange} className="input-field" />
                         }
                         {currentPath === 'codename' && (
-                            <button onClick={handleRandomCodename} type="button" className="ml-2 px-3 py-1.5 text-xs font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600">随机</button>
+                            <button onClick={handleRandomCodename} type="button" className="ml-2 px-3 py-1.5 text-xs font-semibold text-white bg-pink-500 rounded-lg hover:bg-pink-600">随机</button>
                         )}
                     </div>
                     {/* 条件渲染“一键替换”按钮 */}
@@ -714,21 +721,25 @@ const CharacterManagerPage: React.FC = () => {
                                 <img src="/character-manager.svg" width={320} height={40} alt="角色数据管理" />
                             </div>
                             <p className="subtitle mt-2">在这里查看、编辑和维护你的角色档案</p>
-
+                            {/* 实验性警告 */}
+                            <div className="flex mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800 text-left">
+                                <div className="mr-2">⚠️ </div>
+                                <div>目前，用户系统仍处于测试阶段，可能存在功能不稳定的情况，敬请谅解。同时请妥善保存您的登录密钥，之后会开启邮箱找回密钥的功能。</div>
+                            </div>
                             {/* 账户状态显示区域 */}
-                            <div className="mt-4 p-3 bg-purple-50 rounded-lg">
+                            <div className="mt-4 p-3 bg-pink-50 rounded-lg">
                                 {authLoading ? (
                                     <p className="text-sm text-gray-600">加载中...</p>
                                 ) : isAuthenticated ? (
                                     <div className="flex justify-between items-center">
                                         <div className="text-left">
                                             <p className="text-sm text-gray-600">当前用户</p>
-                                            <p className="font-semibold text-purple-700">{user?.username}</p>
+                                            <p className="font-semibold text-pink-700">{user?.username}</p>
                                         </div>
                                         <div className="space-x-2">
                                             <button
                                                 onClick={() => setShowDataCardsModal(true)}
-                                                className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700"
+                                                className="px-3 py-1 text-sm bg-pink-600 text-white rounded hover:bg-pink-700"
                                             >
                                                 我的数据卡 ({userDataCards.length})
                                             </button>
@@ -745,7 +756,7 @@ const CharacterManagerPage: React.FC = () => {
                                         <p className="text-sm text-gray-600 mb-2">登录后可以保存和管理您的角色数据卡</p>
                                         <button
                                             onClick={() => setShowAuthModal(true)}
-                                            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                                            className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
                                         >
                                             登录 / 注册
                                         </button>
@@ -810,7 +821,7 @@ const CharacterManagerPage: React.FC = () => {
                                 <div className="mb-6">
                                     <button
                                         onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)}
-                                        className="text-purple-700 hover:underline cursor-pointer mb-2 font-semibold text-sm"
+                                        className="text-pink-700 hover:underline cursor-pointer mb-2 font-semibold text-sm"
                                     >
                                         {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
                                     </button>
@@ -956,6 +967,7 @@ const CharacterManagerPage: React.FC = () => {
                     setShowSaveCardModal(false);
                     setNewCardForm({ name: '', description: '', isPublic: false });
                     setSaveCardError(null);
+                    setIsSavingCard(false);
                 }}
                 onSave={handleConfirmSaveCard}
                 name={newCardForm.name}
@@ -965,6 +977,7 @@ const CharacterManagerPage: React.FC = () => {
                 onDescriptionChange={(value) => setNewCardForm({ ...newCardForm, description: value })}
                 onPublicChange={(value) => setNewCardForm({ ...newCardForm, isPublic: value })}
                 error={saveCardError}
+                isSaving={isSavingCard}
             />
         </>
     );

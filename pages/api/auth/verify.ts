@@ -1,21 +1,23 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { getUserByAuthKey } from '@/lib/d1';
 
 export const runtime = 'edge';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.get('authorization');
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: '未提供认证信息' });
+      return new Response(JSON.stringify({ error: '未提供认证信息' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     const authKey = authHeader.substring(7);
@@ -24,19 +26,28 @@ export default async function handler(
     const user = await getUserByAuthKey(authKey);
 
     if (!user) {
-      return res.status(401).json({ error: '认证失败' });
+      return new Response(JSON.stringify({ error: '认证失败' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    return res.status(200).json({
+    return new Response(JSON.stringify({
       success: true,
       user: {
         id: user.id,
         username: user.username
       }
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('Verify error:', error);
-    return res.status(500).json({ error: '验证失败，请稍后重试' });
+    return new Response(JSON.stringify({ error: '验证失败，请稍后重试' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

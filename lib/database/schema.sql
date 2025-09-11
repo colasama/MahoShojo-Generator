@@ -32,17 +32,19 @@ CREATE TABLE IF NOT EXISTS player_data (
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
   auth_key TEXT UNIQUE NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   last_login_at DATETIME
 );
 
 CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_auth_key ON users(auth_key);
 
 -- 数据卡表
 CREATE TABLE IF NOT EXISTS data_cards (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT PRIMARY KEY NOT NULL,  -- UUID 字符串作为主键
   user_id INTEGER NOT NULL,
   type TEXT NOT NULL CHECK(type IN ('character', 'scenario')),
   name TEXT NOT NULL,

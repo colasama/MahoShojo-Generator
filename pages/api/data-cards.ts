@@ -1,4 +1,3 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { 
   getUserByAuthKey, 
   createDataCardWithAuthor, 
@@ -10,8 +9,8 @@ import {
 export const runtime = 'edge';
 
 // 辅助函数：从请求头获取用户认证信息
-async function getUserFromAuth(req: NextApiRequest): Promise<{ id: number; username: string } | null> {
-  const authHeader = req.headers.authorization;
+async function getUserFromAuth(req: Request): Promise<{ id: number; username: string } | null> {
+  const authHeader = req.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -23,14 +22,14 @@ async function getUserFromAuth(req: NextApiRequest): Promise<{ id: number; usern
   return user;
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: Request): Promise<Response> {
   // 验证用户身份
   const user = await getUserFromAuth(req);
   if (!user) {
-    return res.status(401).json({ error: '未授权' });
+    return new Response(JSON.stringify({ error: '未授权' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const userId = user.id;
@@ -40,23 +39,35 @@ export default async function handler(
       // 获取用户的所有数据卡
       try {
         const cards = await getUserDataCards(userId);
-        return res.status(200).json({ success: true, cards });
+        return new Response(JSON.stringify({ success: true, cards }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       } catch (error) {
         console.error('Get cards error:', error);
-        return res.status(500).json({ error: '获取数据卡失败' });
+        return new Response(JSON.stringify({ error: '获取数据卡失败' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
 
     case 'POST':
       // 创建新数据卡
       try {
-        const { type, name, description, data, isPublic } = req.body;
+        const { type, name, description, data, isPublic } = await req.json();
 
         if (!type || !name || !data) {
-          return res.status(400).json({ error: '缺少必要参数' });
+          return new Response(JSON.stringify({ error: '缺少必要参数' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
         if (type !== 'character' && type !== 'scenario') {
-          return res.status(400).json({ error: '无效的数据卡类型' });
+          return new Response(JSON.stringify({ error: '无效的数据卡类型' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
         const result = await createDataCardWithAuthor(
@@ -70,64 +81,101 @@ export default async function handler(
         );
 
         if (!result.success) {
-          return res.status(result.error?.includes('同名') ? 409 : 500).json({ 
+          return new Response(JSON.stringify({ 
             error: result.error || '创建数据卡失败' 
+          }), {
+            status: result.error?.includes('同名') ? 409 : 500,
+            headers: { 'Content-Type': 'application/json' }
           });
         }
 
-        return res.status(201).json({ 
+        return new Response(JSON.stringify({ 
           success: true, 
           id: result.id,
           message: '数据卡创建成功' 
+        }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' }
         });
       } catch (error) {
         console.error('Create card error:', error);
-        return res.status(500).json({ error: '创建数据卡失败' });
+        return new Response(JSON.stringify({ error: '创建数据卡失败' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
 
     case 'PUT':
       // 更新数据卡
       try {
-        const { id, name, description, isPublic } = req.body;
+        const { id, name, description, isPublic } = await req.json();
 
         if (!id) {
-          return res.status(400).json({ error: '缺少数据卡ID' });
+          return new Response(JSON.stringify({ error: '缺少数据卡ID' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
         const success = await updateDataCard(id, userId, name, description, isPublic);
 
         if (!success) {
-          return res.status(404).json({ error: '数据卡不存在或无权访问' });
+          return new Response(JSON.stringify({ error: '数据卡不存在或无权访问' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
-        return res.status(200).json({ success: true, message: '数据卡更新成功' });
+        return new Response(JSON.stringify({ success: true, message: '数据卡更新成功' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       } catch (error) {
         console.error('Update card error:', error);
-        return res.status(500).json({ error: '更新数据卡失败' });
+        return new Response(JSON.stringify({ error: '更新数据卡失败' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
 
     case 'DELETE':
       // 删除数据卡
       try {
-        const { id } = req.query;
+        const url = new URL(req.url);
+        const id = url.searchParams.get('id');
 
         if (!id) {
-          return res.status(400).json({ error: '缺少数据卡ID' });
+          return new Response(JSON.stringify({ error: '缺少数据卡ID' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
-        const success = await deleteDataCard(Number(id), userId);
+        const success = await deleteDataCard(id, userId);
 
         if (!success) {
-          return res.status(404).json({ error: '数据卡不存在或无权访问' });
+          return new Response(JSON.stringify({ error: '数据卡不存在或无权访问' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
-        return res.status(200).json({ success: true, message: '数据卡删除成功' });
+        return new Response(JSON.stringify({ success: true, message: '数据卡删除成功' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       } catch (error) {
         console.error('Delete card error:', error);
-        return res.status(500).json({ error: '删除数据卡失败' });
+        return new Response(JSON.stringify({ error: '删除数据卡失败' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
 
     default:
-      return res.status(405).json({ error: 'Method not allowed' });
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { 'Content-Type': 'application/json' }
+      });
   }
 }

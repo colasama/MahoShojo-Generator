@@ -14,6 +14,41 @@ export function generateRandomId(): string {
   return result;
 }
 
+// 生成 UUID v4 格式的字符串 (xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)
+export function generateUUID(): string {
+  // 使用加密安全的随机数生成器
+  const getRandomValues = (arr: Uint8Array) => {
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      return crypto.getRandomValues(arr);
+    }
+    // Fallback for environments without crypto.getRandomValues
+    for (let i = 0; i < arr.length; i++) {
+      arr[i] = Math.floor(Math.random() * 256);
+    }
+    return arr;
+  };
+
+  const randomBytes = new Uint8Array(16);
+  getRandomValues(randomBytes);
+  
+  // Set version (4) and variant bits
+  randomBytes[6] = (randomBytes[6] & 0x0f) | 0x40; // Version 4
+  randomBytes[8] = (randomBytes[8] & 0x3f) | 0x80; // Variant bits
+  
+  // Convert to hex string with dashes
+  const hex = Array.from(randomBytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+    
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20, 32)
+  ].join('-');
+}
+
 // 核心查询函数
 async function query(sql: string, params: unknown[] = []): Promise<Response> {
   if (!D1_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !D1_DATABASE_ID) {

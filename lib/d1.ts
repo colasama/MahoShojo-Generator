@@ -4,6 +4,7 @@
 // 重新导出核心功能
 export {
   generateRandomId,
+  generateUUID,
   queryFromD1,
   createWithCustomId,
   updateById,
@@ -15,6 +16,7 @@ export {
 export {
   createUser,
   getUserByUsername,
+  getUserByEmail,
   getUserByAuthKey,
   verifyUserLogin
 } from './database/users';

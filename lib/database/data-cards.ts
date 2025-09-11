@@ -1,4 +1,4 @@
-import { queryFromD1 } from './core';
+import { queryFromD1, generateUUID } from './core';
 
 // 检查公开数据卡是否存在同名
 export async function checkPublicCardNameExists(
@@ -30,7 +30,7 @@ export async function createDataCardWithAuthor(
   description: string,
   data: string,
   isPublic: boolean = false
-): Promise<{ success: boolean; id?: number; error?: string }> {
+): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
     // 如果是公开卡，先检查是否有同名
     if (isPublic) {
@@ -47,14 +47,16 @@ export async function createDataCardWithAuthor(
       _authorId: userId
     });
     
+    // 生成 UUID 作为主键
+    const uuid = generateUUID();
+    
     const result = await queryFromD1(
-      'INSERT INTO data_cards (user_id, type, name, description, data, is_public) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, type, name, description, dataWithAuthor, isPublic ? 1 : 0]
+      'INSERT INTO data_cards (id, user_id, type, name, description, data, is_public) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [uuid, userId, type, name, description, dataWithAuthor, isPublic ? 1 : 0]
     ) as any;
     
     if (result.success && result.result) {
-      const id = result.result[0]?.meta?.last_row_id || null;
-      return { success: true, id };
+      return { success: true, id: uuid };
     }
     return { success: false, error: '创建失败' };
   } catch (error) {
@@ -71,15 +73,18 @@ export async function createDataCard(
   description: string,
   data: string,
   isPublic: boolean = false
-): Promise<number | null> {
+): Promise<string | null> {
   try {
+    // 生成 UUID 作为主键
+    const uuid = generateUUID();
+    
     const result = await queryFromD1(
-      'INSERT INTO data_cards (user_id, type, name, description, data, is_public) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, type, name, description, data, isPublic ? 1 : 0]
+      'INSERT INTO data_cards (id, user_id, type, name, description, data, is_public) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [uuid, userId, type, name, description, data, isPublic ? 1 : 0]
     ) as any;
     
     if (result.success && result.result) {
-      return result.result[0]?.meta?.last_row_id || null;
+      return uuid;
     }
     return null;
   } catch (error) {
@@ -108,7 +113,7 @@ export async function getUserDataCards(userId: number): Promise<any[]> {
 
 // 更新数据卡信息
 export async function updateDataCard(
-  id: number,
+  id: string,
   userId: number,
   name: string,
   description: string,
@@ -139,7 +144,7 @@ export async function updateDataCard(
 }
 
 // 删除数据卡
-export async function deleteDataCard(id: number, userId: number): Promise<boolean> {
+export async function deleteDataCard(id: string, userId: number): Promise<boolean> {
   try {
     const result = await queryFromD1(
       'DELETE FROM data_cards WHERE id = ? AND user_id = ?',
@@ -157,7 +162,7 @@ export async function deleteDataCard(id: number, userId: number): Promise<boolea
 }
 
 // 验证数据卡所有权
-export async function verifyCardOwnership(cardId: number, userId: number): Promise<boolean> {
+export async function verifyCardOwnership(cardId: string, userId: number): Promise<boolean> {
   try {
     const result = await queryFromD1(
       'SELECT id FROM data_cards WHERE id = ? AND user_id = ?',

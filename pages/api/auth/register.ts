@@ -1,5 +1,4 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { createUser, getUserByUsername } from '@/lib/d1';
+import { createUser, getUserByUsername, getUserByEmail } from '@/lib/d1';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { webcrypto } from 'crypto';
@@ -9,6 +8,12 @@ export const runtime = 'edge';
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const getRandomValues = typeof crypto !== 'undefined' ? crypto.getRandomValues.bind(crypto) : webcrypto.getRandomValues.bind(webcrypto);
 
+// Email validation function
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 // Generate auth key using Web Crypto API
 async function generateAuthKey(): Promise<string> {
   const array = new Uint8Array(32);
@@ -16,37 +21,55 @@ async function generateAuthKey(): Promise<string> {
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
-    const { username, turnstileToken } = req.body;
+    const { username, email, turnstileToken } = await req.json();
 
-    if (!username || !turnstileToken) {
-      return res.status(400).json({ error: '用户名和安全验证不能为空' });
+    if (!username || !email || !turnstileToken) {
+      return new Response(JSON.stringify({ error: '用户名、邮箱和安全验证不能为空' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // 验证 Turnstile token
     const isTurnstileValid = await verifyTurnstileToken(turnstileToken);
     if (!isTurnstileValid) {
-      return res.status(400).json({ error: '安全验证失败，请重新验证' });
+      return new Response(JSON.stringify({ error: '安全验证失败，请重新验证' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     if (username.length < 2 || username.length > 20) {
-      return res.status(400).json({ error: '用户名长度必须在2-20个字符之间' });
+      return new Response(JSON.stringify({ error: '用户名长度必须在2-20个字符之间' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // 验证邮箱格式
+    if (!isValidEmail(email)) {
+      return new Response(JSON.stringify({ error: '请输入有效的邮箱地址' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // 验证用户名是否包含敏感词
     try {
       const sensitiveCheck = await quickCheck(username);
       if (sensitiveCheck.hasSensitiveWords) {
-        return res.status(400).json({ 
-          error: `用户名包含不当内容，请重新输入` 
+        return new Response(JSON.stringify({ error: '用户名包含不当内容，请重新输入' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
         });
       }
     } catch (error) {
@@ -57,28 +80,50 @@ export default async function handler(
     // 检查用户名是否已存在
     const existingUser = await getUserByUsername(username);
     if (existingUser) {
-      return res.status(409).json({ error: '用户名已存在' });
+      return new Response(JSON.stringify({ error: '用户名已存在' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // 检查邮箱是否已存在
+    const existingEmail = await getUserByEmail(email);
+    if (existingEmail) {
+      return new Response(JSON.stringify({ error: '邮箱已被注册' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // 生成唯一的认证密钥
     const authKey = await generateAuthKey();
 
     // 创建用户
-    const userId = await createUser(username, authKey);
+    const userId = await createUser(username, email, authKey);
     
     if (!userId) {
-      return res.status(500).json({ error: '创建用户失败' });
+      return new Response(JSON.stringify({ error: '创建用户失败' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    return res.status(200).json({
+    return new Response(JSON.stringify({
       success: true,
       username,
+      email,
       authKey,
       message: '注册成功！请妥善保存您的登录密钥'
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    return res.status(500).json({ error: '注册失败，请稍后重试' });
+    return new Response(JSON.stringify({ error: '注册失败，请稍后重试' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

@@ -1,11 +1,11 @@
 import { queryFromD1 } from './core';
 
 // 创建用户
-export async function createUser(username: string, authKey: string): Promise<number | null> {
+export async function createUser(username: string, email: string, authKey: string): Promise<number | null> {
   try {
     const result = await queryFromD1(
-      'INSERT INTO users (username, auth_key) VALUES (?, ?)',
-      [username, authKey]
+      'INSERT INTO users (username, email, auth_key) VALUES (?, ?, ?)',
+      [username, email, authKey]
     ) as any;
     
     if (result.success && result.result) {
@@ -32,6 +32,24 @@ export async function getUserByUsername(username: string): Promise<any> {
     return null;
   } catch (error) {
     console.error("查找用户失败:", error);
+    return null;
+  }
+}
+
+// 根据邮箱查找用户
+export async function getUserByEmail(email: string): Promise<any> {
+  try {
+    const result = await queryFromD1(
+      'SELECT * FROM users WHERE email = ?',
+      [email]
+    ) as any;
+    
+    if (result.success && result.result && result.result[0]?.results?.length > 0) {
+      return result.result[0].results[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("根据邮箱查找用户失败:", error);
     return null;
   }
 }
