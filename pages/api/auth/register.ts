@@ -1,8 +1,20 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import crypto from 'crypto';
 import { createUser, getUserByUsername } from '@/lib/d1';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { quickCheck } from '@/lib/sensitive-word-filter';
+import { webcrypto } from 'crypto';
+
+export const runtime = 'edge';
+
+// 兼容 Edge 和 Node.js 环境的 crypto API
+const getRandomValues = typeof crypto !== 'undefined' ? crypto.getRandomValues.bind(crypto) : webcrypto.getRandomValues.bind(webcrypto);
+
+// Generate auth key using Web Crypto API
+async function generateAuthKey(): Promise<string> {
+  const array = new Uint8Array(32);
+  getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -49,7 +61,7 @@ export default async function handler(
     }
 
     // 生成唯一的认证密钥
-    const authKey = crypto.randomBytes(32).toString('hex');
+    const authKey = await generateAuthKey();
 
     // 创建用户
     const userId = await createUser(username, authKey);

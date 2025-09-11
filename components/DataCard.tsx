@@ -20,7 +20,6 @@ interface DataCardProps {
 }
 
 export default function DataCard({
-  id,
   name,
   description,
   type,
@@ -29,7 +28,6 @@ export default function DataCard({
   likeCount = 0,
   author,
   isOwner = false,
-  isSelected = false,
   onDownload,
   onLike,
   onEditInfo,

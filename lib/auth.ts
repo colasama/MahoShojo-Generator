@@ -39,7 +39,7 @@ class CryptoHelper {
     combined.set(iv);
     combined.set(new Uint8Array(encryptedBuffer), iv.length);
     
-    return btoa(String.fromCharCode(...combined));
+    return btoa(Array.from(combined, byte => String.fromCharCode(byte)).join(''));
   }
 
   async decrypt(encryptedData: string): Promise<string | null> {

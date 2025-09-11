@@ -116,17 +116,17 @@ const CharacterManagerPage: React.FC = () => {
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
 
     // 加载用户数据卡
-    const loadUserDataCards = async () => {
+    const loadUserDataCards = useCallback(async () => {
         if (!isAuthenticated) return;
         const cards = await dataCardApi.getCards();
         setUserDataCards(cards);
-    };
+    }, [isAuthenticated]);
 
     useEffect(() => {
         if (isAuthenticated) {
             loadUserDataCards();
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, loadUserDataCards]);
 
     // 处理注册
     const handleRegister = async (username: string, turnstileToken: string) => {
@@ -207,7 +207,7 @@ const CharacterManagerPage: React.FC = () => {
             setOriginalData(JSON.parse(JSON.stringify(data)));
             setShowDataCardsModal(false);
             setMessage({ type: 'success', text: `已加载数据卡: ${card.name}` });
-        } catch (error) {
+        } catch {
             setMessage({ type: 'error', text: '加载数据卡失败' });
         }
     };

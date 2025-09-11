@@ -116,7 +116,7 @@ export async function updateDataCard(
 ): Promise<boolean> {
   try {
     let sql = 'UPDATE data_cards SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP';
-    let params: any[] = [name, description];
+    const params: any[] = [name, description];
     
     if (isPublic !== undefined) {
       sql += ', is_public = ?';
@@ -182,7 +182,7 @@ export async function getPublicDataCards(
 ): Promise<any[]> {
   try {
     let sql = 'SELECT dc.*, u.username FROM data_cards dc JOIN users u ON dc.user_id = u.id WHERE dc.is_public = 1';
-    let params: any[] = [];
+    const params: any[] = [];
     
     if (type) {
       sql += ' AND dc.type = ?';

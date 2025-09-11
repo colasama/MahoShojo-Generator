@@ -7,6 +7,8 @@ import {
   deleteDataCard 
 } from '@/lib/d1';
 
+export const runtime = 'edge';
+
 // 辅助函数：从请求头获取用户认证信息
 async function getUserFromAuth(req: NextApiRequest): Promise<{ id: number; username: string } | null> {
   const authHeader = req.headers.authorization;

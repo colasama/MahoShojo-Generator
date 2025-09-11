@@ -2,6 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { verifyUserLogin } from '@/lib/d1';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 
+export const runtime = 'edge';
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
