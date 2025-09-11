@@ -323,6 +323,7 @@ const CanshouPage: React.FC = () => {
                                 setCanshouDetails(data);
                                 setShowIntroduction(false);
                             } catch (err) {
+                                console.error('随机生成失败: ', err);
                                 setError('随机生成失败，请稍后再试。');
                             } finally {
                                 setSubmitting(false);

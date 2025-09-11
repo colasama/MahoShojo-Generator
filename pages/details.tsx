@@ -473,6 +473,7 @@ const DetailsPage: React.FC = () => {
                         setMagicalGirlDetails(data);
                         setShowIntroduction(false); // 直接进入结果展示
                       } catch (err) {
+                        console.error('随机生成失败: ', err);
                         setError('随机生成失败，请稍后再试。');
                       } finally {
                         setIsGenerating(false);

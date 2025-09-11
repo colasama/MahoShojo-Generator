@@ -371,7 +371,7 @@ const BattlePage: React.FC = () => {
       for (const item of dataArray) {
           const itemName = item.codename || item.name || sourceName;
           try {
-              let type: 'magical-girl' | 'canshou' = item.codename ? 'magical-girl' : 'canshou';
+              const type: 'magical-girl' | 'canshou' = item.codename ? 'magical-girl' : 'canshou';
               if (!item.codename && !item.name) throw new Error('缺少 "codename" 或 "name" 字段。');
               
               const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
