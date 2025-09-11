@@ -106,7 +106,7 @@ export const authStorage = {
 // API 请求工具函数
 export const authApi = {
   // 注册
-  async register(username: string, code: string): Promise<{
+  async register(username: string, code: string, turnstileToken: string): Promise<{
     success: boolean;
     authKey?: string;
     message?: string;
@@ -116,7 +116,7 @@ export const authApi = {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, code })
+        body: JSON.stringify({ username, code, turnstileToken })
       });
 
       const data = await response.json();
@@ -134,7 +134,7 @@ export const authApi = {
   },
 
   // 登录
-  async login(username: string, authKey: string): Promise<{
+  async login(username: string, authKey: string, turnstileToken: string): Promise<{
     success: boolean;
     user?: { id: number; username: string };
     error?: string;
@@ -143,7 +143,7 @@ export const authApi = {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, authKey })
+        body: JSON.stringify({ username, authKey, turnstileToken })
       });
 
       const data = await response.json();

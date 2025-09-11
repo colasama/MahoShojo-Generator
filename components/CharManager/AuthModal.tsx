@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import TurnstileWidget, { TurnstileRef } from '../Turnstile';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (username: string, authKey: string) => Promise<void>;
-  onRegister: (username: string, code: string) => Promise<void>;
+  onLogin: (username: string, authKey: string, turnstileToken: string) => Promise<void>;
+  onRegister: (username: string, code: string, turnstileToken: string) => Promise<void>;
   authMessage: { type: 'error' | 'success', text: string } | null;
   generatedAuthKey: string | null;
 }
@@ -19,16 +20,66 @@ export default function AuthModal({
 }: AuthModalProps) {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authForm, setAuthForm] = useState({ username: '', code: '', authKey: '' });
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileRef>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 重置表单当模态框关闭时
+  useEffect(() => {
+    if (!isOpen) {
+      setAuthForm({ username: '', code: '', authKey: '' });
+      setTurnstileToken('');
+      setAuthMode('login');
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  // 监听认证消息变化
+  useEffect(() => {
+    if (authMessage && isSubmitting) {
+      if (authMessage.type === 'error') {
+        // 登录/注册失败，重置Turnstile以获取新token
+        turnstileRef.current?.reset();
+        setTurnstileToken('');
+      } else if (authMessage.type === 'success') {
+        // 登录/注册成功，保持当前状态
+        // 模态框关闭会在父组件中处理
+      }
+      setIsSubmitting(false);
+    }
+  }, [authMessage, isSubmitting]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (authMode === 'register') {
-      await onRegister(authForm.username, authForm.code);
-    } else {
-      await onLogin(authForm.username, authForm.authKey);
+    
+    if (!turnstileToken) {
+      return; // Turnstile验证必须完成
     }
+
+    setIsSubmitting(true);
+    try {
+      if (authMode === 'register') {
+        await onRegister(authForm.username, authForm.code, turnstileToken);
+      } else {
+        await onLogin(authForm.username, authForm.authKey, turnstileToken);
+      }
+    } finally {
+      // 如果没有错误，setIsSubmitting会在useEffect中处理
+      // 如果有错误，也会在useEffect中处理并重置
+    }
+  };
+
+  const switchMode = () => {
+    setAuthMode(authMode === 'login' ? 'register' : 'login');
+    setAuthForm({ username: '', code: '', authKey: '' });
+    setTurnstileToken(''); // 重置turnstile token
+    turnstileRef.current?.reset(); // 重置turnstile组件
+  };
+
+  const handleTurnstileVerify = (token: string) => {
+    setTurnstileToken(token);
   };
 
   return (
@@ -121,21 +172,27 @@ export default function AuthModal({
             </div>
           )}
 
+          {/* Turnstile验证码 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              安全验证
+            </label>
+            <TurnstileWidget ref={turnstileRef} onVerify={handleTurnstileVerify} />
+          </div>
+
           <button
             type="submit"
-            className="w-full generate-button"
+            disabled={!turnstileToken || isSubmitting}
+            className={`w-full generate-button ${(!turnstileToken || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {authMode === 'login' ? '登录' : '注册'}
+            {isSubmitting ? '验证中...' : (authMode === 'login' ? '登录' : '注册')}
           </button>
         </form>
 
         <div className="mt-4 text-center text-sm text-gray-600">
           {authMode === 'login' ? '还没有账号？' : '已有账号？'}
           <button
-            onClick={() => {
-              setAuthMode(authMode === 'login' ? 'register' : 'login');
-              setAuthForm({ username: '', code: '', authKey: '' });
-            }}
+            onClick={switchMode}
             className="ml-1 text-purple-600 hover:text-purple-700 font-medium"
           >
             {authMode === 'login' ? '去注册' : '去登录'}

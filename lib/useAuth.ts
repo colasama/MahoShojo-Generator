@@ -29,8 +29,8 @@ export function useAuth() {
   }, []);
 
   // 注册
-  const register = async (username: string, code: string) => {
-    const result = await authApi.register(username, code);
+  const register = async (username: string, code: string, turnstileToken: string) => {
+    const result = await authApi.register(username, code, turnstileToken);
     if (result.success) {
       // 注册成功后自动验证登录
       const verifyResult = await authApi.verify();
@@ -42,8 +42,8 @@ export function useAuth() {
   };
 
   // 登录
-  const login = async (username: string, authKey: string) => {
-    const result = await authApi.login(username, authKey);
+  const login = async (username: string, authKey: string, turnstileToken: string) => {
+    const result = await authApi.login(username, authKey, turnstileToken);
     if (result.success && result.user) {
       setUser(result.user);
     }

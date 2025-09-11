@@ -86,8 +86,6 @@ const CharacterManagerPage: React.FC = () => {
 
     // 账户系统相关状态
     const [showAuthModal, setShowAuthModal] = useState(false);
-    const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-    const [authForm, setAuthForm] = useState({ username: '', code: '', authKey: '' });
     const [authMessage, setAuthMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
     const [generatedAuthKey, setGeneratedAuthKey] = useState<string | null>(null);
 
@@ -131,9 +129,9 @@ const CharacterManagerPage: React.FC = () => {
     }, [isAuthenticated]);
 
     // 处理注册
-    const handleRegister = async () => {
+    const handleRegister = async (username: string, code: string, turnstileToken: string) => {
         setAuthMessage(null);
-        const result = await register(authForm.username, authForm.code);
+        const result = await register(username, code, turnstileToken);
         if (result.success && result.authKey) {
             setGeneratedAuthKey(result.authKey);
             setAuthMessage({ type: 'success', text: '注册成功！请复制并保存您的登录密钥。' });
@@ -143,12 +141,11 @@ const CharacterManagerPage: React.FC = () => {
     };
 
     // 处理登录
-    const handleLogin = async () => {
+    const handleLogin = async (username: string, authKey: string, turnstileToken: string) => {
         setAuthMessage(null);
-        const result = await login(authForm.username, authForm.authKey);
+        const result = await login(username, authKey, turnstileToken);
         if (result.success) {
             setShowAuthModal(false);
-            setAuthForm({ username: '', code: '', authKey: '' });
             setMessage({ type: 'success', text: '登录成功！' });
             loadUserDataCards();
         } else {

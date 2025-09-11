@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import { createUser, getUserByUsername } from '@/lib/d1';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,10 +12,16 @@ export default async function handler(
   }
 
   try {
-    const { username, code } = req.body;
+    const { username, code, turnstileToken } = req.body;
 
-    if (!username || !code) {
-      return res.status(400).json({ error: '用户名和验证码不能为空' });
+    if (!username || !code || !turnstileToken) {
+      return res.status(400).json({ error: '用户名、验证码和安全验证不能为空' });
+    }
+
+    // 验证 Turnstile token
+    const isTurnstileValid = await verifyTurnstileToken(turnstileToken);
+    if (!isTurnstileValid) {
+      return res.status(400).json({ error: '安全验证失败，请重新验证' });
     }
 
     if (username.length < 2 || username.length > 20) {
