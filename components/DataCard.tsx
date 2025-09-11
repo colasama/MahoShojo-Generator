@@ -87,7 +87,7 @@ export default function DataCard({
         </span>
         {type === 'scenario' && (
           <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">
-            场景
+            情景
           </span>
         )}
         {type === 'character' && (

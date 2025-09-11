@@ -15,6 +15,7 @@ import { dataCardApi } from '@/lib/auth';
 import AuthModal from '../components/CharManager/AuthModal';
 import SaveCardModal from '../components/CharManager/SaveCardModal';
 import DataCardsModal from '../components/CharManager/DataCardsModal';
+import ScenarioEditor from '../components/ScenarioEditor';
 
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
@@ -159,9 +160,12 @@ const CharacterManagerPage: React.FC = () => {
         if (!isAuthenticated || !characterData) return;
 
         // 打开保存弹窗，设置默认值
-        const type = characterData.codename ? 'character' : 'scenario';
-        const defaultName = characterData.codename || characterData.name || '';
-        const defaultDescription = `${type === 'character' ? '魔法少女' : '残兽'}数据卡`;
+        const isScenario = isScenarioData(characterData);
+        const type = isScenario ? 'scenario' : 'character';
+        const defaultName = isScenario 
+            ? (characterData.title || characterData.name || '')
+            : (characterData.codename || characterData.name || '');
+        const defaultDescription = `${type === 'character' ? '角色' : '情景'}数据卡`;
 
         setNewCardForm({
             name: defaultName,
@@ -181,9 +185,9 @@ const CharacterManagerPage: React.FC = () => {
 
         setIsSavingCard(true);
         setSaveCardError(null);
-        
+
         try {
-            const type = characterData.codename ? 'character' : 'scenario';
+            const type = isScenarioData(characterData) ? 'scenario' : 'character';
             const result = await dataCardApi.createCard(
                 type,
                 newCardForm.name,
@@ -242,6 +246,11 @@ const CharacterManagerPage: React.FC = () => {
         } else {
             setMessage({ type: 'error', text: result.error || '更新失败' });
         }
+    };
+
+    // 检测是否为情景文件
+    const isScenarioData = (data: any): boolean => {
+        return Boolean(data && data.title && data.elements && (data.scenario_type || data.elements.events));
     };
 
     // 分享数据卡
@@ -386,7 +395,7 @@ const CharacterManagerPage: React.FC = () => {
     }, [characterData, originalData, isNative, hasLostNativeness]);
 
 
-    // 加载和处理JSON数据
+    // 加载和处理JSON数据 (支持角色和情景文件)
     const processJsonData = async (jsonText: string) => {
         setIsLoading(true);
         setMessage(null);
@@ -395,8 +404,16 @@ const CharacterManagerPage: React.FC = () => {
         try {
             const data = JSON.parse(jsonText);
 
-            if (typeof data !== 'object' || data === null || (!data.codename && !data.name)) {
-                throw new Error('无效的角色文件格式。');
+            if (typeof data !== 'object' || data === null) {
+                throw new Error('无效的文件格式。');
+            }
+
+            // 检测文件类型
+            const isCharacterFile = Boolean(data.codename || (data.name && (data.attributes || data.skills || data.transformationSpell)));
+            const isScenarioFile = Boolean(data.title && data.elements && (data.scenario_type || data.elements.events));
+
+            if (!isCharacterFile && !isScenarioFile) {
+                throw new Error('无效的文件格式。请确保是有效的角色或情景文件。');
             }
 
             // 调用API验证原生性
@@ -410,7 +427,12 @@ const CharacterManagerPage: React.FC = () => {
             setCharacterData(data);
             setOriginalData(JSON.parse(JSON.stringify(data))); // 深拷贝作为原始备份
             setIsNative(isValid);
-            setMessage({ type: 'success', text: `成功加载角色: ${data.codename || data.name}` });
+
+            if (isCharacterFile) {
+                setMessage({ type: 'success', text: `成功加载角色: ${data.codename || data.name}` });
+            } else if (isScenarioFile) {
+                setMessage({ type: 'success', text: `成功加载情景: ${data.title}` });
+            }
         } catch (err) {
             const text = err instanceof Error ? err.message : '解析JSON失败。';
             setMessage({ type: 'error', text: `加载失败: ${text}` });
@@ -819,7 +841,7 @@ const CharacterManagerPage: React.FC = () => {
                         {!characterData ? (
                             <>
                                 <div className="input-group">
-                                    <label htmlFor="file-upload" className="input-label">上传 .json 设定文件</label>
+                                    <label htmlFor="file-upload" className="input-label">上传 .json 设定文件（支持角色或情景文件）</label>
                                     <input id="file-upload" type="file" accept=".json" onChange={handleFileChange} className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0" />
                                 </div>
                                 <div className="text-center my-4 text-gray-500">或</div>
@@ -836,12 +858,12 @@ const CharacterManagerPage: React.FC = () => {
                                             <textarea
                                                 value={pastedJson}
                                                 onChange={(e) => setPastedJson(e.target.value)}
-                                                placeholder="在此处粘贴一个角色的设定文件(.json)内容..."
+                                                placeholder="在此处粘贴角色或情景的设定文件(.json)内容..."
                                                 className="input-field resize-y h-32"
                                                 disabled={isLoading}
                                             />
                                             <button onClick={handlePasteAndLoad} disabled={isLoading || !pastedJson.trim()} className="generate-button mt-2 mb-0">
-                                                {isLoading ? '加载中...' : '从文本加载角色'}
+                                                {isLoading ? '加载中...' : '从文本加载数据'}
                                             </button>
                                         </div>
                                     )}
@@ -850,7 +872,12 @@ const CharacterManagerPage: React.FC = () => {
                         ) : (
                             <div>
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold">编辑角色: {originalData.codename || originalData.name}</h2>
+                                    <h2 className="text-xl font-bold">
+                                        {isScenarioData(characterData) ?
+                                            `编辑情景: ${characterData.title}` :
+                                            `编辑角色: ${originalData.codename || originalData.name}`
+                                        }
+                                    </h2>
                                     {isNative && !hasLostNativeness ? (
                                         <span className="px-3 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">原生数据</span>
                                     ) : (
@@ -858,12 +885,20 @@ const CharacterManagerPage: React.FC = () => {
                                     )}
                                 </div>
 
-                                <div className="space-y-4">
-                                    {renderFormFields(characterData)}
-                                </div>
+                                {/* 按文件类型显示不同的编辑界面 */}
+                                {isScenarioData(characterData) ? (
+                                    <ScenarioEditor
+                                        data={characterData}
+                                        onChange={handleFieldChange}
+                                    />
+                                ) : (
+                                    <div className="space-y-4">
+                                        {renderFormFields(characterData)}
+                                    </div>
+                                )}
 
-                                {/* 历战记录管理模块 */}
-                                {characterData.arena_history && (
+                                {/* 历战记录管理模块 - 只对角色数据显示 */}
+                                {!isScenarioData(characterData) && characterData.arena_history && (
                                     <fieldset className="border border-gray-300 p-4 rounded-lg mt-4">
                                         <legend className="text-sm font-semibold px-2 text-gray-600">历战记录管理</legend>
                                         <div className="space-y-4">
@@ -898,7 +933,7 @@ const CharacterManagerPage: React.FC = () => {
                                         {isLoading ? '处理中...' : copiedStatus ? '已复制！' : '复制到剪贴板'}
                                     </button>
                                     <button onClick={() => { setCharacterData(null); setPastedJson('') }} className="footer-link mt-4 w-full text-center">
-                                        加载其他角色
+                                        加载其他数据
                                     </button>
                                 </div>
                             </div>
@@ -913,19 +948,22 @@ const CharacterManagerPage: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    <div className="card mt-6">
-                        <button
-                            onClick={() => setIsTachieVisible(!isTachieVisible)}
-                            className="w-full text-left text-lg font-bold text-gray-800"
-                        >
-                            {isTachieVisible ? '▼' : '▶'} 立绘生成
-                        </button>
-                        {isTachieVisible && characterData && (
-                            <div className="mt-4 pt-4 border-t">
-                                <TachieGenerator prompt={tachiePrompt} />
-                            </div>
-                        )}
-                    </div>
+                    {/* 立绘生成 - 只对角色数据显示 */}
+                    {!isScenarioData(characterData) && (
+                        <div className="card mt-6">
+                            <button
+                                onClick={() => setIsTachieVisible(!isTachieVisible)}
+                                className="w-full text-left text-lg font-bold text-gray-800"
+                            >
+                                {isTachieVisible ? '▼' : '▶'} 立绘生成
+                            </button>
+                            {isTachieVisible && characterData && (
+                                <div className="mt-4 pt-4 border-t">
+                                    <TachieGenerator prompt={tachiePrompt} />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="text-center mt-8">
                         <Link href="/" className="footer-link">返回首页</Link>
