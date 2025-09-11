@@ -203,7 +203,7 @@ const MagicalGirlCard: React.FC<MagicalGirlCardProps> = ({
         <div className="result-item">
           <div className="result-label">🌸 繁开状态</div>
           <div className="result-value">
-            <div><strong>繁开魔装名：</strong>{renderComplexValue(magicalGirl.blooming.name)}</div>
+            <div><strong>繁开名：</strong>{renderComplexValue(magicalGirl.blooming.name)}</div>
             <div><strong>进化能力：</strong></div>
             <ul style={{ marginLeft: '1rem', marginTop: '0.5rem' }}>
               {/*如果 magicalGirl.blooming.evolvedAbilities 是字符串，.map() 会抛出 TypeError。

@@ -8,6 +8,7 @@ import { useCooldown } from '../lib/cooldown';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import Link from 'next/link';
 import TachieGenerator from '../components/TachieGenerator';
+import { generateRandomMagicalGirl } from '../lib/random-character-generator';
 
 interface Questionnaire {
   questions: string[];
@@ -463,27 +464,28 @@ const DetailsPage: React.FC = () => {
                     开始回答问卷
                   </button>
                   <button
-                    onClick={async () => {
-                      setIsGenerating(true); // 使用 isGenerating 状态
-                      setError(null);
-                      try {
-                        const res = await fetch('/api/generate-random-character?type=magical-girl');
-                        if (!res.ok) throw new Error('随机生成失败');
-                        const data = await res.json();
-                        setMagicalGirlDetails(data);
-                        setShowIntroduction(false); // 直接进入结果展示
-                      } catch (err) {
-                        console.error('随机生成失败: ', err);
-                        setError('随机生成失败，请稍后再试。');
-                      } finally {
-                        setIsGenerating(false);
-                      }
-                    }}
-                    disabled={isGenerating}
-                    className="generate-button text-lg flex-1"
-                    style={{ background: 'linear-gradient(to right, #22c55e, #16a34a)' }}
+                      onClick={async () => {
+                          // 设置为生成中状态，禁用按钮
+                          setIsGenerating(true); 
+                          setError(null);
+                          try {
+                              // 直接调用客户端生成函数，不再发送API请求
+                              const data = await generateRandomMagicalGirl();
+                              setMagicalGirlDetails(data);
+                              setShowIntroduction(false); // 直接进入结果展示
+                          } catch (err) {
+                              console.error('随机生成失败: ', err);
+                              setError('随机生成失败，请稍后再试。');
+                          } finally {
+                              // 结束生成状态
+                              setIsGenerating(false);
+                          }
+                      }}
+                      disabled={isGenerating}
+                      className="generate-button text-lg flex-1"
+                      style={{ background: 'linear-gradient(to right, #22c55e, #16a34a)' }}
                   >
-                    {isGenerating ? '生成中...' : '快速随机生成'}
+                      {isGenerating ? '生成中...' : '快速随机生成'}
                   </button>
                 </div>
                 {/* 修改结束 */}

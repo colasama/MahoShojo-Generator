@@ -6,6 +6,7 @@ import { useCooldown } from '../lib/cooldown';
 import Link from 'next/link';
 import CanshouCard, { CanshouDetails } from '../components/CanshouCard';
 import { CANSHOU_LORE } from '../lib/canshou-lore';
+import { generateRandomCanshou } from '../lib/random-character-generator';
 
 // 定义问卷和问题的类型
 interface Question {
@@ -317,9 +318,8 @@ const CanshouPage: React.FC = () => {
                             setSubmitting(true); // 使用 submitting 状态
                             setError(null);
                             try {
-                                const res = await fetch('/api/generate-random-character?type=canshou');
-                                if (!res.ok) throw new Error('随机生成失败');
-                                const data = await res.json();
+                                // 直接调用客户端生成函数
+                                const data = await generateRandomCanshou();
                                 setCanshouDetails(data);
                                 setShowIntroduction(false);
                             } catch (err) {

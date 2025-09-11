@@ -12,6 +12,7 @@ import { StatsData } from './api/get-stats';
 import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
 import { ArenaHistory } from '../types/arena';
+import { generateRandomMagicalGirl, generateRandomCanshou } from '../lib/random-character-generator';
 
 interface UpdatedCombatantData {
     codename?: string;
@@ -662,11 +663,15 @@ const BattlePage: React.FC = () => {
 
             if (placeholders.length > 0) {
                 setError('正在生成随机角色...'); // 提示用户
-                const randomCharacterPromises = placeholders.map(p =>
-                    fetch(`/api/generate-random-character?type=${p.type.replace('random-', '')}`)
-                        .then(res => res.ok ? res.json() : Promise.reject(new Error(`随机${p.filename}生成失败`)))
-                );
-                
+
+                // 直接调用客户端生成函数，不再发送API请求
+                const randomCharacterPromises = placeholders.map(p => {
+                    if (p.type === 'random-magical-girl') {
+                        return generateRandomMagicalGirl();
+                    }
+                    return generateRandomCanshou();
+                });
+
                 const generatedCharacters = await Promise.all(randomCharacterPromises);
 
                 // 将生成的角色数据转换为 CombatantData 格式
@@ -785,7 +790,7 @@ const BattlePage: React.FC = () => {
         }
     };
 
-    // 修复：为情景模式添加按钮文本
+    // 为情景模式添加按钮文本
     const getButtonText = () => {
         if (isCooldown) return `记者赶稿中...请等待 ${remainingTime} 秒`;
         if (isGenerating) {
