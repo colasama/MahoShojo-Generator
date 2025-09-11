@@ -12,7 +12,14 @@ import TachieGenerator from '../components/TachieGenerator';
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import CanshouCard from '../components/CanshouCard';
 import { MainColor } from '../lib/main-color';
+import { useAuth } from '@/lib/useAuth';
+import { dataCardApi } from '@/lib/auth';
 
+// 导入拆分的组件
+import AuthModal from '../components/CharManager/AuthModal';
+import SaveCardModal from '../components/CharManager/SaveCardModal';
+import DataCardsModal from '../components/CharManager/DataCardsModal';
+import ScenarioEditor from '../components/ScenarioEditor';
 
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
@@ -89,9 +96,26 @@ const gradientColors: Record<string, { first: string; second: string }> = {
 
 const CharacterManagerPage: React.FC = () => {
     const router = useRouter();
+    const { user, loading: authLoading, isAuthenticated, register, login, logout } = useAuth();
     const [pastedJson, setPastedJson] = useState('');
     const [characterData, setCharacterData] = useState<any | null>(null);
     const [originalData, setOriginalData] = useState<any | null>(null);
+
+    // 账户系统相关状态
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [authMessage, setAuthMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+    const [generatedAuthKey, setGeneratedAuthKey] = useState<string | null>(null);
+
+    // 数据卡管理相关状态
+    const [userDataCards, setUserDataCards] = useState<any[]>([]);
+    const [showDataCardsModal, setShowDataCardsModal] = useState(false);
+    const [editingCard, setEditingCard] = useState<any | null>(null);
+    const [showSaveCardModal, setShowSaveCardModal] = useState(false);
+    const [newCardForm, setNewCardForm] = useState({ name: '', description: '', isPublic: false });
+    const [saveCardError, setSaveCardError] = useState<string | null>(null);
+    const [isSavingCard, setIsSavingCard] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const cardsPerPage = 12;
 
     // 状态管理
     const [isNative, setIsNative] = useState(false);
@@ -111,6 +135,148 @@ const CharacterManagerPage: React.FC = () => {
 
     // 用于控制粘贴区域折叠/展开的状态，默认为折叠
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
+
+    // 加载用户数据卡
+    const loadUserDataCards = useCallback(async () => {
+        if (!isAuthenticated) return;
+        const cards = await dataCardApi.getCards();
+        setUserDataCards(cards);
+    }, [isAuthenticated]);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            loadUserDataCards();
+        }
+    }, [isAuthenticated, loadUserDataCards]);
+
+    // 处理注册
+    const handleRegister = async (username: string, email: string, turnstileToken: string) => {
+        setAuthMessage(null);
+        const result = await register(username, email, turnstileToken);
+        if (result.success && result.authKey) {
+            setGeneratedAuthKey(result.authKey);
+            setAuthMessage({ type: 'success', text: '注册成功！请复制并保存您的登录密钥。' });
+        } else {
+            setAuthMessage({ type: 'error', text: result.error || '注册失败' });
+        }
+    };
+
+    // 处理登录
+    const handleLogin = async (username: string, authKey: string, turnstileToken: string) => {
+        setAuthMessage(null);
+        const result = await login(username, authKey, turnstileToken);
+        if (result.success) {
+            setShowAuthModal(false);
+            setMessage({ type: 'success', text: '登录成功！' });
+            loadUserDataCards();
+        } else {
+            setAuthMessage({ type: 'error', text: result.error || '登录失败' });
+        }
+    };
+
+    // 保存当前角色为数据卡
+    const handleSaveAsDataCard = async () => {
+        if (!isAuthenticated || !characterData) return;
+
+        // 打开保存弹窗，设置默认值
+        const isScenario = isScenarioData(characterData);
+        const type = isScenario ? 'scenario' : 'character';
+        const defaultName = isScenario 
+            ? (characterData.title || characterData.name || '')
+            : (characterData.codename || characterData.name || '');
+        const defaultDescription = `${type === 'character' ? '角色' : '情景'}数据卡`;
+
+        setNewCardForm({
+            name: defaultName,
+            description: defaultDescription,
+            isPublic: false
+        });
+        setSaveCardError(null);
+        setShowSaveCardModal(true);
+    };
+
+    // 确认保存数据卡
+    const handleConfirmSaveCard = async () => {
+        if (!newCardForm.name.trim()) {
+            setSaveCardError('请输入数据卡名称');
+            return;
+        }
+
+        setIsSavingCard(true);
+        setSaveCardError(null);
+
+        try {
+            const type = isScenarioData(characterData) ? 'scenario' : 'character';
+            const result = await dataCardApi.createCard(
+                type,
+                newCardForm.name,
+                newCardForm.description,
+                characterData,
+                newCardForm.isPublic
+            );
+
+            if (result.success) {
+                setMessage({ type: 'success', text: `数据卡保存成功！${newCardForm.isPublic ? '（公开）' : '（私有）'}` });
+                setShowSaveCardModal(false);
+                setNewCardForm({ name: '', description: '', isPublic: false });
+                setSaveCardError(null);
+                loadUserDataCards();
+            } else {
+                setSaveCardError(result.error || '保存失败');
+            }
+        } finally {
+            setIsSavingCard(false);
+        }
+    };
+
+    // 加载数据卡
+    const handleLoadDataCard = (card: any) => {
+        try {
+            const data = JSON.parse(card.data);
+            setCharacterData(data);
+            setOriginalData(JSON.parse(JSON.stringify(data)));
+            setShowDataCardsModal(false);
+            setMessage({ type: 'success', text: `已加载数据卡: ${card.name}` });
+        } catch {
+            setMessage({ type: 'error', text: '加载数据卡失败' });
+        }
+    };
+
+    // 删除数据卡
+    const handleDeleteDataCard = async (id: string) => {
+        if (!window.confirm('确定要删除这个数据卡吗？')) return;
+
+        const result = await dataCardApi.deleteCard(id);
+        if (result.success) {
+            setMessage({ type: 'success', text: '数据卡已删除' });
+            loadUserDataCards();
+        } else {
+            setMessage({ type: 'error', text: result.error || '删除失败' });
+        }
+    };
+
+    // 更新数据卡信息
+    const handleUpdateDataCard = async (id: string, name: string, description: string, isPublic?: boolean) => {
+        const result = await dataCardApi.updateCard(id, name, description, isPublic);
+        if (result.success) {
+            setEditingCard(null);
+            loadUserDataCards();
+            setMessage({ type: 'success', text: '数据卡信息已更新' });
+        } else {
+            setMessage({ type: 'error', text: result.error || '更新失败' });
+        }
+    };
+
+    // 检测是否为情景文件
+    const isScenarioData = (data: any): boolean => {
+        return Boolean(data && data.title && data.elements && (data.scenario_type || data.elements.events));
+    };
+
+    // 分享数据卡
+    const handleShareDataCard = async (card: any) => {
+        // 在这里可以添加额外的分享统计或其他操作
+        console.log(`分享了数据卡: ${card.name} (${card.id})`);
+    };
 
     // 组件加载时运行，检测设备类型以决定是否默认展开粘贴区域
     useEffect(() => {
@@ -171,7 +337,7 @@ const CharacterManagerPage: React.FC = () => {
         // 获取原始名称和当前名称
         const originalName = originalData.codename || originalData.name;
         const currentName = characterData.codename || characterData.name;
-        
+
         // 如果名称发生了变化，则显示替换按钮，否则隐藏
         if (originalName !== currentName) {
             setShowNameReplaceButton(true);
@@ -209,14 +375,14 @@ const CharacterManagerPage: React.FC = () => {
                 if (key === 'signature' || key === 'arena_history' || NATIVE_PRESERVING_PATHS.has(currentPath)) {
                     continue;
                 }
-                
+
                 if (!deepEqual(originalNode[key], currentNode[key])) {
                     // 历战记录有特殊规则：只允许删除条目，不允许新增或修改
                     if (currentPath === 'arena_history.entries') {
                         const originalEntries = originalNode[key] || [];
                         const currentEntries = currentNode[key] || [];
                         if (currentEntries.length > originalEntries.length) {
-                             hasBreakingChange = true;
+                            hasBreakingChange = true;
                         } else {
                             const originalIds = new Set(originalEntries.map((e: any) => e.id));
                             for (const currentEntry of currentEntries) {
@@ -248,7 +414,7 @@ const CharacterManagerPage: React.FC = () => {
     }, [characterData, originalData, isNative, hasLostNativeness]);
 
 
-    // 加载和处理JSON数据
+    // 加载和处理JSON数据 (支持角色和情景文件)
     const processJsonData = async (jsonText: string) => {
         setIsLoading(true);
         setMessage(null);
@@ -257,8 +423,16 @@ const CharacterManagerPage: React.FC = () => {
         try {
             const data = JSON.parse(jsonText);
 
-            if (typeof data !== 'object' || data === null || (!data.codename && !data.name)) {
-                throw new Error('无效的角色文件格式。');
+            if (typeof data !== 'object' || data === null) {
+                throw new Error('无效的文件格式。');
+            }
+
+            // 检测文件类型
+            const isCharacterFile = Boolean(data.codename || (data.name && (data.attributes || data.skills || data.transformationSpell)));
+            const isScenarioFile = Boolean(data.title && data.elements && (data.scenario_type || data.elements.events));
+
+            if (!isCharacterFile && !isScenarioFile) {
+                throw new Error('无效的文件格式。请确保是有效的角色或情景文件。');
             }
 
             // 调用API验证原生性
@@ -272,7 +446,12 @@ const CharacterManagerPage: React.FC = () => {
             setCharacterData(data);
             setOriginalData(JSON.parse(JSON.stringify(data))); // 深拷贝作为原始备份
             setIsNative(isValid);
-            setMessage({ type: 'success', text: `成功加载角色: ${data.codename || data.name}` });
+
+            if (isCharacterFile) {
+                setMessage({ type: 'success', text: `成功加载角色: ${data.codename || data.name}` });
+            } else if (isScenarioFile) {
+                setMessage({ type: 'success', text: `成功加载情景: ${data.title}` });
+            }
         } catch (err) {
             const text = err instanceof Error ? err.message : '解析JSON失败。';
             setMessage({ type: 'error', text: `加载失败: ${text}` });
@@ -346,7 +525,7 @@ const CharacterManagerPage: React.FC = () => {
         // 这是保持原生性的关键：让 useEffect 认为除了豁免字段外，其他内容没有“意外”变化。
         const updatedCharacterData = replaceAllNamesInData(characterData, oldBaseName, newBaseName);
         const updatedOriginalData = replaceAllNamesInData(originalData, oldBaseName, newBaseName);
-        
+
         // 更新状态
         setCharacterData(updatedCharacterData);
         setOriginalData(updatedOriginalData);
@@ -526,11 +705,11 @@ const CharacterManagerPage: React.FC = () => {
                             <input type="text" id={currentPath} value={value as any} onChange={(e) => handleFieldChange(currentPath, e.target.value)} className="input-field" />
                         }
                         {currentPath === 'codename' && (
-                            <button onClick={handleRandomCodename} type="button" className="ml-2 px-3 py-1.5 text-xs font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600">随机</button>
+                            <button onClick={handleRandomCodename} type="button" className="ml-2 px-3 py-1.5 text-xs font-semibold text-white bg-pink-500 rounded-lg hover:bg-pink-600">随机</button>
                         )}
                     </div>
-                     {/* 条件渲染“一键替换”按钮 */}
-                     {showNameReplaceButton && (currentPath === 'codename' || currentPath === 'name') && (
+                    {/* 条件渲染“一键替换”按钮 */}
+                    {showNameReplaceButton && (currentPath === 'codename' || currentPath === 'name') && (
                         <button
                             onClick={handleReplaceAllNames}
                             className="text-sm text-white bg-green-500 hover:bg-green-600 rounded-md px-3 py-1 mt-2 w-full"
@@ -687,6 +866,48 @@ const CharacterManagerPage: React.FC = () => {
                                 <img src="/character-manager.svg" width={320} height={40} alt="角色数据管理" />
                             </div>
                             <p className="subtitle mt-2">在这里查看、编辑和维护你的角色档案</p>
+                            {/* 实验性警告 */}
+                            <div className="flex mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800 text-left">
+                                <div className="mr-2">⚠️ </div>
+                                <div>目前，用户系统仍处于测试阶段，可能存在功能不稳定的情况，敬请谅解。同时请妥善保存您的登录密钥，之后会开启邮箱找回密钥的功能。</div>
+                            </div>
+                            {/* 账户状态显示区域 */}
+                            <div className="mt-4 p-3 bg-pink-50 rounded-lg">
+                                {authLoading ? (
+                                    <p className="text-sm text-gray-600">加载中...</p>
+                                ) : isAuthenticated ? (
+                                    <div className="flex justify-between items-center">
+                                        <div className="text-left">
+                                            <p className="text-sm text-gray-600">当前用户</p>
+                                            <p className="font-semibold text-pink-700">{user?.username}</p>
+                                        </div>
+                                        <div className="space-x-2">
+                                            <button
+                                                onClick={() => setShowDataCardsModal(true)}
+                                                className="px-3 py-1 text-sm bg-pink-600 text-white rounded hover:bg-pink-700"
+                                            >
+                                                我的数据卡 ({userDataCards.length})
+                                            </button>
+                                            <button
+                                                onClick={logout}
+                                                className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+                                            >
+                                                退出登录
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center">
+                                        <p className="text-sm text-gray-600 mb-2">登录后可以保存和管理您的角色数据卡</p>
+                                        <button
+                                            onClick={() => setShowAuthModal(true)}
+                                            className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700"
+                                        >
+                                            登录 / 注册
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-800">
@@ -738,7 +959,7 @@ const CharacterManagerPage: React.FC = () => {
                         {!characterData ? (
                             <>
                                 <div className="input-group">
-                                    <label htmlFor="file-upload" className="input-label">上传 .json 设定文件</label>
+                                    <label htmlFor="file-upload" className="input-label">上传 .json 设定文件（支持角色或情景文件）</label>
                                     <input id="file-upload" type="file" accept=".json" onChange={handleFileChange} className="input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0" />
                                 </div>
                                 <div className="text-center my-4 text-gray-500">或</div>
@@ -746,7 +967,7 @@ const CharacterManagerPage: React.FC = () => {
                                 <div className="mb-6">
                                     <button
                                         onClick={() => setIsPasteAreaVisible(!isPasteAreaVisible)}
-                                        className="text-purple-700 hover:underline cursor-pointer mb-2 font-semibold text-sm"
+                                        className="text-pink-700 hover:underline cursor-pointer mb-2 font-semibold text-sm"
                                     >
                                         {isPasteAreaVisible ? '▼ 折叠文本粘贴区域' : '▶ 展开文本粘贴区域 (手机端推荐)'}
                                     </button>
@@ -755,12 +976,12 @@ const CharacterManagerPage: React.FC = () => {
                                             <textarea
                                                 value={pastedJson}
                                                 onChange={(e) => setPastedJson(e.target.value)}
-                                                placeholder="在此处粘贴一个角色的设定文件(.json)内容..."
+                                                placeholder="在此处粘贴角色或情景的设定文件(.json)内容..."
                                                 className="input-field resize-y h-32"
                                                 disabled={isLoading}
                                             />
                                             <button onClick={handlePasteAndLoad} disabled={isLoading || !pastedJson.trim()} className="generate-button mt-2 mb-0">
-                                                {isLoading ? '加载中...' : '从文本加载角色'}
+                                                {isLoading ? '加载中...' : '从文本加载数据'}
                                             </button>
                                         </div>
                                     )}
@@ -769,7 +990,12 @@ const CharacterManagerPage: React.FC = () => {
                         ) : (
                             <div>
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold">编辑角色: {originalData.codename || originalData.name}</h2>
+                                    <h2 className="text-xl font-bold">
+                                        {isScenarioData(characterData) ?
+                                            `编辑情景: ${characterData.title}` :
+                                            `编辑角色: ${originalData.codename || originalData.name}`
+                                        }
+                                    </h2>
                                     {isNative && !hasLostNativeness ? (
                                         <span className="px-3 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">原生数据</span>
                                     ) : (
@@ -777,15 +1003,22 @@ const CharacterManagerPage: React.FC = () => {
                                     )}
                                 </div>
 
-                                <div className="space-y-4">
-                                    {renderFormFields(characterData)}
-                                </div>
+                                {/* 按文件类型显示不同的编辑界面 */}
+                                {isScenarioData(characterData) ? (
+                                    <ScenarioEditor
+                                        data={characterData}
+                                        onChange={handleFieldChange}
+                                    />
+                                ) : (
+                                    <div className="space-y-4">
+                                        {renderFormFields(characterData)}
+                                    </div>
+                                )}
 
                                 {/* 【v0.3.0 新增】调用内嵌随机事件编辑器 */}
                                 {renderAdjudicationEventsEditor()}
-
-                                {/* 历战记录管理模块 */}
-                                {characterData.arena_history && (
+                                {/* 历战记录管理模块 - 只对角色数据显示 */}
+                                {!isScenarioData(characterData) && characterData.arena_history && (
                                     <fieldset className="border border-gray-300 p-4 rounded-lg mt-4">
                                         <legend className="text-sm font-semibold px-2 text-gray-600">历战记录管理</legend>
                                         <div className="space-y-4">
@@ -804,6 +1037,15 @@ const CharacterManagerPage: React.FC = () => {
                                 )}
 
                                 <div className="mt-8 pt-4 border-t space-y-2">
+                                    {isAuthenticated && characterData && (
+                                        <button
+                                            onClick={handleSaveAsDataCard}
+                                            className="generate-button w-full"
+                                            style={{ backgroundColor: '#10b981', backgroundImage: 'linear-gradient(to right, #10b981, #059669)' }}
+                                        >
+                                            保存到云端
+                                        </button>
+                                    )}
                                     <button onClick={() => handleSaveChanges('download')} disabled={message?.type === 'error' || isLoading} className="generate-button w-full">
                                         {isLoading ? '处理中...' : '保存修改并下载'}
                                     </button>
@@ -811,7 +1053,7 @@ const CharacterManagerPage: React.FC = () => {
                                         {isLoading ? '处理中...' : copiedStatus ? '已复制！' : '复制到剪贴板'}
                                     </button>
                                     <button onClick={() => { setCharacterData(null); setPastedJson('') }} className="footer-link mt-4 w-full text-center">
-                                        加载其他角色
+                                        加载其他数据
                                     </button>
                                 </div>
                             </div>
@@ -853,19 +1095,22 @@ const CharacterManagerPage: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="card mt-6">
-                        <button
-                            onClick={() => setIsTachieVisible(!isTachieVisible)}
-                            className="w-full text-left text-lg font-bold text-gray-800"
-                        >
-                            {isTachieVisible ? '▼' : '▶'} 立绘生成
-                        </button>
-                        {isTachieVisible && characterData && (
-                            <div className="mt-4 pt-4 border-t">
-                                <TachieGenerator prompt={tachiePrompt} />
-                            </div>
-                        )}
-                    </div>
+                    {/* 立绘生成 - 只对角色数据显示 */}
+                    {!isScenarioData(characterData) && (
+                        <div className="card mt-6">
+                            <button
+                                onClick={() => setIsTachieVisible(!isTachieVisible)}
+                                className="w-full text-left text-lg font-bold text-gray-800"
+                            >
+                                {isTachieVisible ? '▼' : '▶'} 立绘生成
+                            </button>
+                            {isTachieVisible && characterData && (
+                                <div className="mt-4 pt-4 border-t">
+                                    <TachieGenerator prompt={tachiePrompt} />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="text-center mt-8">
                         <Link href="/" className="footer-link">返回首页</Link>
@@ -883,6 +1128,60 @@ const CharacterManagerPage: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* 认证模态框 */}
+            <AuthModal
+                isOpen={showAuthModal}
+                onClose={() => {
+                    setShowAuthModal(false);
+                    setAuthMessage(null);
+                    setGeneratedAuthKey(null);
+                }}
+                onLogin={handleLogin}
+                onRegister={handleRegister}
+                authMessage={authMessage}
+                generatedAuthKey={generatedAuthKey}
+            />
+
+            {/* 数据卡管理模态框 */}
+            <DataCardsModal
+                isOpen={showDataCardsModal}
+                onClose={() => {
+                    setShowDataCardsModal(false);
+                    setCurrentPage(1);
+                }}
+                dataCards={userDataCards}
+                editingCard={editingCard}
+                currentPage={currentPage}
+                cardsPerPage={cardsPerPage}
+                onPageChange={setCurrentPage}
+                onEditCard={setEditingCard}
+                onUpdateCard={handleUpdateDataCard}
+                onDeleteCard={handleDeleteDataCard}
+                onLoadCard={handleLoadDataCard}
+                onCancelEdit={() => setEditingCard(null)}
+                onShareCard={handleShareDataCard}
+            />
+
+            {/* 保存数据卡弹窗 */}
+            <SaveCardModal
+                isOpen={showSaveCardModal}
+                onClose={() => {
+                    setShowSaveCardModal(false);
+                    setNewCardForm({ name: '', description: '', isPublic: false });
+                    setSaveCardError(null);
+                    setIsSavingCard(false);
+                }}
+                onSave={handleConfirmSaveCard}
+                name={newCardForm.name}
+                description={newCardForm.description}
+                isPublic={newCardForm.isPublic}
+                onNameChange={(value) => setNewCardForm({ ...newCardForm, name: value })}
+                onDescriptionChange={(value) => setNewCardForm({ ...newCardForm, description: value })}
+                onPublicChange={(value) => setNewCardForm({ ...newCardForm, isPublic: value })}
+                error={saveCardError}
+                isSaving={isSavingCard}
+            />
         </>
     );
 };
