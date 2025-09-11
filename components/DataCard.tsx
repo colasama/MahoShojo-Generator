@@ -69,7 +69,7 @@ export default function DataCard({
     }
   };
   const bgColor = type === 'scenario'
-    ? 'bg-white border-purple-200 hover:border-purple-400'
+    ? 'bg-white border-green-200 hover:border-green-400'
     : 'bg-white border-pink-200 hover:border-pink-400';
 
   const textColor = 'text-gray-800';

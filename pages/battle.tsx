@@ -13,6 +13,8 @@ import Leaderboard from '../components/Leaderboard';
 import { config as appConfig } from '../lib/config';
 import { ArenaHistory } from '../types/arena';
 import { generateRandomMagicalGirl, generateRandomCanshou } from '../lib/random-character-generator';
+import BattleDataModal from '../components/BattleDataModal';
+import { useAuth } from '@/lib/useAuth';
 
 interface UpdatedCombatantData {
     codename?: string;
@@ -57,9 +59,9 @@ const battleLevels = [
 
 // 新增：定义随机角色占位符的类型
 interface RandomCombatantPlaceholder {
-  type: 'random-magical-girl' | 'random-canshou';
-  id: string; // 使用唯一ID作为key
-  filename: string; // 用于UI显示
+    type: 'random-magical-girl' | 'random-canshou';
+    id: string; // 使用唯一ID作为key
+    filename: string; // 用于UI显示
 }
 
 // 定义参战者的数据结构
@@ -93,6 +95,8 @@ interface AdjudicationResult {
 
 const BattlePage: React.FC = () => {
     const router = useRouter();
+    const { isAuthenticated } = useAuth();
+
     // 统一存储所有参战者
     const [combatants, setCombatants] = useState<Combatant[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -110,6 +114,11 @@ const BattlePage: React.FC = () => {
     // 新增：用于复制粘贴情景设定文本
     const [pastedScenarioJson, setPastedScenarioJson] = useState('');
     const [isScenarioPasteAreaVisible, setIsScenarioPasteAreaVisible] = useState(false);
+
+    // 数据库数据选择相关状态
+    const [showBattleDataModal, setShowBattleDataModal] = useState(false);
+    const [dataModalType, setDataModalType] = useState<'character' | 'scenario'>('character');
+
     // 用于跟踪哪些文件被自动修正过
     const [correctedFiles, setCorrectedFiles] = useState<Record<string, boolean>>({});
     // 用于跟踪复制操作的状态
@@ -353,65 +362,65 @@ const BattlePage: React.FC = () => {
     const processJsonData = async (jsonText: string, sourceName: string) => {
         // [SRS 3.2.2] 兼容性加载核心逻辑
         let parsedData;
-      try {
-          parsedData = JSON.parse(jsonText);
-      } catch {
-          const sanitizedText = `[${jsonText.trim().replace(/}\s*{/g, '},{')}]`;
-          parsedData = JSON.parse(sanitizedText);
-      }
+        try {
+            parsedData = JSON.parse(jsonText);
+        } catch {
+            const sanitizedText = `[${jsonText.trim().replace(/}\s*{/g, '},{')}]`;
+            parsedData = JSON.parse(sanitizedText);
+        }
 
-      const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+        const dataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
 
-      if (dataArray.length > (4 - combatants.length)) {
-          throw new Error(`队伍将超出4人上限！`);
-      }
+        if (dataArray.length > (4 - combatants.length)) {
+            throw new Error(`队伍将超出4人上限！`);
+        }
 
-      const loadedCombatants: CombatantData[] = [];
-      const newAdjudicationEvents: AdjudicationEvent[] = [];
+        const loadedCombatants: CombatantData[] = [];
+        const newAdjudicationEvents: AdjudicationEvent[] = [];
 
-      for (const item of dataArray) {
-          const itemName = item.codename || item.name || sourceName;
-          try {
-              const type: 'magical-girl' | 'canshou' = item.codename ? 'magical-girl' : 'canshou';
-              if (!item.codename && !item.name) throw new Error('缺少 "codename" 或 "name" 字段。');
-              
-              const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
-              if (!validationResult.success) throw new Error("标准验证失败");
+        for (const item of dataArray) {
+            const itemName = item.codename || item.name || sourceName;
+            try {
+                const type: 'magical-girl' | 'canshou' = item.codename ? 'magical-girl' : 'canshou';
+                if (!item.codename && !item.name) throw new Error('缺少 "codename" 或 "name" 字段。');
 
-              const verificationResponse = await fetch('/api/verify-origin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
-              const { isValid } = await verificationResponse.json();
+                const validationResult = type === 'magical-girl' ? validateMagicalGirlData(item, itemName) : validateCanshouData(item, itemName);
+                if (!validationResult.success) throw new Error("标准验证失败");
 
-              loadedCombatants.push({ type, data: item, filename: itemName, isValid, isPreset: false, isNonStandard: false });
-              
-              // [FR-4] 检查并加载内嵌的随机判定事件
-              if (Array.isArray(item.adjudicationEvents)) {
-                  item.adjudicationEvents.forEach((event: any) => {
-                      if (event.event && event.probability) {
-                          // 兼容小数和百分比
-                          const probability = event.probability <= 1 ? event.probability * 100 : event.probability;
-                          newAdjudicationEvents.push({
-                              id: `char-event-${Date.now()}-${Math.random()}`,
-                              event: String(event.event),
-                              probability: Math.round(Math.max(1, Math.min(100, probability))),
-                          });
-                      }
-                  });
-              }
+                const verificationResponse = await fetch('/api/verify-origin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
+                const { isValid } = await verificationResponse.json();
 
-          } catch {
-              if (item && (item.codename || item.name)) {
-                  setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。`);
-                  const type = item.codename ? 'magical-girl' : 'canshou';
-                  loadedCombatants.push({ type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true });
-              } else {
-                  throw new Error(`文件 "${itemName}" 格式不规范，缺少必需的 "codename" 或 "name" 字段。`);
-              }
-          }
-      }
-      setCombatants(prev => [...prev, ...loadedCombatants]);
-      if (newAdjudicationEvents.length > 0) {
-          setAdjudicationEvents(prev => [...prev, ...newAdjudicationEvents]);
-      }
+                loadedCombatants.push({ type, data: item, filename: itemName, isValid, isPreset: false, isNonStandard: false });
+
+                // [FR-4] 检查并加载内嵌的随机判定事件
+                if (Array.isArray(item.adjudicationEvents)) {
+                    item.adjudicationEvents.forEach((event: any) => {
+                        if (event.event && event.probability) {
+                            // 兼容小数和百分比
+                            const probability = event.probability <= 1 ? event.probability * 100 : event.probability;
+                            newAdjudicationEvents.push({
+                                id: `char-event-${Date.now()}-${Math.random()}`,
+                                event: String(event.event),
+                                probability: Math.round(Math.max(1, Math.min(100, probability))),
+                            });
+                        }
+                    });
+                }
+
+            } catch {
+                if (item && (item.codename || item.name)) {
+                    setError(`✔️ 文件 "${itemName}" 格式不完全规范，已通过兼容模式加载。`);
+                    const type = item.codename ? 'magical-girl' : 'canshou';
+                    loadedCombatants.push({ type, data: item, filename: itemName, isValid: false, isPreset: false, isNonStandard: true });
+                } else {
+                    throw new Error(`文件 "${itemName}" 格式不规范，缺少必需的 "codename" 或 "name" 字段。`);
+                }
+            }
+        }
+        setCombatants(prev => [...prev, ...loadedCombatants]);
+        if (newAdjudicationEvents.length > 0) {
+            setAdjudicationEvents(prev => [...prev, ...newAdjudicationEvents]);
+        }
     };
 
 
@@ -449,6 +458,70 @@ const BattlePage: React.FC = () => {
                 setError(`❌ 文本解析失败: ${err.message}\n建议前往 https://www.toolhelper.cn/JSON/JSONFormat 进行格式化检查。`);
             }
         }
+    };
+
+    // 处理数据卡选择
+    const handleSelectDataCard = (cardData: any) => {
+        try {
+            // 构造文件名显示
+            const filename = `${cardData._cardName || (cardData.codename || cardData.name || cardData.title || '未命名')}.json`;
+
+            // 检查是否已存在同名文件
+            if (combatants.some(c => c.filename === filename)) {
+                setError(`❌ 已添加同名角色: ${filename}`);
+                return;
+            }
+
+            if (combatants.length >= 4) {
+                setError('❌ 最多只能添加4位角色。');
+                return;
+            }
+
+            // 根据数据类型判断是角色还是情景
+            if (cardData.title && cardData.elements) {
+                // 这是情景数据卡，在情景模式下处理
+                if (battleMode !== 'scenario') {
+                    setError('❌ 情景数据卡只能在情景模式下使用。');
+                    return;
+                }
+                // 设置为情景内容
+                setScenarioContent(cardData);
+                setScenarioFileName(filename);
+                setIsScenarioNative(cardData._isNative || false);
+                setError(null);
+                return;
+            }
+
+            // 这是角色数据卡
+            const type = cardData.codename ? 'magical-girl' : 'canshou';
+
+            const combatant: CombatantData = {
+                type,
+                data: cardData,
+                filename,
+                isValid: cardData._isNative || false, // 从数据库来的数据标记为有效
+                isPreset: false,
+                isNonStandard: false
+            };
+
+            setCombatants(prev => [...prev, combatant]);
+            setError(null);
+
+        } catch (err) {
+            setError(`❌ 数据卡加载失败: ${err instanceof Error ? err.message : '未知错误'}`);
+        }
+    };
+
+    // 打开角色数据卡选择器
+    const handleOpenCharacterDataModal = () => {
+        setDataModalType('character');
+        setShowBattleDataModal(true);
+    };
+
+    // 打开情景数据卡选择器
+    const handleOpenScenarioDataModal = () => {
+        setDataModalType('scenario');
+        setShowBattleDataModal(true);
     };
 
     const handlePasteAndLoadScenario = async () => {
@@ -603,7 +676,7 @@ const BattlePage: React.FC = () => {
             // 可以选择在这里处理空输入的情况，例如暂时不清空
             return;
         }
-        
+
         // 确保概率值在 1 到 100 之间
         const clampedValue = Math.max(1, Math.min(100, newProbability));
 
@@ -886,6 +959,25 @@ const BattlePage: React.FC = () => {
                         {renderPresetSelector(magicalGirlPresets, currentMgPresetPage, setCurrentMgPresetPage, '选择预设魔法少女')}
                         {renderPresetSelector(canshouPresets, currentCanshouPresetPage, setCurrentCanshouPresetPage, '选择预设残兽')}
 
+                        {/* 数据库数据选择按钮 */}
+                        <div className="mb-6">
+                            <h3 className="input-label">从数据库选择角色</h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleOpenCharacterDataModal}
+                                    disabled={isGenerating || combatants.length >= 4}
+                                    className="flex-1 px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                >
+                                    从在线角色数据库中选择
+                                </button>
+                                {!isAuthenticated && (
+                                    <div className="flex-1 text-xs text-gray-500 flex items-center px-2">
+                                        登录后可访问私有数据卡
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div className="input-group">
                             <label htmlFor="file-upload" className="input-label">上传自己的 .json 设定文件</label>
                             <input ref={fileInputRef} id="file-upload" type="file" multiple accept=".json" onChange={handleFileChange} disabled={isGenerating} className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 disabled:opacity-50 disabled:cursor-not-allowed" />
@@ -969,7 +1061,7 @@ const BattlePage: React.FC = () => {
                                         const isPlaceholder = 'id' in c;
                                         const key = isPlaceholder ? c.id : c.filename;
                                         const name = isPlaceholder ? c.filename : (c.data.codename || c.data.name);
-                                        const typeDisplay = isPlaceholder 
+                                        const typeDisplay = isPlaceholder
                                             ? (c.type === 'random-magical-girl' ? '(随机魔法少女)' : '(随机残兽)')
                                             : (c.type === 'magical-girl' ? '(魔法少女)' : '(残兽)');
                                         const isCorrected = !isPlaceholder && correctedFiles[name];
@@ -1100,6 +1192,24 @@ const BattlePage: React.FC = () => {
                         {/* --- 情景模式UI --- */}
                         {battleMode === 'scenario' && (
                             <div className="mt-4">
+                                <div className="mb-4">
+                                    <h3 className="input-label">选择情景</h3>
+                                    <div className="flex gap-2 mb-4">
+                                        <button
+                                            onClick={handleOpenScenarioDataModal}
+                                            disabled={isGenerating}
+                                            className="flex-1 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                        >
+                                            从在线情景数据库中选择
+                                        </button>
+                                        {!isAuthenticated && (
+                                            <div className="flex-1 text-xs text-gray-500 flex items-center px-2">
+                                                登录后可访问私有数据卡
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 <label htmlFor="scenario-upload" className="input-label">上传情景文件 (.json)</label>
                                 <input
                                     id="scenario-upload"
@@ -1107,7 +1217,7 @@ const BattlePage: React.FC = () => {
                                     accept=".json"
                                     onChange={handleScenarioFileChange}
                                     disabled={isGenerating}
-                                    className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="cursor-pointer input-field file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 />
                                 {scenarioFileName && (
                                     <p className="text-xs text-gray-500 mt-2">
@@ -1117,7 +1227,7 @@ const BattlePage: React.FC = () => {
                                 )}
                                 <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
                                     <p className="font-bold">你已选择【情景模式】！</p>
-                                    <p className="mt-1">上传一个情景文件，让角色们在自定义的舞台上展开故事吧！</p>
+                                    <p className="mt-1">选择一个情景数据卡或上传情景文件，让角色们在自定义的舞台上展开故事吧！</p>
                                 </div>
                             </div>
                         )}
@@ -1229,12 +1339,12 @@ const BattlePage: React.FC = () => {
                                 + 添加判定事件
                             </button>
                         </div>
-                        
+
                         {/* [FR-5] 字数选择 UI */}
                         <div className="input-group">
                             <label className="input-label">期望字数</label>
                             <div className="flex flex-wrap gap-2">
-                                {[{v: 'default', l: '默认'}, {v: 'short', l: '简短(300+)'}, {v: 'standard', l: '标准(600+)'}, {v: 'detailed', l: '详细(1000+)'}, {v: 'long', l: '长篇(2000+)'}].map(opt => (
+                                {[{ v: 'default', l: '默认' }, { v: 'short', l: '简短(300+)' }, { v: 'standard', l: '标准(600+)' }, { v: 'detailed', l: '详细(1000+)' }, { v: 'long', l: '长篇(2000+)' }].map(opt => (
                                     <button
                                         key={opt.v}
                                         onClick={() => setStoryLength(opt.v)}
@@ -1278,10 +1388,10 @@ const BattlePage: React.FC = () => {
                             {getButtonText()}
                         </button>
                         <div className="text-center mt-3">
-                            <a 
-                                href="https://qun.qq.com/universal-share/share?ac=1&busi_data=eyJncm91cENvZGUiOiIxMDU5ODMwOTUyIiwidG9rZW4iOiJNUFN6UVpBRVZNNU9COWpBa21DU1lxczRObXhiKy9kSzEvbHhOcnNpT1RBZUVVU3dtZ2hUQjJVNGtuYk5ISDhrIiwidWluIjoiMTAxOTcyNzcxMCJ9&data=DxfxSXDeGY3mgLKqoTGEoHkfqpums19TEW8Alu5Ikc3uCmV0O8YkLVLyRTMOp61VjFN387-7QL8-j2AFHUX2QXq525oXb8rl0lNhm0K453Q&svctype=5&tempid=h5_group_info" 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
+                            <a
+                                href="https://qun.qq.com/universal-share/share?ac=1&busi_data=eyJncm91cENvZGUiOiIxMDU5ODMwOTUyIiwidG9rZW4iOiJNUFN6UVpBRVZNNU9COWpBa21DU1lxczRObXhiKy9kSzEvbHhOcnNpT1RBZUVVU3dtZ2hUQjJVNGtuYk5ISDhrIiwidWluIjoiMTAxOTcyNzcxMCJ9&data=DxfxSXDeGY3mgLKqoTGEoHkfqpums19TEW8Alu5Ikc3uCmV0O8YkLVLyRTMOp61VjFN387-7QL8-j2AFHUX2QXq525oXb8rl0lNhm0K453Q&svctype=5&tempid=h5_group_info"
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-sm text-blue-600 hover:underline font-semibold"
                             >
                                 点击加入QQ交流群
@@ -1299,9 +1409,8 @@ const BattlePage: React.FC = () => {
                                     <div key={index} className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
                                         <p className="font-semibold text-gray-700">事件: {res.event}</p>
                                         <p className="text-gray-600">
-                                            判定结果: <span className={`font-bold ${
-                                                res.result.includes('成功') ? 'text-green-600' : 'text-red-600'
-                                            }`}>{res.result}</span> (掷出 {res.roll} / 设定 {res.probability})
+                                            判定结果: <span className={`font-bold ${res.result.includes('成功') ? 'text-green-600' : 'text-red-600'
+                                                }`}>{res.result}</span> (掷出 {res.roll} / 设定 {res.probability})
                                         </p>
                                     </div>
                                 ))}
@@ -1450,6 +1559,14 @@ const BattlePage: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* 数据库数据选择模态框 */}
+            <BattleDataModal
+                isOpen={showBattleDataModal}
+                onClose={() => setShowBattleDataModal(false)}
+                onSelectCard={handleSelectDataCard}
+                selectedType={dataModalType}
+            />
         </>
     );
 };
