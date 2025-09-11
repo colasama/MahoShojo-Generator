@@ -11,10 +11,11 @@ interface DataCardsModalProps {
   cardsPerPage: number;
   onPageChange: (page: number) => void;
   onEditCard: (card: any) => void;
-  onUpdateCard: (id: number, name: string, description: string, isPublic: boolean) => void;
-  onDeleteCard: (id: number) => void;
+  onUpdateCard: (id: string, name: string, description: string, isPublic: boolean) => void;
+  onDeleteCard: (id: string) => void;
   onLoadCard: (card: any) => void;
   onCancelEdit: () => void;
+  onShareCard?: (card: any) => void;
 }
 
 export default function DataCardsModal({
@@ -29,7 +30,8 @@ export default function DataCardsModal({
   onUpdateCard,
   onDeleteCard,
   onLoadCard,
-  onCancelEdit
+  onCancelEdit,
+  onShareCard
 }: DataCardsModalProps) {
   if (!isOpen) return null;
 
@@ -105,6 +107,7 @@ export default function DataCardsModal({
                       onEditInfo={() => onEditCard(card)}
                       onEditData={() => onLoadCard(card)}
                       onDelete={() => onDeleteCard(card.id)}
+                      onShare={() => onShareCard?.(card)}
                     />
                   );
                 })}

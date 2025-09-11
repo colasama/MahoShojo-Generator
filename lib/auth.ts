@@ -246,7 +246,7 @@ export const dataCardApi = {
   },
 
   // 更新数据卡
-  async updateCard(id: number, name: string, description: string, isPublic?: boolean): Promise<{
+  async updateCard(id: string, name: string, description: string, isPublic?: boolean): Promise<{
     success: boolean;
     error?: string;
   }> {
@@ -274,7 +274,7 @@ export const dataCardApi = {
   },
 
   // 删除数据卡
-  async deleteCard(id: number): Promise<{
+  async deleteCard(id: string): Promise<{
     success: boolean;
     error?: string;
   }> {

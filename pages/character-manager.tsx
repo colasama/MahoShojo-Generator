@@ -220,7 +220,7 @@ const CharacterManagerPage: React.FC = () => {
     };
 
     // 删除数据卡
-    const handleDeleteDataCard = async (id: number) => {
+    const handleDeleteDataCard = async (id: string) => {
         if (!window.confirm('确定要删除这个数据卡吗？')) return;
 
         const result = await dataCardApi.deleteCard(id);
@@ -233,7 +233,7 @@ const CharacterManagerPage: React.FC = () => {
     };
 
     // 更新数据卡信息
-    const handleUpdateDataCard = async (id: number, name: string, description: string, isPublic?: boolean) => {
+    const handleUpdateDataCard = async (id: string, name: string, description: string, isPublic?: boolean) => {
         const result = await dataCardApi.updateCard(id, name, description, isPublic);
         if (result.success) {
             setEditingCard(null);
@@ -242,6 +242,12 @@ const CharacterManagerPage: React.FC = () => {
         } else {
             setMessage({ type: 'error', text: result.error || '更新失败' });
         }
+    };
+
+    // 分享数据卡
+    const handleShareDataCard = async (card: any) => {
+        // 在这里可以添加额外的分享统计或其他操作
+        console.log(`分享了数据卡: ${card.name} (${card.id})`);
     };
 
     // 组件加载时运行，检测设备类型以决定是否默认展开粘贴区域
@@ -958,6 +964,7 @@ const CharacterManagerPage: React.FC = () => {
                 onDeleteCard={handleDeleteDataCard}
                 onLoadCard={handleLoadDataCard}
                 onCancelEdit={() => setEditingCard(null)}
+                onShareCard={handleShareDataCard}
             />
 
             {/* 保存数据卡弹窗 */}

@@ -1,8 +1,8 @@
-import React from 'react';
-import { Download, Heart } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Heart, Share } from 'lucide-react';
 
 interface DataCardProps {
-  id: number;
+  id: string; // Changed from number to string for UUID
   name: string;
   description: string;
   type: 'character' | 'scenario';
@@ -17,9 +17,16 @@ interface DataCardProps {
   onEditInfo?: () => void;
   onEditData?: () => void;
   onDelete?: () => void;
+  onShare?: () => void;
+}
+
+const typeMap = {
+  character: '角色',
+  scenario: '情景',
 }
 
 export default function DataCard({
+  id,
   name,
   description,
   type,
@@ -33,7 +40,34 @@ export default function DataCard({
   onEditInfo,
   onEditData,
   onDelete,
+  onShare,
 }: DataCardProps) {
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+
+  // 分享功能 - 复制卡片名称和UUID到剪贴板
+  const handleShare = async () => {
+    try {
+      const shareText = `【${typeMap[type]}：${name}】${id}`;
+      await navigator.clipboard.writeText(shareText);
+      setShareStatus('copied');
+      setTimeout(() => setShareStatus('idle'), 2000);
+    } catch (error) {
+      console.error('复制到剪贴板失败:', error);
+      // 降级处理：尝试使用传统方法
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = `${name} ${id}`;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setShareStatus('copied');
+        setTimeout(() => setShareStatus('idle'), 2000);
+      } catch (fallbackError) {
+        console.error('降级复制方法也失败了:', fallbackError);
+      }
+    }
+  };
   const bgColor = type === 'scenario'
     ? 'bg-white border-purple-200 hover:border-purple-400'
     : 'bg-white border-pink-200 hover:border-pink-400';
@@ -71,33 +105,51 @@ export default function DataCard({
             {description}
           </p>
         )}
+      </div>
+
+      <div className="flex items-center gap-3 text-sm mb-3 justify-between">
+        {/* 作者 */}
         {author && (
-          <p className={`text-xs mt-2 ${subTextColor}`}>
+          <p className={`text-xs mt-1 ${subTextColor}`}>
             作者: {author}
           </p>
         )}
-      </div>
+        {/* 统计信息 */}
+        <div className="flex items-bottom gap-3 text-sm justify-end">
 
-      {/* 统计信息 */}
-      <div className="flex items-center gap-3 text-sm mt-3 mb-3">
-        {/* 点赞按钮和计数 */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onLike?.();
-          }}
-          className={`flex items-center gap-1 ${isPublic ? 'hover:text-red-500 transition-colors' : 'text-gray-400 cursor-not-allowed'
-            }`}
-          disabled={!isPublic || !onLike}
-        >
-          <Heart className="w-4 h-4" />
-          <span>{likeCount}</span>
-        </button>
+          {/* 点赞按钮和计数 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onLike?.();
+            }}
+            className={`flex items-center gap-1 ${isPublic ? 'hover:text-red-500 transition-colors' : 'text-gray-400 cursor-not-allowed'
+              }`}
+            disabled={!isPublic || !onLike}
+          >
+            <Heart className="w-4 h-4" />
+            <span>{likeCount}</span>
+          </button>
 
-        {/* 使用次数 */}
-        <div className="flex items-center gap-1 text-gray-500">
-          <Download className="w-4 h-4" />
-          <span>{usageCount}</span>
+          {/* 使用次数 */}
+          <div className="flex items-center gap-1 text-gray-500">
+            <Download className="w-4 h-4" />
+            <span>{usageCount}</span>
+          </div>
+
+          {/* 分享按钮 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShare();
+              onShare?.();
+            }}
+            className="flex items-center gap-1 text-gray-500 hover:text-blue-500 transition-colors"
+            title={`分享：${name} ${id}`}
+          >
+            <Share className="w-4 h-4" />
+            <span className="text-xs">{shareStatus === 'copied' ? '已复制！' : '分享'}</span>
+          </button>
         </div>
       </div>
 
