@@ -573,7 +573,17 @@ async function handler(req: NextRequest): Promise<Response> {
       const errorMessage = `该模式需要 ${minParticipants} 到 4 位角色`;
       return new Response(JSON.stringify({ error: errorMessage }), { status: 400 });
     }
-    
+
+    // 在进行操作之前，先为客户端生成的随机角色补上签名。
+    for (const combatant of combatants) {
+        // 条件：被标记为原生(`isNative: true`)，但数据中没有 `signature` 字段
+        if (combatant.isNative && !combatant.data.signature) {
+            log.info(`为客户端生成的原生角色 ${combatant.data.codename || combatant.data.name} 进行补签...`);
+            // 生成签名并直接修改 combatant 对象
+            combatant.data.signature = await generateSignature(combatant.data);
+        }
+    }
+
     // [v0.2.1 更新] 一体化内容安全检查 (SRS 3.1)
     const inputsToCheck: { type: keyof SafetyCheckPolicy, content: string, isNative: boolean }[] = [];
 

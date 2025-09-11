@@ -464,20 +464,18 @@ const DetailsPage: React.FC = () => {
                     开始回答问卷
                   </button>
                   <button
-                      onClick={async () => {
-                          // 设置为生成中状态，禁用按钮
-                          setIsGenerating(true); 
+                      onClick={() => {
+                          setIsGenerating(true);
                           setError(null);
                           try {
-                              // 直接调用客户端生成函数，不再发送API请求
-                              const data = await generateRandomMagicalGirl();
+                              // 直接同步调用，移除 await
+                              const data = generateRandomMagicalGirl();
                               setMagicalGirlDetails(data);
-                              setShowIntroduction(false); // 直接进入结果展示
+                              setShowIntroduction(false);
                           } catch (err) {
                               console.error('随机生成失败: ', err);
                               setError('随机生成失败，请稍后再试。');
                           } finally {
-                              // 结束生成状态
                               setIsGenerating(false);
                           }
                       }}

@@ -663,16 +663,13 @@ const BattlePage: React.FC = () => {
 
             if (placeholders.length > 0) {
                 setError('正在生成随机角色...'); // 提示用户
-
-                // 直接调用客户端生成函数，不再发送API请求
-                const randomCharacterPromises = placeholders.map(p => {
+                // 同步调用客户端生成函数
+                const generatedCharacters = placeholders.map(p => {
                     if (p.type === 'random-magical-girl') {
                         return generateRandomMagicalGirl();
                     }
                     return generateRandomCanshou();
                 });
-
-                const generatedCharacters = await Promise.all(randomCharacterPromises);
 
                 // 将生成的角色数据转换为 CombatantData 格式
                 const newCombatants: CombatantData[] = generatedCharacters.map((data, i) => ({

@@ -314,12 +314,12 @@ const CanshouPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button onClick={() => setShowIntroduction(false)} className="generate-button text-lg flex-1">开始调查</button>
                     <button
-                        onClick={async () => {
-                            setSubmitting(true); // 使用 submitting 状态
+                        onClick={() => { // 移除 async
+                            setSubmitting(true);
                             setError(null);
                             try {
-                                // 直接调用客户端生成函数
-                                const data = await generateRandomCanshou();
+                                // 直接同步调用，移除 await
+                                const data = generateRandomCanshou();
                                 setCanshouDetails(data);
                                 setShowIntroduction(false);
                             } catch (err) {
