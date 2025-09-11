@@ -167,7 +167,21 @@ const updateCombatantsWithHistory = async (
         const characterData = JSON.parse(JSON.stringify(combatant.data));
         const characterName = characterData.codename || characterData.name;
 
-        // 【核心修复逻辑】
+        // 【新增】确保 templateId 存在，兼容旧文件
+        if (!characterData.templateId) {
+            if (characterData.codename) { // 魔法少女
+                // 通过字段判断是问卷生成还是名字生成
+                characterData.templateId = characterData.magicConstruct 
+                    ? "魔法少女/心之花/魔法少女（问卷生成）" 
+                    : "魔法少女/心之花/魔法少女（名字生成）";
+            } else if (characterData.name) { // 残兽
+                characterData.templateId = "魔法少女/心之花/残兽（问卷生成）";
+            } else {
+                characterData.templateId = "魔法少女/心之花/未知";
+            }
+            log.info(`为旧版角色 "${characterName}" 补充了 templateId: ${characterData.templateId}`);
+        }
+        
         // 只有当 useArenaHistory 为 true 时，才进行历战记录的追加和更新
         if (useArenaHistory) {
             let history = characterData.arena_history;

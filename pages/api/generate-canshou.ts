@@ -123,16 +123,17 @@ async function handler(req: NextRequest): Promise<Response> {
     // 调用通用AI生成函数
     const canshouDetails = await generateWithAI({ answers, language }, canshouGenerationConfig);
 
-    // 新增：将用户答案和生成结果合并，为签名做准备
+    // 将用户答案和生成结果合并，并添加模板ID，为签名做准备
     const dataToSign = {
         ...canshouDetails,
+        templateId: "魔法少女/心之花/残兽（问卷生成）", // 添加模板ID
         userAnswers: answers
     };
 
-    // 新增：为合并后的数据生成签名
+    // 为合并后的数据生成签名
     const signature = await generateSignature(dataToSign);
 
-    // 新增：将签名附加到最终结果中
+    // 将签名附加到最终结果中
     const finalResult = {
         ...dataToSign,
         signature: signature

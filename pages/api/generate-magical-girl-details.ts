@@ -154,16 +154,17 @@ async function handler(req: Request): Promise<Response> {
     //   saveToD1(saveData).catch(err => log.error('保存到D1失败（非阻塞）', err));
     // }
 
-    // 新增：将用户答案和生成结果合并，为签名做准备
+    // 将用户答案和生成结果合并，并添加模板ID，为签名做准备
     const dataToSign = {
         ...magicalGirlDetails,
+        templateId: "魔法少女/心之花/魔法少女（问卷生成）", // 添加模板ID
         userAnswers: answers
     };
 
-    // 新增：为合并后的数据生成签名
+    // 为合并后的数据生成签名
     const signature = await generateSignature(dataToSign);
 
-    // 新增：将签名附加到最终结果中
+    // 将签名附加到最终结果中
     const finalResult = {
         ...dataToSign,
         signature: signature
