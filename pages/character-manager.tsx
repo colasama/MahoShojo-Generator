@@ -21,6 +21,7 @@ import AuthModal from '../components/CharManager/AuthModal';
 import SaveCardModal from '../components/CharManager/SaveCardModal';
 import DataCardsModal from '../components/CharManager/DataCardsModal';
 import ScenarioEditor from '../components/ScenarioEditor';
+import { UserWithTitle } from '../components/UserTitle';
 
 // 兼容 Edge 和 Node.js 环境的 crypto API
 const randomUUID = typeof crypto !== 'undefined' ? crypto.randomUUID.bind(crypto) : webcrypto.randomUUID.bind(webcrypto);
@@ -917,7 +918,12 @@ const CharacterManagerPage: React.FC = () => {
                                     <div className="flex justify-between items-center">
                                         <div className="text-left">
                                             <p className="text-sm text-gray-600">当前用户</p>
-                                            <p className="font-semibold text-pink-700">{user?.username}</p>
+                                            <UserWithTitle 
+                                                username={user?.username || ''}
+                                                prefix={user?.prefix}
+                                                usernameClassName="font-semibold text-pink-700"
+                                                titleClassName="ml-1"
+                                            />
                                         </div>
                                         <div className="space-x-2">
                                             <button

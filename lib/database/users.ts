@@ -75,7 +75,7 @@ export async function getUserByAuthKey(authKey: string): Promise<any> {
 export async function verifyUserLogin(username: string, authKey: string): Promise<any> {
   try {
     const result = await queryFromD1(
-      'SELECT id, username FROM users WHERE username = ? AND auth_key = ?',
+      'SELECT id, username, prefix FROM users WHERE username = ? AND auth_key = ?',
       [username, authKey]
     ) as any;
     

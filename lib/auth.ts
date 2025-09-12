@@ -136,7 +136,7 @@ export const authApi = {
   // 登录
   async login(username: string, authKey: string, turnstileToken: string): Promise<{
     success: boolean;
-    user?: { id: number; username: string };
+    user?: { id: number; username: string; prefix?: string | null };
     error?: string;
   }> {
     try {
@@ -163,7 +163,7 @@ export const authApi = {
   // 验证当前认证状态
   async verify(): Promise<{
     success: boolean;
-    user?: { id: number; username: string };
+    user?: { id: number; username: string; prefix?: string | null };
   }> {
     const authHeader = await authStorage.getAuthHeader();
     if (!authHeader) {
