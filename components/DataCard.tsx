@@ -77,7 +77,7 @@ export default function DataCard({
 
   return (
     <div
-      className={`flex-col justify-between relative p-4 rounded-lg border-2 transition-all duration-200 ${bgColor}`}
+      className={`flex flex-col justify-between relative p-4 rounded-lg border-2 transition-all duration-200 ${bgColor}`}
     >
       {/* 公开/私有标签 */}
       <div className="absolute top-4 right-4 flex items-center gap-2">

@@ -33,12 +33,13 @@ export async function createDataCardWithAuthor(
 ): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
     // 如果是公开卡，先检查是否有同名
-    if (isPublic) {
-      const exists = await checkPublicCardNameExists(name, type);
-      if (exists) {
-        return { success: false, error: '已存在同名的公开数据卡，请修改名称' };
-      }
-    }
+    // 暂时取消检查
+    // if (isPublic) {
+    //   const exists = await checkPublicCardNameExists(name, type);
+    //   if (exists) {
+    //     return { success: false, error: '已存在同名的公开数据卡，请修改名称' };
+    //   }
+    // }
     
     // 创建包含作者信息的数据对象
     const dataWithAuthor = JSON.stringify({
