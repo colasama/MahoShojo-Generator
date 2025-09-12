@@ -69,12 +69,14 @@ export default function BattleDataModal({
   }, []);
 
   // 获取公开数据卡
-  const loadPublicDataCards = useCallback(async (searchTerm?: string) => {
+  const loadPublicDataCards = useCallback(async (searchTerm?: string, page: number = 1) => {
     try {
       setIsLoading(true);
+      const offset = (page - 1) * cardsPerPage;
       const searchParams = new URLSearchParams({
         type: selectedType,
-        limit: '12' // 获取更多数据以便搜索
+        limit: cardsPerPage.toString(),
+        offset: offset.toString()
       });
 
       if (searchTerm) {
@@ -85,7 +87,8 @@ export default function BattleDataModal({
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setPublicDataCards(result.cards || []);
+          const cards = result.cards || [];
+          setPublicDataCards(cards);
         }
       }
     } catch (error) {
@@ -93,7 +96,7 @@ export default function BattleDataModal({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedType]);
+  }, [selectedType, cardsPerPage]);
 
   // 防抖功能 - 延迟500ms执行搜索
   useEffect(() => {
@@ -120,10 +123,10 @@ export default function BattleDataModal({
       // 否则进行搜索
       const trimmedQuery = debouncedSearchQuery.trim();
       if (trimmedQuery) {
-        loadPublicDataCards(trimmedQuery);
+        loadPublicDataCards(trimmedQuery, 1);
       } else if (debouncedSearchQuery === '') {
         // 只有在搜索框完全清空时才重新加载所有数据
-        loadPublicDataCards();
+        loadPublicDataCards(undefined, 1);
       }
     }
 
@@ -145,7 +148,7 @@ export default function BattleDataModal({
         setActiveTab('public');
       }
 
-      loadPublicDataCards();
+      loadPublicDataCards(undefined, 1);
     }
   }, [isOpen, selectedType, isAuthenticated, loadUserDataCards, loadPublicDataCards]);
 
@@ -172,15 +175,27 @@ export default function BattleDataModal({
     setSearchQuery(query);
   };
 
+  // 处理页码变化
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (activeTab === 'public') {
+      // 对于公开标签页，需要重新加载数据
+      const searchTerm = debouncedSearchQuery.trim() || undefined;
+      loadPublicDataCards(searchTerm, newPage);
+    }
+  };
+
   // 移除原来的过滤函数
   if (!isOpen) return null;
 
-  const currentCards = activeTab === 'my' ? userDataCards : publicDataCards;
-  const totalPages = Math.ceil(currentCards.length / cardsPerPage);
-  const paginatedCards = currentCards.slice(
-    (currentPage - 1) * cardsPerPage,
-    currentPage * cardsPerPage
-  );
+  // 对于我的数据卡，使用客户端分页
+  const userTotalPages = activeTab === 'my' ? Math.ceil(userDataCards.length / cardsPerPage) : 1;
+  const paginatedUserCards = activeTab === 'my'
+    ? userDataCards.slice((currentPage - 1) * cardsPerPage, currentPage * cardsPerPage)
+    : [];
+
+  // 对于公开数据卡，使用服务端分页，直接显示获取的数据
+  const displayCards = activeTab === 'my' ? paginatedUserCards : publicDataCards;
 
   const typeLabel = selectedType === 'character' ? '角色' : '情景';
 
@@ -198,7 +213,7 @@ export default function BattleDataModal({
         <h2 className="text-xl font-bold mb-4 pr-8">选择{typeLabel}数据卡</h2>
 
         {/* 搜索框 */}
-        <div className="mb-4">
+        <div className="mb-2">
           <div className="relative">
             <input
               type="text"
@@ -213,8 +228,8 @@ export default function BattleDataModal({
               </div>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            💡 支持搜索{typeLabel}的完整名称，或粘贴分享内容（如：【角色：翠雀】ea10aba3-7b46-404b-8048-6f58fc12a430）来查找特定数据卡
+          <p className="text-xs text-gray-500 mt-2">
+            💡 支持搜索{typeLabel}的完整名称，或粘贴分享内容来查找特定数据卡
           </p>
         </div>
 
@@ -238,13 +253,15 @@ export default function BattleDataModal({
             onClick={() => {
               setActiveTab('public');
               setCurrentPage(1);
+              // 重新加载公开数据卡的第一页
+              loadPublicDataCards(debouncedSearchQuery.trim() || undefined, 1);
             }}
             className={`px-4 py-2 rounded text-sm font-medium ${activeTab === 'public'
               ? 'bg-pink-500 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
           >
-            公开{typeLabel} ({publicDataCards.length})
+            公开{typeLabel}
           </button>
         </div>
 
@@ -254,7 +271,7 @@ export default function BattleDataModal({
             <div className="flex justify-center items-center h-32">
               <div className="text-gray-500">加载中...</div>
             </div>
-          ) : currentCards.length === 0 ? (
+          ) : displayCards.length === 0 ? (
             <div className="text-center text-gray-500 py-8">
               {searchQuery ? (
                 <>
@@ -279,7 +296,7 @@ export default function BattleDataModal({
             <>
               {/* 数据卡网格 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {paginatedCards.map((card: any) => {
+                {displayCards.map((card: any) => {
                   const author = activeTab === 'public' ? (card.username || '未知') : '我';
 
                   return (
@@ -302,33 +319,38 @@ export default function BattleDataModal({
                   );
                 })}
               </div>
-
-              {/* 分页控件 */}
-              {currentCards.length > cardsPerPage && (
-                <div className="flex justify-center items-center gap-2 pt-4 border-t mt-4">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
-                  >
-                    上一页
-                  </button>
-                  <span className="text-sm text-gray-600">
-                    {currentPage} / {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
-                  >
-                    下一页
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>
-
+        {/* 分页控件 */}
+        {(
+          (activeTab === 'my' && userDataCards.length > cardsPerPage) ||
+          (activeTab === 'public' && (displayCards.length === cardsPerPage || currentPage > 1))
+        ) && (
+            <div className="flex justify-center items-center gap-2 pt-4 border-t mt-4">
+              <button
+                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                上一页
+              </button>
+              <span className="text-sm text-gray-600">
+                第 {currentPage} 页{activeTab === 'my' ? ` / ${userTotalPages}` : ''}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={
+                  activeTab === 'my'
+                    ? currentPage >= userTotalPages
+                    : displayCards.length < cardsPerPage
+                }
+                className="px-3 py-1 rounded text-sm bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                下一页
+              </button>
+            </div>
+          )}
         {/* 底部提示 */}
         <div className="mt-4 text-center text-sm text-gray-500">
           点击数据卡即可加载到竞技场中
