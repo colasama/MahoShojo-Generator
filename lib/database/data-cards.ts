@@ -179,11 +179,30 @@ export async function verifyCardOwnership(cardId: string, userId: number): Promi
   }
 }
 
+// 通过ID获取单个数据卡（公开或私有）
+export async function getDataCardById(cardId: string, isPublic: boolean = false): Promise<any | null> {
+  try {
+    const result = await queryFromD1(
+      'SELECT dc.*, u.username FROM data_cards dc JOIN users u ON dc.user_id = u.id WHERE dc.id = ? AND dc.is_public = ?',
+      [cardId, isPublic ? 1 : 0]
+    ) as any;
+    
+    if (result.success && result.result && result.result[0]?.results?.length > 0) {
+      return result.result[0].results[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("通过ID获取数据卡失败:", error);
+    return null;
+  }
+}
+
 // 获取公开的数据卡列表
 export async function getPublicDataCards(
   limit: number = 20,
   offset: number = 0,
-  type?: 'character' | 'scenario'
+  type?: 'character' | 'scenario',
+  search?: string
 ): Promise<any[]> {
   try {
     let sql = 'SELECT dc.*, u.username FROM data_cards dc JOIN users u ON dc.user_id = u.id WHERE dc.is_public = 1';
@@ -192,6 +211,11 @@ export async function getPublicDataCards(
     if (type) {
       sql += ' AND dc.type = ?';
       params.push(type);
+    }
+    
+    if (search) {
+      sql += ' AND (dc.name LIKE ? OR dc.description LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
     }
     
     sql += ' ORDER BY dc.created_at DESC LIMIT ? OFFSET ?';

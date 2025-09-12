@@ -109,6 +109,7 @@ const CharacterManagerPage: React.FC = () => {
 
     // 数据卡管理相关状态
     const [userDataCards, setUserDataCards] = useState<any[]>([]);
+    const [userCapacity, setUserCapacity] = useState(config.DEFAULT_DATA_CARD_CAPACITY);
     const [showDataCardsModal, setShowDataCardsModal] = useState(false);
     const [editingCard, setEditingCard] = useState<any | null>(null);
     const [showSaveCardModal, setShowSaveCardModal] = useState(false);
@@ -137,11 +138,17 @@ const CharacterManagerPage: React.FC = () => {
     // 用于控制粘贴区域折叠/展开的状态，默认为折叠
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
 
-    // 加载用户数据卡
+    // 加载用户数据卡和容量
     const loadUserDataCards = useCallback(async () => {
         if (!isAuthenticated) return;
-        const cards = await dataCardApi.getCards();
+        const [cards, capacity] = await Promise.all([
+            dataCardApi.getCards(),
+            dataCardApi.getUserCapacity()
+        ]);
         setUserDataCards(cards);
+        if (capacity !== null) {
+            setUserCapacity(capacity);
+        }
     }, [isAuthenticated]);
 
     useEffect(() => {
@@ -182,7 +189,7 @@ const CharacterManagerPage: React.FC = () => {
         // 打开保存弹窗，设置默认值
         const isScenario = isScenarioData(characterData);
         const type = isScenario ? 'scenario' : 'character';
-        const defaultName = isScenario 
+        const defaultName = isScenario
             ? (characterData.title || characterData.name || '')
             : (characterData.codename || characterData.name || '');
         const defaultDescription = `${type === 'character' ? '角色' : '情景'}数据卡`;
@@ -207,7 +214,17 @@ const CharacterManagerPage: React.FC = () => {
         setSaveCardError(null);
 
         try {
+            // 前端敏感词检查
             const type = isScenarioData(characterData) ? 'scenario' : 'character';
+            const textToCheck = `${newCardForm.name} ${newCardForm.description} ${JSON.stringify(characterData)}`;
+            const sensitiveWordResult = await quickCheck(textToCheck);
+
+            if (sensitiveWordResult.hasSensitiveWords) {
+                // 直接跳转到 /arrested 页面
+                router.push('/arrested');
+                return;
+            }
+
             const result = await dataCardApi.createCard(
                 type,
                 newCardForm.name,
@@ -223,6 +240,11 @@ const CharacterManagerPage: React.FC = () => {
                 setSaveCardError(null);
                 loadUserDataCards();
             } else {
+                // 检查是否是敏感词错误，如果是则跳转到 /arrest
+                if (result.error === 'SENSITIVE_WORD_DETECTED' || (result as any).redirect === '/arrested') {
+                    router.push('/arrested');
+                    return;
+                }
                 setSaveCardError(result.error || '保存失败');
             }
         } finally {
@@ -258,12 +280,27 @@ const CharacterManagerPage: React.FC = () => {
 
     // 更新数据卡信息
     const handleUpdateDataCard = async (id: string, name: string, description: string, isPublic?: boolean) => {
+        // 前端敏感词检查
+        const textToCheck = `${name} ${description}`;
+        const sensitiveWordResult = await quickCheck(textToCheck);
+
+        if (sensitiveWordResult.hasSensitiveWords) {
+            // 直接跳转到 /arrested 页面
+            router.push('/arrested');
+            return;
+        }
+
         const result = await dataCardApi.updateCard(id, name, description, isPublic);
         if (result.success) {
             setEditingCard(null);
             loadUserDataCards();
             setMessage({ type: 'success', text: '数据卡信息已更新' });
         } else {
+            // 检查是否是敏感词错误，如果是则跳转到 /arrested
+            if (result.error === 'SENSITIVE_WORD_DETECTED' || (result as any).redirect === '/arrested') {
+                router.push('/arrested');
+                return;
+            }
             setMessage({ type: 'error', text: result.error || '更新失败' });
         }
     };
@@ -496,7 +533,7 @@ const CharacterManagerPage: React.FC = () => {
                 const key = keys[i];
                 const nextKey = keys[i + 1];
                 const isNextKeyNumeric = !isNaN(parseInt(nextKey, 10));
-                
+
                 if (isNextKeyNumeric && !Array.isArray(current[key])) {
                     current[key] = [];
                 } else if (!isNextKeyNumeric && !isObject(current[key])) {
@@ -542,14 +579,14 @@ const CharacterManagerPage: React.FC = () => {
     const renderAdjudicationEventsEditor = () => {
         // 从角色数据中获取事件数组，如果不存在则默认为空数组
         const events = characterData.adjudicationEvents || [];
-    
+
         // 添加新事件的处理函数
         const handleAddEvent = () => {
             const newEvent = { event: '', probability: 50 };
             // 更新角色数据状态，将新事件添加到数组末尾
             handleFieldChange('adjudicationEvents', [...events, newEvent]);
         };
-    
+
         // 删除事件的处理函数
         const handleDeleteEvent = (index: number) => {
             // 创建一个新数组，其中不包含指定索引的事件
@@ -557,7 +594,7 @@ const CharacterManagerPage: React.FC = () => {
             // 更新角色数据状态
             handleFieldChange('adjudicationEvents', newEvents);
         };
-    
+
         // 渲染UI
         return (
             <fieldset className="border border-gray-300 p-4 rounded-lg mt-4">
@@ -625,7 +662,7 @@ const CharacterManagerPage: React.FC = () => {
     };
 
     // 递归渲染表单
-// 【修正】渲染表单的递归函数，移除了未被使用的变量以修复ESLint报错
+    // 【修正】渲染表单的递归函数，移除了未被使用的变量以修复ESLint报错
     const renderFormFields = (data: any, path: string = ''): React.ReactNode => {
         // 渲染顺序：基本信息 -> 外观 -> 魔装 -> 奇境 -> 繁开 -> 分析 -> 问卷 -> 历战记录
         if (!isObject(data)) return null;
@@ -887,7 +924,7 @@ const CharacterManagerPage: React.FC = () => {
                                                 onClick={() => setShowDataCardsModal(true)}
                                                 className="px-3 py-1 text-sm bg-pink-600 text-white rounded hover:bg-pink-700"
                                             >
-                                                我的数据卡 ({userDataCards.length}/{config.DEFAULT_DATA_CARD_CAPACITY})
+                                                我的数据卡 ({userDataCards.length}/{userCapacity})
                                             </button>
                                             <button
                                                 onClick={logout}
@@ -1069,7 +1106,7 @@ const CharacterManagerPage: React.FC = () => {
                             </div>
                         )}
                     </div>
-                    
+
                     {/* 【新增】角色卡片预览与生成区域 */}
                     {characterData && !isLoading && (
                         <div className="card mt-6">
@@ -1162,6 +1199,7 @@ const CharacterManagerPage: React.FC = () => {
                 onLoadCard={handleLoadDataCard}
                 onCancelEdit={() => setEditingCard(null)}
                 onShareCard={handleShareDataCard}
+                userCapacity={userCapacity}
             />
 
             {/* 保存数据卡弹窗 */}
@@ -1183,6 +1221,7 @@ const CharacterManagerPage: React.FC = () => {
                 error={saveCardError}
                 isSaving={isSavingCard}
                 currentCardCount={userDataCards.length}
+                userCapacity={userCapacity}
             />
         </>
     );

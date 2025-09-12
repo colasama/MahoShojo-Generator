@@ -69,18 +69,18 @@ export default function DataCard({
     }
   };
   const bgColor = type === 'scenario'
-    ? 'bg-white border-green-200 hover:border-green-400'
-    : 'bg-white border-pink-200 hover:border-pink-400';
+    ? 'bg-white border-gray-200 hover:border-green-400'
+    : 'bg-white border-gray-200 hover:border-pink-400';
 
   const textColor = 'text-gray-800';
   const subTextColor = 'text-gray-600';
 
   return (
     <div
-      className={`relative p-4 rounded-lg border-2 transition-all duration-200 ${bgColor}`}
+      className={`flex-col justify-between relative p-4 rounded-lg border-2 transition-all duration-200 ${bgColor}`}
     >
       {/* 公开/私有标签 */}
-      <div className="absolute top-2 right-2 flex items-center gap-2">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
         <span className={`text-xs px-2 py-1 rounded ${isPublic ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
           }`}>
           {isPublic ? '公开' : '私有'}
@@ -98,7 +98,7 @@ export default function DataCard({
       </div>
 
       {/* 主要内容 */}
-      <div className="pr-20">
+      <div className='mb-1'>
         <h4 className={`font-semibold text-lg ${textColor} mb-1`}>{name}</h4>
         {description && (
           <p className={`text-sm line-clamp-2 ${subTextColor}`}>
@@ -107,7 +107,7 @@ export default function DataCard({
         )}
       </div>
 
-      <div className="flex items-center gap-3 text-sm mb-3 justify-between">
+      <div className="flex gap-3 text-sm justify-between">
         {/* 作者 */}
         {author && (
           <p className={`text-xs mt-1 ${subTextColor}`}>
@@ -115,7 +115,7 @@ export default function DataCard({
           </p>
         )}
         {/* 统计信息 */}
-        <div className="flex items-bottom gap-3 text-sm justify-end">
+        <div className="flex gap-3 text-sm justify-end">
 
           {/* 点赞按钮和计数 */}
           <button
@@ -141,21 +141,29 @@ export default function DataCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleShare();
-              onShare?.();
+              if (isPublic) {
+                handleShare();
+                onShare?.();
+              }
             }}
-            className="flex items-center gap-1 text-gray-500 hover:text-blue-500 transition-colors"
-            title={`分享：${name} ${id}`}
+            className={`flex items-center gap-1 transition-colors ${isPublic
+              ? 'text-gray-500 hover:text-blue-500'
+              : 'text-gray-400 cursor-not-allowed'
+              }`}
+            title={isPublic ? `分享：${name} ${id}` : '私有数据卡不允许分享'}
+            disabled={!isPublic}
           >
             <Share className="w-4 h-4" />
-            <span className="text-xs">{shareStatus === 'copied' ? '已复制！' : '分享'}</span>
+            <span className="text-xs">
+              {!isPublic ? '不可分享' : (shareStatus === 'copied' ? '已复制！' : '分享')}
+            </span>
           </button>
         </div>
       </div>
 
       {/* 操作按钮 */}
       {isOwner && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mt-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -172,7 +180,7 @@ export default function DataCard({
             }}
             className="flex-1 min-w-[80px] text-sm px-3 py-1.5 bg-green-100 text-green-700 hover:bg-green-200 rounded transition-colors flex items-center justify-center gap-1"
           >
-            修改介绍
+            修改信息
           </button>
           <button
             onClick={(e) => {

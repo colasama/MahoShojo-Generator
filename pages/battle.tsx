@@ -972,7 +972,12 @@ const BattlePage: React.FC = () => {
                                 </button>
                                 {!isAuthenticated && (
                                     <div className="flex-1 text-xs text-gray-500 flex items-center px-2">
-                                        登录后可访问私有数据卡
+                                        <Link
+                                            href="/character-manager"
+                                            className="text-pink-600 hover:text-pink-800 underline"
+                                        >
+                                            登录后可访问私有数据卡
+                                        </Link>
                                     </div>
                                 )}
                             </div>
@@ -1204,7 +1209,12 @@ const BattlePage: React.FC = () => {
                                         </button>
                                         {!isAuthenticated && (
                                             <div className="flex-1 text-xs text-gray-500 flex items-center px-2">
-                                                登录后可访问私有数据卡
+                                                <Link
+                                                    href="/character-manager"
+                                                    className="text-green-600 hover:text-green-800 underline"
+                                                >
+                                                    登录后可访问私有数据卡
+                                                </Link>
                                             </div>
                                         )}
                                     </div>

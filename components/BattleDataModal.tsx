@@ -20,8 +20,10 @@ export default function BattleDataModal({
   const [userDataCards, setUserDataCards] = useState<any[]>([]);
   const [publicDataCards, setPublicDataCards] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'my' | 'public'>('my');
+  const [activeTab, setActiveTab] = useState<'my' | 'public'>('public');
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const cardsPerPage = 12;
 
   // 获取用户的数据卡
@@ -41,12 +43,45 @@ export default function BattleDataModal({
     }
   }, [isAuthenticated, selectedType]);
 
-  // 获取公开数据卡
-  const loadPublicDataCards = useCallback(async () => {
+  // 通过 ID 获取数据卡并显示在列表中（不直接使用）
+  const loadCardByIdForDisplay = useCallback(async (cardId: string) => {
     try {
       setIsLoading(true);
-      // 这里需要一个新的API端点来获取公开数据卡
-      const response = await fetch(`/api/public-data-cards?type=${selectedType}`);
+      const response = await fetch(`/api/public-data-cards?id=${cardId}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.card) {
+          // 将找到的数据卡设置到公开数据卡列表中显示
+          setPublicDataCards([result.card]);
+        } else {
+          // 未找到数据卡，清空列表
+          setPublicDataCards([]);
+        }
+      } else {
+        setPublicDataCards([]);
+      }
+    } catch (error) {
+      console.error('通过ID获取数据卡失败:', error);
+      setPublicDataCards([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // 获取公开数据卡
+  const loadPublicDataCards = useCallback(async (searchTerm?: string) => {
+    try {
+      setIsLoading(true);
+      const searchParams = new URLSearchParams({
+        type: selectedType,
+        limit: '12' // 获取更多数据以便搜索
+      });
+
+      if (searchTerm) {
+        searchParams.append('search', searchTerm);
+      }
+
+      const response = await fetch(`/api/public-data-cards?${searchParams}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -60,13 +95,56 @@ export default function BattleDataModal({
     }
   }, [selectedType]);
 
+  // 防抖功能 - 延迟500ms执行搜索
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // 当防抖搜索词变化时执行搜索
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // 检查是否包含 UUID 格式的 ID
+    const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+    const match = debouncedSearchQuery.match(uuidRegex);
+
+    if (match) {
+      // 如果检测到 UUID，通过 ID 搜索并展示在列表中
+      const cardId = match[0];
+      loadCardByIdForDisplay(cardId);
+    } else {
+      // 否则进行搜索
+      const trimmedQuery = debouncedSearchQuery.trim();
+      if (trimmedQuery) {
+        loadPublicDataCards(trimmedQuery);
+      } else if (debouncedSearchQuery === '') {
+        // 只有在搜索框完全清空时才重新加载所有数据
+        loadPublicDataCards();
+      }
+    }
+
+    // 重置到第一页
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, isOpen, loadCardByIdForDisplay, loadPublicDataCards]);
+
   // 当模态框打开时加载数据
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(1);
+      setSearchQuery(''); // 清空搜索
+
+      // 根据登录状态设置默认标签页
       if (isAuthenticated) {
+        setActiveTab('my');
         loadUserDataCards();
+      } else {
+        setActiveTab('public');
       }
+
       loadPublicDataCards();
     }
   }, [isOpen, selectedType, isAuthenticated, loadUserDataCards, loadPublicDataCards]);
@@ -89,6 +167,12 @@ export default function BattleDataModal({
     }
   };
 
+  // 处理搜索输入 - 简化版，只更新输入值
+  const handleSearchInput = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  // 移除原来的过滤函数
   if (!isOpen) return null;
 
   const currentCards = activeTab === 'my' ? userDataCards : publicDataCards;
@@ -102,7 +186,7 @@ export default function BattleDataModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col relative">
+      <div className="bg-white rounded-lg mx-4 p-6 max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col relative">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl leading-none z-10"
@@ -112,6 +196,27 @@ export default function BattleDataModal({
         </button>
 
         <h2 className="text-xl font-bold mb-4 pr-8">选择{typeLabel}数据卡</h2>
+
+        {/* 搜索框 */}
+        <div className="mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchInput(e.target.value)}
+              placeholder={`搜索${typeLabel}名称或粘贴分享链接...`}
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
+            />
+            {searchQuery && searchQuery !== debouncedSearchQuery && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            💡 支持搜索{typeLabel}的完整名称，或粘贴分享内容（如：【角色：翠雀】ea10aba3-7b46-404b-8048-6f58fc12a430）来查找特定数据卡
+          </p>
+        </div>
 
         {/* 标签页切换 */}
         <div className="flex gap-2 mb-4">
@@ -151,10 +256,24 @@ export default function BattleDataModal({
             </div>
           ) : currentCards.length === 0 ? (
             <div className="text-center text-gray-500 py-8">
-              {activeTab === 'my' ?
-                `暂无${typeLabel}数据卡，去角色管理中心创建一些吧！` :
-                `暂无公开的${typeLabel}数据卡`
-              }
+              {searchQuery ? (
+                <>
+                  <div className="mb-2">未找到匹配的{typeLabel}数据卡</div>
+                  <div className="text-sm">尝试修改搜索关键词或清空搜索框查看所有数据卡</div>
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                    }}
+                    className="mt-2 px-3 py-1 bg-pink-500 text-white rounded text-sm hover:bg-pink-600"
+                  >
+                    清空搜索
+                  </button>
+                </>
+              ) : (
+                activeTab === 'my' ?
+                  `暂无${typeLabel}数据卡` :
+                  `暂无公开的${typeLabel}数据卡`
+              )}
             </div>
           ) : (
             <>

@@ -17,6 +17,7 @@ interface DataCardsModalProps {
   onLoadCard: (card: any) => void;
   onCancelEdit: () => void;
   onShareCard?: (card: any) => void;
+  userCapacity?: number;
 }
 
 export default function DataCardsModal({
@@ -32,7 +33,8 @@ export default function DataCardsModal({
   onDeleteCard,
   onLoadCard,
   onCancelEdit,
-  onShareCard
+  onShareCard,
+  userCapacity = config.DEFAULT_DATA_CARD_CAPACITY
 }: DataCardsModalProps) {
   if (!isOpen) return null;
 
@@ -55,7 +57,7 @@ export default function DataCardsModal({
         <div className="flex justify-between items-center mb-4 pr-8">
           <h2 className="text-xl font-bold">我的数据卡</h2>
           <div className="text-sm text-gray-600">
-            {dataCards.length}/{config.DEFAULT_DATA_CARD_CAPACITY}
+            {dataCards.length}/{userCapacity}
           </div>
         </div>
 

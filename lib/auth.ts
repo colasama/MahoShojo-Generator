@@ -216,6 +216,27 @@ export const dataCardApi = {
     }
   },
 
+  // 获取用户数据卡容量
+  async getUserCapacity(): Promise<number | null> {
+    const authHeader = await authStorage.getAuthHeader();
+    if (!authHeader) return null;
+
+    try {
+      const response = await fetch('/api/user-capacity', {
+        headers: { 'Authorization': authHeader }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.capacity || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Get user capacity error:', error);
+      return null;
+    }
+  },
+
   // 创建数据卡
   async createCard(type: 'character' | 'scenario', name: string, description: string, data: any, isPublic: boolean = false): Promise<{
     success: boolean;
