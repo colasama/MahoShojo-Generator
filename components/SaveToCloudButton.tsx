@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import SaveCardModal from './CharManager/SaveCardModal';
+import { useAuth } from '@/lib/useAuth';
+import { dataCardApi } from '@/lib/auth';
+import { quickCheck } from '@/lib/sensitive-word-filter';
+import { config } from '@/lib/config';
 
 interface SaveToCloudButtonProps {
   data: any;
@@ -8,47 +13,62 @@ interface SaveToCloudButtonProps {
   style?: React.CSSProperties;
 }
 
-export default function SaveToCloudButton({ 
-  data, 
-  buttonText = "保存到云端", 
+// 检测是否为情景文件
+const isScenarioData = (data: any): boolean => {
+  return Boolean(data && data.title && data.elements && (data.scenario_type || data.elements.events));
+};
+
+export default function SaveToCloudButton({
+  data,
+  buttonText = "保存到云端",
   className = "generate-button",
   style = {}
 }: SaveToCloudButtonProps) {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [cardName, setCardName] = useState('');
   const [cardDescription, setCardDescription] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [userDataCards, setUserDataCards] = useState<any[]>([]);
+  const [userCapacity, setUserCapacity] = useState(config.DEFAULT_DATA_CARD_CAPACITY);
 
-  // 检查用户登录状态
-  const checkLoginStatus = () => {
-    // 这里需要根据实际的登录状态检查逻辑来实现
-    // 暂时假设通过某种方式检查用户是否登录
-    const isLoggedIn = localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
-    return !!isLoggedIn;
+  // 加载用户数据卡信息
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadUserDataCards();
+    }
+  }, [isAuthenticated]);
+
+  const loadUserDataCards = async () => {
+    const [cards, capacity] = await Promise.all([
+      dataCardApi.getCards(),
+      dataCardApi.getUserCapacity()
+    ]);
+    setUserDataCards(cards);
+    if (capacity !== null) {
+      setUserCapacity(capacity);
+    }
   };
 
   const handleSaveClick = () => {
-    if (!checkLoginStatus()) {
+    if (!isAuthenticated) {
       alert('请先登录后再保存到云端');
       return;
     }
-    
-    // 生成默认名称
-    let defaultName = '';
-    if (data.codename) {
-      defaultName = `魔法少女_${data.codename}`;
-    } else if (data.name) {
-      defaultName = `残兽档案_${data.name}`;
-    } else if (data.title) {
-      defaultName = `情景_${data.title}`;
-    } else {
-      defaultName = '角色档案';
-    }
-    
+
+    // 根据数据类型生成默认名称和描述
+    const isScenario = isScenarioData(data);
+    const type = isScenario ? 'scenario' : 'character';
+    const defaultName = isScenario
+      ? (data.title || data.name || '')
+      : (data.codename || data.name || '');
+    const defaultDescription = `${type === 'character' ? '角色' : '情景'}数据卡`;
+
     setCardName(defaultName);
-    setCardDescription('');
+    setCardDescription(defaultDescription);
     setIsPublic(false);
     setSaveError(null);
     setShowSaveModal(true);
@@ -64,29 +84,42 @@ export default function SaveToCloudButton({
     setSaveError(null);
 
     try {
-      // 这里需要实现实际的保存到云端的API调用
-      // 暂时模拟保存过程
-      const response = await fetch('/api/save-to-cloud', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('userToken') || sessionStorage.getItem('userToken')}`
-        },
-        body: JSON.stringify({
-          name: cardName,
-          description: cardDescription,
-          isPublic,
-          data
-        })
-      });
+      // 前端敏感词检查
+      const type = isScenarioData(data) ? 'scenario' : 'character';
+      const textToCheck = `${cardName} ${cardDescription} ${JSON.stringify(data)}`;
+      const sensitiveWordResult = await quickCheck(textToCheck);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '保存失败');
+      if (sensitiveWordResult.hasSensitiveWords) {
+        // 直接跳转到 /arrested 页面
+        router.push('/arrested');
+        return;
       }
 
-      alert('保存到云端成功！');
-      setShowSaveModal(false);
+      const result = await dataCardApi.createCard(
+        type,
+        cardName,
+        cardDescription,
+        data,
+        isPublic
+      );
+
+      if (result.success) {
+        alert(`数据卡保存成功！${isPublic ? '（公开）' : '（私有）'}`);
+        setShowSaveModal(false);
+        setCardName('');
+        setCardDescription('');
+        setIsPublic(false);
+        setSaveError(null);
+        // 重新加载用户数据卡数量
+        loadUserDataCards();
+      } else {
+        // 检查是否是敏感词错误，如果是则跳转到 /arrested
+        if (result.error === 'SENSITIVE_WORD_DETECTED' || (result as any).redirect === '/arrested') {
+          router.push('/arrested');
+          return;
+        }
+        setSaveError(result.error || '保存失败');
+      }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : '保存失败，请稍后重试');
     } finally {
@@ -116,6 +149,8 @@ export default function SaveToCloudButton({
         onPublicChange={setIsPublic}
         error={saveError}
         isSaving={isSaving}
+        currentCardCount={userDataCards.length}
+        userCapacity={userCapacity}
       />
     </>
   );

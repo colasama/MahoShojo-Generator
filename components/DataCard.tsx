@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Heart, Share } from 'lucide-react';
+import { isCardLiked, addLikedCard } from '@/lib/localStorage';
 
 interface DataCardProps {
   id: string; // Changed from number to string for UUID
@@ -18,6 +19,7 @@ interface DataCardProps {
   onEditData?: () => void;
   onDelete?: () => void;
   onShare?: () => void;
+  onLikeSuccess?: () => void;
 }
 
 const typeMap = {
@@ -41,8 +43,58 @@ export default function DataCard({
   onEditData,
   onDelete,
   onShare,
+  onLikeSuccess,
 }: DataCardProps) {
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+  const [liked, setLiked] = useState(false);
+  const [liking, setLiking] = useState(false);
+  const [currentLikeCount, setCurrentLikeCount] = useState(likeCount);
+
+  // 检查本地存储中的点赞状态
+  useEffect(() => {
+    setLiked(isCardLiked(id));
+  }, [id]);
+
+  // 处理点赞
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!isPublic || liked || liking) return;
+    
+    try {
+      setLiking(true);
+      
+      // 调用 API 增加点赞数
+      const response = await fetch('/api/data-card-stats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cardId: id,
+          type: 'like'
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 添加到本地存储
+          const success = addLikedCard(id);
+          if (success) {
+            setLiked(true);
+            setCurrentLikeCount(prev => prev + 1);
+            onLike?.();
+            onLikeSuccess?.();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('点赞失败:', error);
+    } finally {
+      setLiking(false);
+    }
+  };
 
   // 分享功能 - 复制卡片名称和UUID到剪贴板
   const handleShare = async () => {
@@ -119,16 +171,21 @@ export default function DataCard({
 
           {/* 点赞按钮和计数 */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onLike?.();
-            }}
-            className={`flex items-center gap-1 ${isPublic ? 'hover:text-red-500 transition-colors' : 'text-gray-400 cursor-not-allowed'
-              }`}
-            disabled={!isPublic || !onLike}
+            onClick={handleLike}
+            className={`flex items-center gap-1 transition-colors ${
+              !isPublic
+                ? 'text-gray-400 cursor-not-allowed'
+                : liked
+                ? 'text-red-500'
+                : liking
+                ? 'text-red-300'
+                : 'text-gray-500 hover:text-red-500'
+            }`}
+            disabled={!isPublic || liked || liking}
+            title={!isPublic ? '私有数据卡无法点赞' : liked ? '已点赞' : '点赞'}
           >
-            <Heart className="w-4 h-4" />
-            <span>{likeCount}</span>
+            <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
+            <span>{currentLikeCount}</span>
           </button>
 
           {/* 使用次数 */}

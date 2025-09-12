@@ -8,15 +8,16 @@ interface FooterProps {
   showSponsor?: boolean;
 }
 
-export default function Footer({ className = "footer", textWhite = false, showSponsor = true }: FooterProps) {
+export default function Footer({ className = "footer", textWhite = false }: FooterProps) {
   return (
     <footer className={className} style={{ color: textWhite ? 'white' : '' }}>
       <p>
-        本项目靠爱发电中，欢迎在爱发电上赞助我们！
+        本项目绝赞靠爱发电中，
       </p>
+      <p>欢迎在爱发电上赞助我们！</p>
       <p style={{ textAlign: 'center', display: 'flex', justifyContent: 'center' }}>
-        <Link href="https://afdian.com/a/colanns">
-          <Image src="/afdian.svg" alt="afdian" width={120} height={20} />
+        <Link href="https://afdian.com/a/colanns" target="_blank" rel="noopener noreferrer">
+          {textWhite ? <Image src="/afdian-white.svg" alt="afdian" width={120} height={20} /> : <Image src="/afdian.svg" alt="afdian" width={120} height={20} />}
         </Link>
       </p>
       <p>

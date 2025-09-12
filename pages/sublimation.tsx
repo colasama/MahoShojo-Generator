@@ -11,6 +11,8 @@ import { useCooldown } from '../lib/cooldown';
 import { config as appConfig } from '../lib/config';
 import SaveToCloudButton from '../components/SaveToCloudButton';
 import Footer from '../components/Footer';
+import BattleDataModal from '../components/BattleDataModal';
+import { useAuth } from '@/lib/useAuth';
 
 // 颜色处理方案
 const MainColor = {
@@ -88,6 +90,7 @@ const PRESERVABLE_FIELDS_CONFIG = {
 
 const SublimationPage: React.FC = () => {
     const router = useRouter();
+    const { isAuthenticated } = useAuth();
     const [characterData, setCharacterData] = useState<any>(null);
     const [fileName, setFileName] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -98,6 +101,9 @@ const SublimationPage: React.FC = () => {
     const [pastedJson, setPastedJson] = useState('');
     const [isPasteAreaVisible, setIsPasteAreaVisible] = useState(false);
     const [userGuidance, setUserGuidance] = useState('');
+
+    // 数据库选择相关状态
+    const [showBattleDataModal, setShowBattleDataModal] = useState(false);
 
     // [新增] 用于管理高级选项的状态
     const [fieldsToPreserve, setFieldsToPreserve] = useState<string[]>([]);
@@ -163,6 +169,55 @@ const SublimationPage: React.FC = () => {
         }
         if (processJsonData(pastedJson)) {
             setPastedJson('');
+        }
+    };
+
+    // 打开角色数据卡选择器
+    const handleOpenCharacterDataModal = () => {
+        setShowBattleDataModal(true);
+    };
+
+    // 递归删除以 _ 开头的键
+    const removePrivateKeys = (obj: any): any => {
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
+        
+        if (Array.isArray(obj)) {
+            return obj.map(removePrivateKeys);
+        }
+        
+        const cleaned: any = {};
+        for (const key in obj) {
+            if (!key.startsWith('_')) {
+                cleaned[key] = removePrivateKeys(obj[key]);
+            }
+        }
+        return cleaned;
+    };
+
+    // 处理从数据库选择的角色数据卡
+    const handleSelectDataCard = async (card: any) => {
+        try {
+            // 解析数据卡内容
+            let cardData = typeof card.data === 'string' ? JSON.parse(card.data) : card.data;
+            
+            // 删除以 _ 开头的键
+            cardData = removePrivateKeys(cardData);
+            
+            // 验证数据是否包含历战记录
+            if (!cardData.arena_history) {
+                setError('❌ 选择的角色缺少必需的"历战记录"（arena_history）属性，无法进行升华。');
+                return;
+            }
+
+            setCharacterData(cardData);
+            setFileName(`${card.name}(来自数据库)`);
+            setShowBattleDataModal(false);
+            setError(null);
+            
+        } catch (err) {
+            setError(`❌ 数据卡加载失败: ${err instanceof Error ? err.message : '未知错误'}`);
         }
     };
 
@@ -332,6 +387,35 @@ const SublimationPage: React.FC = () => {
                             )}
                         </div>
 
+                        {/* 数据库选择区域 */}
+                        <div className="mb-6">
+                            <h3 className="input-label">从数据库选择角色</h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleOpenCharacterDataModal}
+                                    disabled={isGenerating}
+                                    className="flex-1 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                >
+                                    从在线角色数据库中选择
+                                </button>
+                                {!isAuthenticated && (
+                                    <div className="flex-1 text-xs text-gray-500 flex items-center px-2">
+                                        <Link
+                                            href="/character-manager"
+                                            className="text-purple-600 hover:text-purple-800 underline"
+                                        >
+                                            登录后可访问私有数据卡
+                                        </Link>
+                                    </div>
+                                )}
+                            </div>
+                            {isAuthenticated && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    选择您保存的角色数据卡，只有包含历战记录的角色才能进行升华
+                                </p>
+                            )}
+                        </div>
+
                         {/* 成长方向引导输入框 */}
                         <div className="input-group">
                             <label htmlFor="user-guidance" className="input-label">成长方向引导 (可选)</label>
@@ -422,7 +506,7 @@ const SublimationPage: React.FC = () => {
                             {renderResultCard()}
                             <div className="card mt-6 text-center">
                                 <h3 className="text-lg font-bold text-gray-800 mb-3">操作</h3>
-                                <div className="flex flex-col md:flex-row gap-4 justify-center">
+                                <div className="flex flex-col md:flex-row justify-center">
                                     <button onClick={() => downloadJson(resultData.sublimatedData)} className="generate-button flex-1">
                                         下载新设定
                                     </button>
@@ -455,6 +539,14 @@ const SublimationPage: React.FC = () => {
                     </div>
                 )}
                 <Footer />
+
+                {/* 数据库数据选择模态框 */}
+                <BattleDataModal
+                    isOpen={showBattleDataModal}
+                    onClose={() => setShowBattleDataModal(false)}
+                    onSelectCard={handleSelectDataCard}
+                    selectedType="character"
+                />
             </div>
         </>
     );

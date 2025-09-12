@@ -238,7 +238,7 @@ const ScenarioPage: React.FC = () => {
               <div className="bg-gray-100 p-4 rounded-lg font-mono text-xs overflow-x-auto">
                 <pre>{JSON.stringify(resultData, null, 2)}</pre>
               </div>
-              <div className="flex flex-col md:flex-row gap-4 justify-center mt-6">
+              <div className="flex flex-col md:flex-row justify-center mt-6">
                 <button onClick={() => downloadJson(resultData)} className="generate-button flex-1">
                   下载情景文件
                 </button>

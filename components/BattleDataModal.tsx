@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import DataCard from './DataCard';
 import { useAuth } from '@/lib/useAuth';
 import { dataCardApi } from '@/lib/auth';
+import { addUsedCard, isCardUsed } from '@/lib/localStorage';
 
 interface BattleDataModalProps {
   isOpen: boolean;
@@ -152,11 +153,38 @@ export default function BattleDataModal({
     }
   }, [isOpen, selectedType, isAuthenticated, loadUserDataCards, loadPublicDataCards]);
 
-  // 处理卡片选择
-  const handleSelectCard = (card: any) => {
+  // 处理卡片选择并增加使用次数
+  const handleSelectCard = async (card: any) => {
     try {
       // 解析数据卡的JSON内容
       const cardData = JSON.parse(card.data);
+      
+      // 如果是公开卡片且未使用过，增加使用次数
+      if (card.is_public && !isCardUsed(card.id)) {
+        try {
+          const response = await fetch('/api/data-card-stats', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              cardId: card.id,
+              type: 'usage'
+            })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+              // 添加到本地存储
+              addUsedCard(card.id);
+            }
+          }
+        } catch (error) {
+          console.error('增加使用次数失败:', error);
+        }
+      }
+      
       onSelectCard({
         ...cardData,
         _cardId: card.id,

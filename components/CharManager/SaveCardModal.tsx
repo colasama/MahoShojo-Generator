@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { config } from '@/lib/config';
 
 interface SaveCardModalProps {
@@ -32,11 +33,36 @@ export default function SaveCardModal({
   currentCardCount = 0,
   userCapacity = config.DEFAULT_DATA_CARD_CAPACITY
 }: SaveCardModalProps) {
+  // 阻止背景滚动
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
+  const modalContent = (
+    <div 
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ 
+        zIndex: 999999,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)'
+      }}
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg p-6 max-w-md w-full relative shadow-2xl"
+        style={{ zIndex: 1000000 }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl leading-none"
@@ -146,4 +172,7 @@ export default function SaveCardModal({
       </div>
     </div>
   );
+
+  // 使用 Portal 将模态框渲染到 document.body
+  return typeof window !== 'undefined' ? createPortal(modalContent, document.body) : null;
 }

@@ -198,6 +198,36 @@ export async function getDataCardById(cardId: string, isPublic: boolean = false)
   }
 }
 
+// 增加数据卡的点赞数
+export async function incrementDataCardLike(cardId: string): Promise<boolean> {
+  try {
+    const result = await queryFromD1(
+      'UPDATE data_cards SET like_count = like_count + 1 WHERE id = ? AND is_public = 1',
+      [cardId]
+    ) as any;
+    
+    return result.success && result.result && result.result[0]?.meta?.changes > 0;
+  } catch (error) {
+    console.error("增加数据卡点赞数失败:", error);
+    return false;
+  }
+}
+
+// 增加数据卡的使用次数
+export async function incrementDataCardUsage(cardId: string): Promise<boolean> {
+  try {
+    const result = await queryFromD1(
+      'UPDATE data_cards SET usage_count = usage_count + 1 WHERE id = ? AND is_public = 1',
+      [cardId]
+    ) as any;
+    
+    return result.success && result.result && result.result[0]?.meta?.changes > 0;
+  } catch (error) {
+    console.error("增加数据卡使用次数失败:", error);
+    return false;
+  }
+}
+
 // 获取公开的数据卡列表
 export async function getPublicDataCards(
   limit: number = 20,

@@ -32,7 +32,9 @@ export {
   deleteDataCard,
   verifyCardOwnership,
   getPublicDataCards,
-  getDataCardById
+  getDataCardById,
+  incrementDataCardLike,
+  incrementDataCardUsage
 } from './database/data-cards';
 
 // 重新导出竞技场相关功能

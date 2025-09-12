@@ -16,6 +16,7 @@ import { generateRandomMagicalGirl, generateRandomCanshou } from '../lib/random-
 import BattleDataModal from '../components/BattleDataModal';
 import { useAuth } from '@/lib/useAuth';
 import Footer from '../components/Footer';
+import SaveToCloudButton from '../components/SaveToCloudButton';
 interface UpdatedCombatantData {
     codename?: string;
     name?: string;
@@ -460,11 +461,37 @@ const BattlePage: React.FC = () => {
         }
     };
 
+    // 递归删除以 _ 开头的键
+    const removePrivateKeys = (obj: any): any => {
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
+
+        if (Array.isArray(obj)) {
+            return obj.map(removePrivateKeys);
+        }
+
+        const cleaned: any = {};
+        for (const key in obj) {
+            if (!key.startsWith('_')) {
+                cleaned[key] = removePrivateKeys(obj[key]);
+            }
+        }
+        return cleaned;
+    };
+
     // 处理数据卡选择
-    const handleSelectDataCard = (cardData: any) => {
+    const handleSelectDataCard = async (cardData: any) => {
         try {
+            // 保存原始的私有键用于逻辑判断
+            console.log(cardData);
+            const originalCardName = cardData._cardName;
+
+            // 删除以 _ 开头的键
+            const cleanedCardData = removePrivateKeys(cardData);
+
             // 构造文件名显示
-            const filename = `${cardData._cardName || (cardData.codename || cardData.name || cardData.title || '未命名')}.json`;
+            const filename = `${originalCardName || (cleanedCardData.codename || cleanedCardData.name || cleanedCardData.title || '未命名')}.json`;
 
             // 检查是否已存在同名文件
             if (combatants.some(c => c.filename === filename)) {
@@ -478,31 +505,47 @@ const BattlePage: React.FC = () => {
             }
 
             // 根据数据类型判断是角色还是情景
-            if (cardData.title && cardData.elements) {
+            if (cleanedCardData.title && cleanedCardData.elements) {
                 // 这是情景数据卡，在情景模式下处理
                 if (battleMode !== 'scenario') {
                     setError('❌ 情景数据卡只能在情景模式下使用。');
                     return;
                 }
+                // --- 新增：验证情景文件的原生性 ---
+                const verificationResponse = await fetch('/api/verify-origin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cleanedCardData),
+                });
+                const { isValid } = await verificationResponse.json();
+                console.log(isValid);
                 // 设置为情景内容
-                setScenarioContent(cardData);
+                setScenarioContent(cleanedCardData);
                 setScenarioFileName(filename);
-                setIsScenarioNative(cardData._isNative || false);
+                setIsScenarioNative(isValid || false);
                 setError(null);
                 return;
             }
 
             // 这是角色数据卡
-            const type = cardData.codename ? 'magical-girl' : 'canshou';
-
+            const type = cleanedCardData.codename ? 'magical-girl' : 'canshou';
+            const verificationResponse = await fetch('/api/verify-origin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cleanedCardData),
+            });
+            const { isValid } = await verificationResponse.json();
+            console.log(isValid);
             const combatant: CombatantData = {
                 type,
-                data: cardData,
+                data: cleanedCardData,
                 filename,
-                isValid: cardData._isNative || false, // 从数据库来的数据标记为有效
+                isValid: isValid || false,
                 isPreset: false,
                 isNonStandard: false
             };
+
+            console.log(combatant);
 
             setCombatants(prev => [...prev, combatant]);
             setError(null);
@@ -1460,12 +1503,20 @@ const BattlePage: React.FC = () => {
                                                         {latestEntry.impact}
                                                     </p>
                                                 </div>
+                                            </div>
+                                            <div className="flex gap-2 mt-2 justify-end">
                                                 <button
                                                     onClick={() => downloadUpdatedJson(charData)}
-                                                    className="ml-4 px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors shrink-0"
+                                                    className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors shrink-0"
                                                 >
                                                     下载更新设定
                                                 </button>
+                                                <SaveToCloudButton
+                                                    data={charData}
+                                                    buttonText="保存到云端"
+                                                    className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg transition-colors shrink-0"
+                                                    style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)' }}
+                                                />
                                             </div>
                                         </div>
                                     );
