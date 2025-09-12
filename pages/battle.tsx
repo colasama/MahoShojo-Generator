@@ -15,7 +15,7 @@ import { ArenaHistory } from '../types/arena';
 import { generateRandomMagicalGirl, generateRandomCanshou } from '../lib/random-character-generator';
 import BattleDataModal from '../components/BattleDataModal';
 import { useAuth } from '@/lib/useAuth';
-
+import Footer from '../components/Footer';
 interface UpdatedCombatantData {
     codename?: string;
     name?: string;
@@ -1517,26 +1517,7 @@ const BattlePage: React.FC = () => {
                         </button>
                     </div>
 
-                    <footer className="footer">
-                        <p>
-                            交流群：<a href="https://qun.qq.com/universal-share/share?ac=1&busi_data=eyJncm91cENvZGUiOiIxMDU5ODMwOTUyIiwidG9rZW4iOiJNUFN6UVpBRVZNNU9COWpBa21DU1lxczRObXhiKy9kSzEvbHhOcnNpT1RBZUVVU3dtZ2hUQjJVNGtuYk5ISDhrIiwidWluIjoiMTAxOTcyNzcxMCJ9&data=DxfxSXDeGY3mgLKqoTGEoHkfqpums19TEW8Alu5Ikc3uCmV0O8YkLVLyRTMOp61VjFN387-7QL8-j2AFHUX2QXq525oXb8rl0lNhm0K453Q&svctype=5&tempid=h5_group_info" target="_blank" rel="noopener noreferrer" className="footer-link">1059830952</a>
-                        </p>
-                        <p>
-                            竞技场、问卷与系统设计 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
-                        </p>
-                        <p>
-                            <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
-                        </p>
-                        <p>
-                            本项目 AI 能力由&nbsp;
-                            <a href="https://github.com/KouriChat/KouriChat" target="_blank" rel="noopener noreferrer" className="footer-link">KouriChat</a> &&nbsp;
-                            <a href="https://api.kourichat.com/" target="_blank" rel="noopener noreferrer" className="footer-link">Kouri API</a>
-                            &nbsp;强力支持
-                        </p>
-                        <p>
-                            <a href="https://github.com/colasama/MahoShojo-Generator" target="_blank" rel="noopener noreferrer" className="footer-link">colasama/MahoShojo-Generator</a>
-                        </p>
-                    </footer>
+                    <Footer />
                 </div>
 
                 {/* 图片模态框 */}

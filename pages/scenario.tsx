@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { useCooldown } from '../lib/cooldown';
+import SaveToCloudButton from '../components/SaveToCloudButton';
+import Footer from '../components/Footer';
 
 // 定义引导性问题
 const scenarioQuestions = [
@@ -240,6 +242,12 @@ const ScenarioPage: React.FC = () => {
                 <button onClick={() => downloadJson(resultData)} className="generate-button flex-1">
                   下载情景文件
                 </button>
+                <SaveToCloudButton
+                  data={resultData}
+                  buttonText="保存到云端"
+                  className="generate-button flex-1"
+                  style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)' }}
+                />
                 <button onClick={() => copyToClipboard(resultData)} className="generate-button flex-1" style={{ backgroundColor: '#3b82f6', backgroundImage: 'linear-gradient(to right, #3b82f6, #2563eb)' }}>
                   复制到剪贴板
                 </button>
@@ -251,6 +259,7 @@ const ScenarioPage: React.FC = () => {
             <Link href="/" className="footer-link">返回首页</Link>
           </div>
         </div>
+        <Footer />
       </div>
     </>
   );

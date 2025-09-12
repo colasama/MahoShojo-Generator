@@ -9,6 +9,8 @@ import CanshouCard from '../components/CanshouCard';
 import { quickCheck } from '@/lib/sensitive-word-filter';
 import { useCooldown } from '../lib/cooldown';
 import { config as appConfig } from '../lib/config';
+import SaveToCloudButton from '../components/SaveToCloudButton';
+import Footer from '../components/Footer';
 
 // 颜色处理方案
 const MainColor = {
@@ -121,7 +123,7 @@ const SublimationPage: React.FC = () => {
             setFileName('粘贴的内容');
             setError(null);
             setResultData(null);
-            
+
             // [新增] 加载角色后，根据类型设置默认的保留字段
             const isMagicalGirl = !!json.codename;
             if (isMagicalGirl) {
@@ -268,7 +270,7 @@ const SublimationPage: React.FC = () => {
                 break;
         }
     };
-    
+
     const renderResultCard = () => {
         if (!resultData?.sublimatedData) return null;
         const data = resultData.sublimatedData;
@@ -424,6 +426,12 @@ const SublimationPage: React.FC = () => {
                                     <button onClick={() => downloadJson(resultData.sublimatedData)} className="generate-button flex-1">
                                         下载新设定
                                     </button>
+                                    <SaveToCloudButton
+                                        data={resultData.sublimatedData}
+                                        buttonText="保存到云端"
+                                        className="generate-button flex-1"
+                                        style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)' }}
+                                    />
                                     <Link href="/battle" className="generate-button flex-1" style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)', textDecoration: 'none' }}>
                                         前往竞技场
                                     </Link>
@@ -446,6 +454,7 @@ const SublimationPage: React.FC = () => {
                         </div>
                     </div>
                 )}
+                <Footer />
             </div>
         </>
     );

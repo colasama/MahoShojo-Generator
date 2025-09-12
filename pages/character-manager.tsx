@@ -9,6 +9,7 @@ import { randomChooseOneHanaName } from '@/lib/random-choose-hana-name';
 import { webcrypto } from 'crypto';
 import { config } from '@/lib/config';
 import TachieGenerator from '../components/TachieGenerator';
+import Footer from '../components/Footer';
 // 【新增】导入卡片组件和颜色配置
 import MagicalGirlCard from '../components/MagicalGirlCard';
 import CanshouCard from '../components/CanshouCard';
@@ -918,7 +919,7 @@ const CharacterManagerPage: React.FC = () => {
                                     <div className="flex justify-between items-center">
                                         <div className="text-left">
                                             <p className="text-sm text-gray-600">当前用户</p>
-                                            <UserWithTitle 
+                                            <UserWithTitle
                                                 username={user?.username || ''}
                                                 prefix={user?.prefix}
                                                 usernameClassName="font-semibold text-pink-700"
@@ -1141,7 +1142,7 @@ const CharacterManagerPage: React.FC = () => {
 
                     {/* 立绘生成 - 只对角色数据显示 */}
                     {!isScenarioData(characterData) && (
-                        <div className="card mt-6">
+                        <div className="card" style={{ marginTop: '1rem' }}>
                             <button
                                 onClick={() => setIsTachieVisible(!isTachieVisible)}
                                 className="w-full text-left text-lg font-bold text-gray-800"
@@ -1159,6 +1160,7 @@ const CharacterManagerPage: React.FC = () => {
                     <div className="text-center mt-8">
                         <Link href="/" className="footer-link">返回首页</Link>
                     </div>
+                    <Footer />
                 </div>
 
                 {/* 【新增】用于移动端长按保存的图片模态框 */}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
+import Footer from '../components/Footer';
 
 interface LogoConfig {
   id: string;
@@ -132,9 +134,20 @@ export default function Home() {
               <img src="/logo.svg" width={280} height={180} alt="魔法少女生成器" />
             </div>
 
-            <p className="subtitle text-center">
+            <p className="subtitle text-center mb-4">
               欢迎来到魔法国度！选择一个项目开始玩耍吧！
             </p>
+
+            {/* 登录/注册按钮 */}
+            {/* <div className='flex justify-center mb-2'>
+              <Link
+                href="/character-manager"
+                className="px-2 py-1 text-sm bg-white-600 text-black hover:text-pink-700 rounded hover:border-pink-700 border-1"
+              >
+                <span className='mr-2'>👤</span>
+                前往账号管理界面
+              </Link>
+            </div> */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {logoConfigs.filter(logo => logo.href).map((logo) => (
                 <Link key={logo.id} href={logo.href!} className={`feature-button ${logo.className}`}>
@@ -161,26 +174,7 @@ export default function Home() {
             </div>
           </div>
 
-          <footer className="footer">
-            <p>
-              交流群：<a href="https://qun.qq.com/universal-share/share?ac=1&busi_data=eyJncm91cENvZGUiOiIxMDU5ODMwOTUyIiwidG9rZW4iOiJNUFN6UVpBRVZNNU9COWpBa21DU1lxczRObXhiKy9kSzEvbHhOcnNpT1RBZUVVU3dtZ2hUQjJVNGtuYk5ISDhrIiwidWluIjoiMTAxOTcyNzcxMCJ9&data=DxfxSXDeGY3mgLKqoTGEoHkfqpums19TEW8Alu5Ikc3uCmV0O8YkLVLyRTMOp61VjFN387-7QL8-j2AFHUX2QXq525oXb8rl0lNhm0K453Q&svctype=5&tempid=h5_group_info" target="_blank" rel="noopener noreferrer" className="footer-link">1059830952</a>
-            </p>
-            <p>
-              设计与制作 <a href="https://github.com/notuhao" target="_blank" rel="noopener noreferrer" className="footer-link">@末伏之夜</a>
-            </p>
-            <p>
-              <a href="https://github.com/colasama" target="_blank" rel="noopener noreferrer" className="footer-link">@Colanns</a> 急速出品
-            </p>
-            <p>
-              本项目 AI 能力由&nbsp;
-              <a href="https://github.com/KouriChat/KouriChat" target="_blank" rel="noopener noreferrer" className="footer-link">KouriChat</a> &&nbsp;
-              <a href="https://api.kourichat.com/" target="_blank" rel="noopener noreferrer" className="footer-link">Kouri API</a>
-              &nbsp;强力支持
-            </p>
-            <p>
-              <a href="https://github.com/colasama/MahoShojo-Generator" target="_blank" rel="noopener noreferrer" className="footer-link">colasama/MahoShojo-Generator</a>
-            </p>
-          </footer>
+          <Footer className="footer" />
         </div>
       </div>
     </>
