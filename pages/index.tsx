@@ -16,16 +16,6 @@ interface LogoConfig {
 
 const logoConfigs: LogoConfig[] = [
   {
-    id: 'magical-generator',
-    src: '/logo-white.svg',
-    width: 250,
-    height: 60,
-    alt: '魔法少女生成器',
-    href: '/name',
-    className: 'magical-generator',
-    color: 'white'
-  },
-  {
     id: 'fairy-quest',
     src: '/questionnaire-logo.svg',
     width: 250,
@@ -33,6 +23,16 @@ const logoConfigs: LogoConfig[] = [
     alt: '奇妙妖精大调查',
     href: '/details',
     className: 'fairy-quest'
+  },
+  {
+    id: 'battle-arena',
+    src: '/arena-white.svg',
+    width: 280,
+    height: 80,
+    alt: '魔法少女竞技场',
+    href: '/battle',
+    className: 'battle-arena',
+    color: 'white'
   },
   {
     id: 'canshou-generator',
@@ -45,13 +45,13 @@ const logoConfigs: LogoConfig[] = [
     color: 'white'
   },
   {
-    id: 'battle-arena',
-    src: '/arena-white.svg',
-    width: 280,
-    height: 80,
-    alt: '魔法少女竞技场',
-    href: '/battle',
-    className: 'battle-arena',
+    id: 'magical-generator',
+    src: '/logo-white.svg',
+    width: 250,
+    height: 60,
+    alt: '魔法少女生成器',
+    href: '/name',
+    className: 'magical-generator',
     color: 'white'
   },
   {
