@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Heart, Share } from 'lucide-react';
+import { Download, Heart, Share, Info } from 'lucide-react';
 import { isCardLiked, addLikedCard } from '@/lib/localStorage';
 
 interface DataCardProps {
@@ -20,6 +20,7 @@ interface DataCardProps {
   onDelete?: () => void;
   onShare?: () => void;
   onLikeSuccess?: () => void;
+  onViewDetails?: () => void; // 新增查看详情回调
 }
 
 const typeMap = {
@@ -44,6 +45,7 @@ export default function DataCard({
   onDelete,
   onShare,
   onLikeSuccess,
+  onViewDetails,
 }: DataCardProps) {
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
   const [liked, setLiked] = useState(false);
@@ -58,12 +60,12 @@ export default function DataCard({
   // 处理点赞
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!isPublic || liked || liking) return;
-    
+
     try {
       setLiking(true);
-      
+
       // 调用 API 增加点赞数
       const response = await fetch('/api/data-card-stats', {
         method: 'POST',
@@ -75,7 +77,7 @@ export default function DataCard({
           type: 'like'
         })
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -129,40 +131,46 @@ export default function DataCard({
 
   return (
     <div
-      className={`flex flex-col justify-between relative p-4 rounded-lg border-2 transition-all duration-200 ${bgColor}`}
+      className={`flex flex-col relative p-4 rounded-lg border-2 transition-all duration-200 h-full ${bgColor}`}
     >
-      {/* 公开/私有标签 */}
-      <div className="absolute top-4 right-4 flex items-center gap-2">
-        <span className={`text-xs px-2 py-1 rounded ${isPublic ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-          }`}>
-          {isPublic ? '公开' : '私有'}
-        </span>
-        {type === 'scenario' && (
-          <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">
-            情景
-          </span>
-        )}
-        {type === 'character' && (
-          <span className="text-xs px-2 py-1 bg-pink-100 text-pink-700 rounded">
-            角色
-          </span>
-        )}
+      {/* 主要内容区域 */}
+      <div className="flex-1">
+        {/* 标题和标签行 */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h4 className={`font-semibold text-lg ${textColor} flex-1`}>{name}</h4>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`text-xs px-2 py-1 rounded ${isPublic ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+              }`}>
+              {isPublic ? '公开' : '私有'}
+            </span>
+            {type === 'scenario' && (
+              <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                情景
+              </span>
+            )}
+            {type === 'character' && (
+              <span className="text-xs px-2 py-1 bg-pink-100 text-pink-700 rounded">
+                角色
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* 描述内容 */}
+        <div className='mb-1'>
+          {description && (
+            <p className={`text-sm line-clamp-2 ${subTextColor}`}>
+              {description}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* 主要内容 */}
-      <div className='mb-1'>
-        <h4 className={`font-semibold text-lg ${textColor} mb-1`}>{name}</h4>
-        {description && (
-          <p className={`text-sm line-clamp-2 ${subTextColor}`}>
-            {description}
-          </p>
-        )}
-      </div>
-
-      <div className="flex gap-3 text-sm justify-between">
+      {/* 底部区域 */}
+      <div className="flex gap-3 text-sm justify-between mt-auto">
         {/* 作者 */}
         {author && (
-          <p className={`text-xs mt-1 ${subTextColor}`}>
+          <p className={`text-xs leading-[20px] ${subTextColor}`}>
             作者: {author}
           </p>
         )}
@@ -172,15 +180,14 @@ export default function DataCard({
           {/* 点赞按钮和计数 */}
           <button
             onClick={handleLike}
-            className={`flex items-center gap-1 transition-colors ${
-              !isPublic
-                ? 'text-gray-400 cursor-not-allowed'
-                : liked
+            className={`flex items-center gap-1 transition-colors ${!isPublic
+              ? 'text-gray-400 cursor-not-allowed'
+              : liked
                 ? 'text-red-500'
                 : liking
-                ? 'text-red-300'
-                : 'text-gray-500 hover:text-red-500'
-            }`}
+                  ? 'text-red-300'
+                  : 'text-gray-500 hover:text-red-500'
+              }`}
             disabled={!isPublic || liked || liking}
             title={!isPublic ? '私有数据卡无法点赞' : liked ? '已点赞' : '点赞'}
           >
@@ -214,6 +221,19 @@ export default function DataCard({
             <span className="text-xs">
               {!isPublic ? '不可分享' : (shareStatus === 'copied' ? '已复制！' : '分享')}
             </span>
+          </button>
+
+          {/* 详情按钮 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDetails?.();
+            }}
+            className="flex items-center gap-1 text-gray-500 hover:text-purple-500 transition-colors"
+            title="查看详细设定"
+          >
+            <Info className="w-4 h-4" />
+            <span className="text-xs">详情</span>
           </button>
         </div>
       </div>

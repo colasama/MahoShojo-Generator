@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import DataCard from './DataCard';
 import SortSelector from './SortSelector';
+import DataCardDetailsModal from './DataCardDetailsModal';
 import { useAuth } from '@/lib/useAuth';
 import { dataCardApi } from '@/lib/auth';
 import { addUsedCard, isCardUsed } from '@/lib/localStorage';
@@ -27,6 +28,8 @@ export default function BattleDataModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'likes' | 'usage' | 'created_at'>('created_at');
+  const [selectedCard, setSelectedCard] = useState<any | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const cardsPerPage = 12;
 
   // 获取用户的数据卡
@@ -236,6 +239,12 @@ export default function BattleDataModal({
     }
   };
 
+  // 处理查看详情
+  const handleViewDetails = (card: any) => {
+    setSelectedCard(card);
+    setShowDetailsModal(true);
+  };
+
   // 移除原来的过滤函数
   if (!isOpen) return null;
 
@@ -355,14 +364,14 @@ export default function BattleDataModal({
           ) : (
             <>
               {/* 数据卡网格 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
                 {displayCards.map((card: any) => {
                   const author = activeTab === 'public' ? (card.username || '未知') : '我';
 
                   return (
                     <div
                       key={card.id}
-                      className="cursor-pointer transition-transform"
+                      className="cursor-pointer transition-transform h-full"
                       onClick={() => handleSelectCard(card)}
                     >
                       <DataCard
@@ -374,6 +383,7 @@ export default function BattleDataModal({
                         usageCount={card.usage_count}
                         likeCount={card.like_count}
                         author={author}
+                        onViewDetails={() => handleViewDetails(card)}
                       />
                     </div>
                   );
@@ -416,6 +426,30 @@ export default function BattleDataModal({
           点击数据卡即可加载到竞技场中
         </div>
       </div>
+
+      {/* 详情模态框 */}
+      {selectedCard && (
+        <DataCardDetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedCard(null);
+          }}
+          card={{
+            id: selectedCard.id,
+            name: selectedCard.name,
+            description: selectedCard.description,
+            type: selectedCard.type,
+            data: selectedCard.data,
+            isPublic: selectedCard.is_public,
+            usageCount: selectedCard.usage_count,
+            likeCount: selectedCard.like_count,
+            author: activeTab === 'public' ? (selectedCard.username || '未知') : '我',
+            createdAt: selectedCard.created_at,
+            updatedAt: selectedCard.updated_at
+          }}
+        />
+      )}
     </div>
   );
 }
