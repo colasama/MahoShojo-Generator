@@ -95,12 +95,33 @@ export async function createDataCard(
 }
 
 // 获取用户的所有数据卡
-export async function getUserDataCards(userId: number): Promise<any[]> {
+export async function getUserDataCards(
+  userId: number, 
+  search?: string,
+  sortBy?: 'likes' | 'usage' | 'created_at'
+): Promise<any[]> {
   try {
-    const result = await queryFromD1(
-      'SELECT * FROM data_cards WHERE user_id = ? ORDER BY updated_at DESC',
-      [userId]
-    ) as any;
+    let sql = 'SELECT * FROM data_cards WHERE user_id = ?';
+    const params: any[] = [userId];
+    
+    if (search) {
+      sql += ' AND (name LIKE ? OR description LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    
+    // 添加排序逻辑
+    let orderBy = 'updated_at DESC'; // 默认按更新时间排序
+    if (sortBy === 'likes') {
+      orderBy = 'like_count DESC, updated_at DESC';
+    } else if (sortBy === 'usage') {
+      orderBy = 'usage_count DESC, updated_at DESC';
+    } else if (sortBy === 'created_at') {
+      orderBy = 'created_at DESC';
+    }
+    
+    sql += ` ORDER BY ${orderBy}`;
+    
+    const result = await queryFromD1(sql, params) as any;
     
     if (result.success && result.result && result.result[0]?.results) {
       return result.result[0].results;
@@ -233,7 +254,8 @@ export async function getPublicDataCards(
   limit: number = 20,
   offset: number = 0,
   type?: 'character' | 'scenario',
-  search?: string
+  search?: string,
+  sortBy?: 'likes' | 'usage' | 'created_at'
 ): Promise<any[]> {
   try {
     let sql = 'SELECT dc.*, u.username FROM data_cards dc JOIN users u ON dc.user_id = u.id WHERE dc.is_public = 1';
@@ -249,7 +271,15 @@ export async function getPublicDataCards(
       params.push(`%${search}%`, `%${search}%`);
     }
     
-    sql += ' ORDER BY dc.created_at DESC LIMIT ? OFFSET ?';
+    // 添加排序逻辑
+    let orderBy = 'dc.created_at DESC'; // 默认按创建时间排序
+    if (sortBy === 'likes') {
+      orderBy = 'dc.like_count DESC, dc.created_at DESC';
+    } else if (sortBy === 'usage') {
+      orderBy = 'dc.usage_count DESC, dc.created_at DESC';
+    }
+    
+    sql += ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     params.push(limit, offset);
     
     const result = await queryFromD1(sql, params) as any;

@@ -41,7 +41,11 @@ export default async function handler(req: Request): Promise<Response> {
     case 'GET':
       // 获取用户的所有数据卡
       try {
-        const cards = await getUserDataCards(userId);
+        const url = new URL(req.url);
+        const search = url.searchParams.get('search'); // 搜索关键词
+        const sortBy = url.searchParams.get('sortBy') as 'likes' | 'usage' | 'created_at' | null; // 排序方式
+        
+        const cards = await getUserDataCards(userId, search || undefined, sortBy || undefined);
         return new Response(JSON.stringify({ success: true, cards }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }

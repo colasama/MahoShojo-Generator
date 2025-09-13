@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import DataCard from './DataCard';
+import SortSelector from './SortSelector';
 import { useAuth } from '@/lib/useAuth';
 import { dataCardApi } from '@/lib/auth';
 import { addUsedCard, isCardUsed } from '@/lib/localStorage';
@@ -25,15 +26,16 @@ export default function BattleDataModal({
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'likes' | 'usage' | 'created_at'>('created_at');
   const cardsPerPage = 12;
 
   // 获取用户的数据卡
-  const loadUserDataCards = useCallback(async () => {
+  const loadUserDataCards = useCallback(async (searchTerm?: string, sortBy?: 'likes' | 'usage' | 'created_at') => {
     if (!isAuthenticated) return;
 
     try {
       setIsLoading(true);
-      const cards = await dataCardApi.getCards();
+      const cards = await dataCardApi.getCards(searchTerm, sortBy);
       // 根据选择的类型过滤数据卡
       const filteredCards = cards.filter((card: any) => card.type === selectedType);
       setUserDataCards(filteredCards);
@@ -70,7 +72,7 @@ export default function BattleDataModal({
   }, []);
 
   // 获取公开数据卡
-  const loadPublicDataCards = useCallback(async (searchTerm?: string, page: number = 1) => {
+  const loadPublicDataCards = useCallback(async (searchTerm?: string, page: number = 1, sortBy?: 'likes' | 'usage' | 'created_at') => {
     try {
       setIsLoading(true);
       const offset = (page - 1) * cardsPerPage;
@@ -82,6 +84,10 @@ export default function BattleDataModal({
 
       if (searchTerm) {
         searchParams.append('search', searchTerm);
+      }
+      
+      if (sortBy) {
+        searchParams.append('sortBy', sortBy);
       }
 
       const response = await fetch(`/api/public-data-cards?${searchParams}`);
@@ -124,15 +130,16 @@ export default function BattleDataModal({
       // 否则进行搜索
       const trimmedQuery = debouncedSearchQuery.trim();
       if (trimmedQuery) {
-        loadPublicDataCards(trimmedQuery, 1);
+        loadPublicDataCards(trimmedQuery, 1, sortBy);
       } else if (debouncedSearchQuery === '') {
         // 只有在搜索框完全清空时才重新加载所有数据
-        loadPublicDataCards(undefined, 1);
+        loadPublicDataCards(undefined, 1, sortBy);
       }
     }
 
     // 重置到第一页
     setCurrentPage(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchQuery, isOpen, loadCardByIdForDisplay, loadPublicDataCards]);
 
   // 当模态框打开时加载数据
@@ -149,8 +156,9 @@ export default function BattleDataModal({
         setActiveTab('public');
       }
 
-      loadPublicDataCards(undefined, 1);
+      loadPublicDataCards(undefined, 1, sortBy);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, selectedType, isAuthenticated, loadUserDataCards, loadPublicDataCards]);
 
   // 处理卡片选择并增加使用次数
@@ -209,7 +217,22 @@ export default function BattleDataModal({
     if (activeTab === 'public') {
       // 对于公开标签页，需要重新加载数据
       const searchTerm = debouncedSearchQuery.trim() || undefined;
-      loadPublicDataCards(searchTerm, newPage);
+      loadPublicDataCards(searchTerm, newPage, sortBy);
+    }
+  };
+
+  // 处理排序变化
+  const handleSortChange = (newSortBy: 'likes' | 'usage' | 'created_at') => {
+    setSortBy(newSortBy);
+    setCurrentPage(1);
+    
+    // 根据当前活跃的标签页重新加载数据，不改变标签页
+    if (activeTab === 'my') {
+      const searchTerm = debouncedSearchQuery.trim() || undefined;
+      loadUserDataCards(searchTerm, newSortBy);
+    } else if (activeTab === 'public') {
+      const searchTerm = debouncedSearchQuery.trim() || undefined;
+      loadPublicDataCards(searchTerm, 1, newSortBy);
     }
   };
 
@@ -240,23 +263,30 @@ export default function BattleDataModal({
 
         <h2 className="text-xl font-bold mb-4 pr-8">选择{typeLabel}数据卡</h2>
 
-        {/* 搜索框 */}
+        {/* 搜索框和排序 */}
         <div className="mb-2">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearchInput(e.target.value)}
-              placeholder={`搜索${typeLabel}名称或粘贴分享链接...`}
-              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
+          <div className="flex gap-2 mb-2">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                placeholder={`搜索${typeLabel}名称或粘贴分享链接...`}
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
+              />
+              {searchQuery && searchQuery !== debouncedSearchQuery && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+            </div>
+            <SortSelector 
+              value={sortBy} 
+              onChange={handleSortChange}
+              className="flex-shrink-0"
             />
-            {searchQuery && searchQuery !== debouncedSearchQuery && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            )}
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-gray-500">
             💡 支持搜索{typeLabel}的完整名称，或粘贴分享内容来查找特定数据卡
           </p>
         </div>
@@ -268,6 +298,8 @@ export default function BattleDataModal({
               onClick={() => {
                 setActiveTab('my');
                 setCurrentPage(1);
+                const searchTerm = debouncedSearchQuery.trim() || undefined;
+                loadUserDataCards(searchTerm, sortBy);
               }}
               className={`px-4 py-2 rounded text-sm font-medium ${activeTab === 'my'
                 ? 'bg-pink-500 text-white'
@@ -282,7 +314,7 @@ export default function BattleDataModal({
               setActiveTab('public');
               setCurrentPage(1);
               // 重新加载公开数据卡的第一页
-              loadPublicDataCards(debouncedSearchQuery.trim() || undefined, 1);
+              loadPublicDataCards(debouncedSearchQuery.trim() || undefined, 1, sortBy);
             }}
             className={`px-4 py-2 rounded text-sm font-medium ${activeTab === 'public'
               ? 'bg-pink-500 text-white'

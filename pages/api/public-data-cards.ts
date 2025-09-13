@@ -15,6 +15,7 @@ export default async function handler(req: Request): Promise<Response> {
     const id = url.searchParams.get('id'); // 单个数据卡ID
     const type = url.searchParams.get('type'); // 'character' or 'scenario'
     const search = url.searchParams.get('search'); // 搜索关键词
+    const sortBy = url.searchParams.get('sortBy') as 'likes' | 'usage' | 'created_at' | null; // 排序方式
     const limit = parseInt(url.searchParams.get('limit') || '12');
     const offset = parseInt(url.searchParams.get('offset') || '0');
 
@@ -41,7 +42,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // 获取公开数据卡列表，支持搜索和类型过滤
-    const cards = await getPublicDataCards(limit, offset, type as 'character' | 'scenario' | undefined, search || undefined);
+    const cards = await getPublicDataCards(limit, offset, type as 'character' | 'scenario' | undefined, search || undefined, sortBy || undefined);
 
     return new Response(JSON.stringify({
       success: true,

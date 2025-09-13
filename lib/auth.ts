@@ -196,12 +196,23 @@ export const authApi = {
 // 数据卡 API
 export const dataCardApi = {
   // 获取所有数据卡
-  async getCards(): Promise<any[]> {
+  async getCards(search?: string, sortBy?: 'likes' | 'usage' | 'created_at'): Promise<any[]> {
     const authHeader = await authStorage.getAuthHeader();
     if (!authHeader) return [];
 
     try {
-      const response = await fetch('/api/data-cards', {
+      const searchParams = new URLSearchParams();
+      if (search) {
+        searchParams.append('search', search);
+      }
+      if (sortBy) {
+        searchParams.append('sortBy', sortBy);
+      }
+      
+      const queryString = searchParams.toString();
+      const url = `/api/data-cards${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await fetch(url, {
         headers: { 'Authorization': authHeader }
       });
 
