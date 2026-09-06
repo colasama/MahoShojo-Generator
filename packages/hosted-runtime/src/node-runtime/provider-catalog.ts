@@ -245,6 +245,11 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
                 description: 'GPT-5.6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
             },
             {
+                value: 'gpt-6-astra', 
+                label: 'GPT-6 Astra', 
+                description: 'GPT-6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
+            },
+            {
                 value: 'claude-opus-4-8',
                 label: 'Claude Opus 4.8',
                 description: 'Anthropic 旗下旗舰模型，非常适合复杂的专业任务和高级代理。'
@@ -311,23 +316,23 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
                 description: '高级模型（Pro/Pro+）。OpenAI 旗舰模型，适合高质量生成与复杂任务。'
             },
             {
-                value: 'gpt-5.4',
-                label: 'GPT 5.4（高级）',
-                description: '高级模型（Pro/Pro+）。OpenAI 通用模型，适合高质量生成与复杂任务。'
+                value: 'gpt-5.6-sol',
+                label: 'GPT 5.6 Sol（高级）',
+                description: '高级模型（Pro/Pro+）。GPT-5.6 系列最高能力档，适合高质量生成与复杂任务。'
             },
             {
-                value: 'gpt-5.4-mini',
-                label: 'GPT 5.4 Mini（标准）',
+                value: 'gpt-5.6-luna',
+                label: 'GPT 5.6 Luna（标准）',
                 description: '标准模型（所有付费方案）。更快更省，适合高频交互。'
             },
             {
-                value: 'claude-opus-4.8',
-                label: 'Claude Opus 4.8（高级）',
+                value: 'claude-opus-5',
+                label: 'Claude Opus 5（高级）',
                 description: '高级模型（Pro/Pro+）。Anthropic 旗下旗舰模型，非常适合复杂的专业任务。'
             },
             {
-                value: 'claude-sonnet-4.6',
-                label: 'Claude Sonnet 4.6（高级）',
+                value: 'claude-fable-5',
+                label: 'Claude Fable 5（高级）',
                 description: '高级模型（Pro/Pro+）。擅长长文本写作与稳健推理。'
             },
             {
@@ -780,8 +785,13 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
                 description: 'GPT-5.6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
             },
             {
-                value: 'claude-opus-4.8',
-                label: 'Claude Opus 4.8',
+                value: 'gpt-6-astra', 
+                label: 'GPT-6 Astra', 
+                description: 'GPT-6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
+            },
+            {
+                value: 'claude-opus-5',
+                label: 'Claude Opus 5',
                 description: 'Anthropic 旗下旗舰模型，非常适合复杂的专业任务和高级代理。'
             },
             {
@@ -982,14 +992,19 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
                 description: 'Claude Opus 4.6 的按次通道，适合复杂创作与高要求任务。'
             },
             {
-                value: '[鹿鹿1]deepseek/deepseek-r1-0528:free',
-                label: 'DeepSeek R1（免费）',
+                value: '[鹿鹿2]gpt-5.5',
+                label: 'GPT-5.5（按次）',
+                description: 'GPT-5.5 的按次通道。'
+            },
+            {
+                value: '[限时2]deepseek-v4-pro-0813',
+                label: 'DeepSeek V4 Pro（免费）',
                 description: '鹿鹿提供的 DeepSeek 免费试用档，实时状态通常不稳定，适合作为低成本备用入口。'
             },
             {
-                value: '[鹿鹿1]qwen/qwen3-next-80b-a3b-instruct:free',
-                label: 'Qwen3 Next 80B（免费）',
-                description: '鹿鹿提供的 Qwen3 免费试用档，适合低成本尝试，但实时可用性较弱。'
+                value: '[限时2]qwen3.8-max',
+                label: 'Qwen3.8 Max（免费）',
+                description: '鹿鹿提供的 Qwen3.8 Max 免费试用档，适合低成本尝试，但实时可用性较弱。'
             },
         ]
     },
@@ -1306,6 +1321,9 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
             { value: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna', description: 'GPT-5.6 系列高性价比模型，主打极致速度与成本效益，适合高频调用、低延迟的高吞吐量任务。' },
             { value: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra', description: 'GPT-5.6 系列均衡主力模型，性能对标 GPT-5.5 但成本仅为其一半，适合日常生产工作负载与通用任务。' },
             { value: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'GPT-5.6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。' },
+            { value: 'openai/gpt-6-astra', label: 'GPT-6 Astra', description: 'GPT-6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。' },
+            { value: 'openai/gpt-6-astra-pro', label: 'GPT-6 Astra Pro', description: 'GPT-6 Astra 的 Pro 推理档，适合质量优先的高难度任务。' },
+            { value: 'anthropic/claude-fable-5.1', label: 'Claude Fable 5.1', description: 'Anthropic 最新高端模型之一，适合高难度推理、长程 Agent 编码、研究与知识工作。' },
             { value: 'anthropic/claude-opus-4.8', label: 'Claude Opus 4.8', description: 'Anthropic 旗下旗舰模型，非常适合复杂的专业任务和高级代理。' },
             { value: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', description: 'Anthropic 旗下主力模型之一，写作、推理与长文本表现稳定。' },
             { value: 'x-ai/grok-4.5', label: 'Grok 4.5', description: 'xAI 通用模型，适合头脑风暴、创意发散与快速问答。' },
@@ -1381,9 +1399,9 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
                 description: 'OpenAI 旗舰模型，综合能力均衡，适合高质量生成与复杂任务。'
             },
             {
-                value: 'GPT-5.4',
-                label: 'GPT-5.4',
-                description: 'OpenAI 通用模型，适合高质量生成与复杂任务。'
+                value: 'GPT-6-Astra',
+                label: 'GPT-6 Astra',
+                description: 'OpenAI 最新旗舰模型。'
             },
             {
                 value: 'GPT-5.6-Luna',
