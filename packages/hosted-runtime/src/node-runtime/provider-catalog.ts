@@ -935,61 +935,106 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
     {
         id: 'nova-cervus',
         name: '鹿鹿 API',
-        description: '鹿鹿 API 为用户提供了国内外广泛的模型库，主要是按次计费，适合按可用性挑选单模型通道。',
+        description: '鹿鹿 API 为用户提供国内外广泛的模型库，同时提供按次、按量和限时免费通道，适合根据价格与实时可用性灵活选择。',
         docsUrl: 'https://nova.cervus.top/register?aff=i0uQ',
         baseUrl: 'https://nova.cervus.top/v1',
         type: 'openai',
         mode: 'json',
         models: [
             {
-                value: '[鹿鹿10]gemini-3.6-flash',
+                value: '[ruru10]gemini-3.8-flash',
+                label: 'Gemini 3.8 Flash（按次）',
+                description: '新一代 Gemini Flash 通道，速度、质量和价格较均衡，近期可用性较好。'
+            },
+            {
+                value: '[ruru10]gemini-3.7-flash',
+                label: 'Gemini 3.7 Flash（按次）',
+                description: 'Gemini 3.7 Flash 的稳定按次通道，长期可用率表现较好。'
+            },
+            {
+                value: '[ruru5]gemini-3.7-flash',
+                label: 'Gemini 3.7 Flash（按量）',
+                description: 'Gemini 3.7 Flash 的按量通道，适合短输出、高频调用等按 Token 计费更划算的场景。'
+            },
+            {
+                value: '[ruru2]gemini-3.6-flash-preview',
                 label: 'Gemini 3.6 Flash（按次）',
-                description: 'Google 的新模型，据用户评测说很喜欢一惊一乍，还挺中二的。'
+                description: '价格较低的 Gemini 3.6 Flash 按次通道，适合高频交互与快速生成。'
             },
             {
-                value: '[鹿鹿10]gemini-3.1-pro-preview',
+                value: '[ruru12]gemini-3.5-flash',
+                label: 'Gemini 3.5 Flash（按次）',
+                description: '价格很低且近期可用性优秀，适合作为高频生成和日常任务的高性价比选择。'
+            },
+            {
+                value: '[ruru20]gemini-3.5-flash',
+                label: 'Gemini 3.5 Flash（按量）',
+                description: 'Gemini 3.5 Flash 的按量通道，适合希望按实际 Token 消耗控制成本的场景。'
+            },
+            {
+                value: '[ruru17]gemini-3.1-pro-preview',
                 label: 'Gemini 3.1 Pro（按次）',
-                description: '鹿鹿当前可选的 Gemini 3.1 Pro 按次档之一，适合复杂指令、高质量创作与长文本任务。'
+                description: '在价格与可用性之间较均衡的 Gemini 3.1 Pro 按次通道，适合复杂指令、推理和长文本生成。'
             },
             {
-                value: '[鹿鹿10]gemini-3-pro-preview',
+                value: '[ruru20]gemini-3.1-pro-preview',
+                label: 'Gemini 3.1 Pro（按量）',
+                description: '近期可用性很高的 Gemini 3.1 Pro 按量通道，适合较短上下文或希望按实际 Token 付费的任务。'
+            },
+            {
+                value: '[鹿鹿2]gemini-3-pro-preview',
                 label: 'Gemini 3.0 Pro（按次）',
-                description: '较稳定的 Gemini 3.0 Pro 按次通道，适合综合写作、推理与结构化生成。'
+                description: '价格和近期可用性均较好的 Gemini 3.0 Pro 按次通道，适合综合写作、推理与结构化生成。'
             },
             {
-                value: '[鹿鹿2]gemini-3-flash-preview',
-                label: 'Gemini 3.0 Flash（按次）',
-                description: '鹿鹿的 Gemini 3.0 Flash 档位，适合高频交互与流式生成。'
+                value: '[ruru20]gemini-3-pro-preview',
+                label: 'Gemini 3.0 Pro（按量）',
+                description: 'Gemini 3.0 Pro 的高可用按量通道，适合按实际 Token 消耗计费的生成任务。'
             },
             {
-                value: '[鹿鹿10]gemini-2.5-pro',
+                value: '[ruru3]gemini-2.5-pro',
                 label: 'Gemini 2.5 Pro（按次）',
-                description: '鹿鹿的 Gemini 2.5 Pro 按次通道，适合质量优先的文本生成场景。'
+                description: '价格较低且可用性仍然不错的 Gemini 2.5 Pro 按次通道，适合作为成熟模型的低成本选择。'
             },
             {
-                value: '[鹿鹿5]gemini-2.5-pro-preview-06-05',
+                value: '[ruru20]gemini-2.5-pro',
                 label: 'Gemini 2.5 Pro（按量）',
-                description: '鹿鹿的 Gemini 2.5 Pro 按量通道，适合质量优先的文本生成场景。'
+                description: 'Gemini 2.5 Pro 的低价按量通道，适合长短请求差异较大的使用场景。'
             },
             {
-                value: '[鹿鹿2]gemini-2.5-flash',
-                label: 'Gemini 2.5 Flash（按次）',
-                description: 'Gemini 2.5 Flash 的按次通道，适合作为均衡速度与成本的常用选择。'
+                value: '[ruru20]gemini-2.5-flash',
+                label: 'Gemini 2.5 Flash（按量）',
+                description: '价格很低的 Gemini 2.5 Flash 按量通道，适合低成本、高频率文本生成。'
             },
             {
-                value: '[鹿鹿14]claude-sonnet-4-6',
-                label: 'Claude Sonnet 4.6（按次）',
-                description: '鹿鹿的 Claude Sonnet 4.6 档位，适合稳健写作与长文本整理。'
+                value: '[鹿鹿3]claude-sonnet-4-6-thinking',
+                label: 'Claude Sonnet 4.6 Thinking（按次）',
+                description: '近期可用性优秀的 Claude Sonnet 4.6 推理通道，适合复杂创作、分析与长文本任务。'
             },
             {
-                value: '[鹿鹿14]claude-sonnet-4-5-20250929',
+                value: '[鹿鹿2]claude-4.5-sonnet',
                 label: 'Claude Sonnet 4.5（按次）',
-                description: '鹿鹿的 Claude Sonnet 4.5 按次档，状态波动较大，建议作为备用通道。'
+                description: '近期可用性较好的 Claude Sonnet 4.5 通道，适合作为稳健的 Claude 备用选择。'
             },
             {
-                value: '[鹿鹿14]claude-opus-4-6',
+                value: '[限时2]claude-opus-5',
+                label: 'Claude Opus 5（免费）',
+                description: '鹿鹿提供的 Claude Opus 5 限时免费通道，近期可用性较好，适合优先尝试高质量复杂任务。'
+            },
+            {
+                value: '[鹿鹿20]claude-opus-4.8',
+                label: 'Claude Opus 4.8（按次）',
+                description: '价格较低的 Claude Opus 4.8 按次通道，可作为 Opus 系列的付费备用入口。'
+            },
+            {
+                value: '[鹿鹿20]claude-opus-4.7',
+                label: 'Claude Opus 4.7（按次）',
+                description: '价格较低的 Claude Opus 4.7 按次通道，适合需要 Opus 系列能力时作为备用选择。'
+            },
+            {
+                value: '[鹿鹿3]claude-opus-4-6',
                 label: 'Claude Opus 4.6（按次）',
-                description: 'Claude Opus 4.6 的按次通道，适合复杂创作与高要求任务。'
+                description: '虽然价格略高，但近期及长期可用性明显优于多个低价 Opus 4.6 通道，适合稳定性优先的任务。'
             },
             {
                 value: '[鹿鹿2]gpt-5.5',
@@ -999,12 +1044,22 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
             {
                 value: '[限时2]deepseek-v4-pro-0813',
                 label: 'DeepSeek V4 Pro（免费）',
-                description: '鹿鹿提供的 DeepSeek 免费试用档，实时状态通常不稳定，适合作为低成本备用入口。'
+                description: '鹿鹿提供的 DeepSeek V4 Pro 限时免费通道，适合低成本体验和备用生成。'
+            },
+            {
+                value: '[限时2]kimi-k3',
+                label: 'Kimi K3（免费）',
+                description: '鹿鹿提供的 Kimi K3 限时免费通道，近期可用性较好，适合作为免费备用模型。'
+            },
+            {
+                value: '[限时2]GLM-5.3',
+                label: 'GLM-5.3（免费）',
+                description: '鹿鹿提供的 GLM-5.3 限时免费通道，可以用于低成本尝试，但近期可用性相对一般。'
             },
             {
                 value: '[限时2]qwen3.8-max',
                 label: 'Qwen3.8 Max（免费）',
-                description: '鹿鹿提供的 Qwen3.8 Max 免费试用档，适合低成本尝试，但实时可用性较弱。'
+                description: '鹿鹿提供的 Qwen3.8 Max 限时免费通道，可作为免费备用入口，但近期稳定性弱于部分其他免费模型。'
             },
         ]
     },
