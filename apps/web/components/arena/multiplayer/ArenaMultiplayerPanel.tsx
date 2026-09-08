@@ -543,6 +543,9 @@ export function ArenaMultiplayerPanelView(props: ArenaMultiplayerPanelViewProps)
     member.membershipState === 'active'
   )) ?? [];
   const host = activeMembers.find((member) => member.role === 'host');
+  const directoryRoom = session
+    ? state.rooms.find((room) => room.roomId === session.roomId)
+    : undefined;
   const activeGeneration = session?.snapshot.activeGeneration;
   const canCancelGeneration = session?.self.role === 'host'
     && (activeGeneration?.state === 'starting' || activeGeneration?.state === 'running');
@@ -558,7 +561,13 @@ export function ArenaMultiplayerPanelView(props: ArenaMultiplayerPanelViewProps)
     if (!session) return;
     // 邀请链接必须指向用户正在浏览的 Web 站点（production/preview/本地天然正确）；
     // props.origin 是 Hono API origin，不能用于产品分享链接。
-    const text = buildArenaRoomInviteText(window.location.origin, session.roomId);
+    const text = buildArenaRoomInviteText(window.location.origin, session.roomId, {
+      roomTitle: directoryRoom?.title
+        ?? (session.self.role === 'host' ? props.roomTitle : undefined),
+      hostDisplayName: host?.displayName,
+      memberCount: activeMembers.length,
+      memberLimit: directoryRoom?.memberLimit ?? MAX_ROOM_MEMBERS,
+    });
     const ok = await copyTextToClipboard(text);
     if (!ok) return;
     setCopiedInvite(true);

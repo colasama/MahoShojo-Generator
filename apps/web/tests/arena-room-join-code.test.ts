@@ -47,11 +47,40 @@ describe('parseArenaRoomJoinCode', () => {
 });
 
 describe('buildArenaRoomInviteText', () => {
-  it('邀请文案包含房间码、入口与用法，可被解析器还原', () => {
-    const text = buildArenaRoomInviteText('https://mahoshojo.colanns.me/', UUID);
+  it('邀请文案包含房间上下文、房间码、入口与用法，可被解析器还原', () => {
+    const text = buildArenaRoomInviteText('https://mahoshojo.colanns.me/', UUID, {
+      roomTitle: '废都茶会',
+      hostDisplayName: '小银',
+      memberCount: 2,
+      memberLimit: 8,
+    });
+    expect(text).toContain('房间：废都茶会');
+    expect(text).toContain('房主：小银');
+    expect(text).toContain('当前在线：2/8 人');
     expect(text).toContain(UUID);
     expect(text).toContain('https://mahoshojo.colanns.me/arena');
     expect(text).toContain('凭房间码加入');
+    expect(text).toContain('直接粘贴整段邀请即可加入');
+    expect(parseArenaRoomJoinCode(text)).toEqual({ ok: true, roomId: UUID });
+  });
+
+  it('用户可控的标题与昵称会折叠为空白分隔的单行文本', () => {
+    const text = buildArenaRoomInviteText('https://example.com', UUID, {
+      roomTitle: '  夜战\n测试房  ',
+      hostDisplayName: '房主\tAlice',
+      memberCount: 1.5,
+      memberLimit: -1,
+    });
+    expect(text).toContain('房间：夜战 测试房');
+    expect(text).toContain('房主：房主 Alice');
+    expect(text).not.toContain('当前在线：');
+    expect(parseArenaRoomJoinCode(text)).toEqual({ ok: true, roomId: UUID });
+  });
+
+  it('未提供房间详情时仍保持兼容并生成可粘贴邀请', () => {
+    const text = buildArenaRoomInviteText('https://example.com/', UUID);
+    expect(text).toContain(`房间码：${UUID}`);
+    expect(text).toContain('https://example.com/arena');
     expect(parseArenaRoomJoinCode(text)).toEqual({ ok: true, roomId: UUID });
   });
 });
