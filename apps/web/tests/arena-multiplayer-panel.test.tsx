@@ -323,6 +323,36 @@ describe('Arena multiplayer panel accessibility/permissions', () => {
     expect(unknown).toContain('请暂时不要再次点击开始');
   });
 
+  it('战报恢复失败时不再显示“等待服务器发布战报内容”', () => {
+    const recoveringState: ArenaRoomControllerState = {
+      ...readyState,
+      phase: 'connected',
+      session,
+      generation: {
+        ...readyState.generation,
+        phase: 'unavailable',
+        errorCode: 'ROOM_GENERATION_RECOVERY_TRANSIENT',
+      },
+    };
+    const recovering = renderToStaticMarkup(
+      <ArenaRoomGenerationResult state={recoveringState} />,
+    );
+    expect(recovering).toContain('暂时无法同步战报');
+    expect(recovering).not.toContain('等待服务器发布战报内容');
+
+    const notFound = renderToStaticMarkup(
+      <ArenaRoomGenerationResult state={{
+        ...recoveringState,
+        generation: {
+          ...recoveringState.generation,
+          errorCode: 'ROOM_GENERATION_RECOVERY_NOT_FOUND',
+        },
+      }} />,
+    );
+    expect(notFound).toContain('当前房间已不再生成这份战报');
+    expect(notFound).not.toContain('等待服务器发布战报内容');
+  });
+
   it('重连/降级/replacement 文案明确，不声称透明 failover', () => {
     const reconnecting = render({
       ...readyState,

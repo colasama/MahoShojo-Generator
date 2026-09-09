@@ -1820,6 +1820,236 @@ describe('Arena Room browser controller', () => {
     }));
   });
 
+  it('generation GET 临时失败时只对 safe-read 有界重试，并在恢复后安装权威视图', async () => {
+    const { client, controller, sockets, runNextTimer } = createHarness({
+      recoveryDelayMs: () => 0,
+    });
+    vi.mocked(client.getGenerationView)
+      .mockRejectedValueOnce(new ArenaRoomClientError(
+        'ROOM_UNAVAILABLE',
+        503,
+        '房间运行时暂不可用',
+      ))
+      .mockResolvedValueOnce(generationView);
+    await controller.create({
+      displayName: '房主',
+      directory: { title: '测试房', visibility: 'public' },
+      sharedConfig,
+    });
+    sockets[0]!.open();
+    sockets[0]!.message(JSON.stringify({
+      protocolVersion: 1,
+      roomId: 'room-1',
+      roomEpoch: 'epoch-1',
+      controlSeq: 1,
+      timestamp: '2026-08-28T00:01:00.000Z',
+      type: 'generation.started',
+      payload: {
+        generationRequestId: generationMirror.generationRequestId,
+        generationId: generationMirror.generationId,
+        attempt: generationMirror.attempt,
+        configRevision: generationMirror.configRevision,
+        snapshotDigest: generationMirror.snapshotDigest,
+        collaborativeInfluence: generationMirror.collaborativeInfluence,
+        participantUserIds: generationMirror.participantUserIds,
+      },
+    }));
+
+    await vi.waitFor(() => expect(client.getGenerationView).toHaveBeenCalledOnce());
+    expect(controller.getSnapshot().generation).toMatchObject({
+      phase: 'resyncing',
+      errorCode: 'ROOM_GENERATION_RECOVERY_TRANSIENT',
+    });
+    expect(controller.getSnapshot().notice).toContain('正在自动重试');
+
+    await runNextTimer();
+    await vi.waitFor(() => expect(client.getGenerationView).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(controller.getSnapshot().generation).toMatchObject({
+      phase: 'running',
+      errorCode: null,
+      markdown: '权威基线',
+    }));
+    expect(client.startGeneration).not.toHaveBeenCalled();
+  });
+
+  it('generation 404 且 session 已无 active generation 时停止旧等待，不再渲染运行中状态', async () => {
+    const { client, controller, sockets } = createHarness();
+    vi.mocked(client.getGenerationView).mockRejectedValueOnce(new ArenaRoomClientError(
+      'ROOM_GENERATION_NOT_FOUND',
+      404,
+      '未找到生成记录',
+    ));
+    vi.mocked(client.getSession).mockResolvedValueOnce(session);
+    await controller.create({
+      displayName: '房主',
+      directory: { title: '测试房', visibility: 'public' },
+      sharedConfig,
+    });
+    sockets[0]!.open();
+    sockets[0]!.message(JSON.stringify({
+      protocolVersion: 1,
+      roomId: 'room-1',
+      roomEpoch: 'epoch-1',
+      controlSeq: 1,
+      timestamp: '2026-08-28T00:01:00.000Z',
+      type: 'generation.started',
+      payload: {
+        generationRequestId: generationMirror.generationRequestId,
+        generationId: generationMirror.generationId,
+        attempt: generationMirror.attempt,
+        configRevision: generationMirror.configRevision,
+        snapshotDigest: generationMirror.snapshotDigest,
+        collaborativeInfluence: generationMirror.collaborativeInfluence,
+        participantUserIds: generationMirror.participantUserIds,
+      },
+    }));
+
+    await vi.waitFor(() => expect(client.getSession).toHaveBeenCalledWith('room-1'));
+    await vi.waitFor(() => expect(controller.getSnapshot().generation).toMatchObject({
+      phase: 'unavailable',
+      mirror: null,
+      errorCode: 'ROOM_GENERATION_RECOVERY_NOT_FOUND',
+    }));
+    expect(controller.getSnapshot().notice).toContain('不再生成');
+    expect(client.getGenerationView).toHaveBeenCalledOnce();
+  });
+
+  it('generation 404 但 session 仍指向同一 generation 时在预算内重试 safe-read', async () => {
+    const { client, controller, sockets, runNextTimer } = createHarness({
+      recoveryDelayMs: () => 0,
+    });
+    const sessionWithGeneration = {
+      ...session,
+      snapshot: { ...snapshot, activeGeneration: generationMirror },
+    };
+    vi.mocked(client.getGenerationView)
+      .mockRejectedValueOnce(new ArenaRoomClientError(
+        'ROOM_GENERATION_NOT_FOUND',
+        404,
+        '未找到生成记录',
+      ))
+      .mockResolvedValueOnce(generationView);
+    vi.mocked(client.getSession).mockResolvedValueOnce(sessionWithGeneration);
+    await controller.create({
+      displayName: '房主',
+      directory: { title: '测试房', visibility: 'public' },
+      sharedConfig,
+    });
+    sockets[0]!.open();
+    sockets[0]!.message(JSON.stringify({
+      protocolVersion: 1,
+      roomId: 'room-1',
+      roomEpoch: 'epoch-1',
+      controlSeq: 1,
+      timestamp: '2026-08-28T00:01:00.000Z',
+      type: 'generation.started',
+      payload: {
+        generationRequestId: generationMirror.generationRequestId,
+        generationId: generationMirror.generationId,
+        attempt: generationMirror.attempt,
+        configRevision: generationMirror.configRevision,
+        snapshotDigest: generationMirror.snapshotDigest,
+        collaborativeInfluence: generationMirror.collaborativeInfluence,
+        participantUserIds: generationMirror.participantUserIds,
+      },
+    }));
+
+    await vi.waitFor(() => expect(client.getSession).toHaveBeenCalledWith('room-1'));
+    await runNextTimer();
+    await vi.waitFor(() => expect(client.getGenerationView).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(controller.getSnapshot().generation).toMatchObject({
+      phase: 'running',
+      markdown: '权威基线',
+    }));
+    expect(client.startGeneration).not.toHaveBeenCalled();
+  });
+
+  it('generation recovery 临时失败最多执行四次 GET，耗尽后停止自动重试', async () => {
+    const { client, controller, sockets, runNextTimer } = createHarness({
+      recoveryDelayMs: () => 0,
+    });
+    vi.mocked(client.getGenerationView).mockRejectedValue(new ArenaRoomClientError(
+      'ROOM_UNAVAILABLE',
+      503,
+      '房间运行时暂不可用',
+    ));
+    await controller.create({
+      displayName: '房主',
+      directory: { title: '测试房', visibility: 'public' },
+      sharedConfig,
+    });
+    sockets[0]!.open();
+    sockets[0]!.message(JSON.stringify({
+      protocolVersion: 1,
+      roomId: 'room-1',
+      roomEpoch: 'epoch-1',
+      controlSeq: 1,
+      timestamp: '2026-08-28T00:01:00.000Z',
+      type: 'generation.started',
+      payload: {
+        generationRequestId: generationMirror.generationRequestId,
+        generationId: generationMirror.generationId,
+        attempt: generationMirror.attempt,
+        configRevision: generationMirror.configRevision,
+        snapshotDigest: generationMirror.snapshotDigest,
+        collaborativeInfluence: generationMirror.collaborativeInfluence,
+        participantUserIds: generationMirror.participantUserIds,
+      },
+    }));
+
+    for (let expectedCalls = 1; expectedCalls <= 4; expectedCalls += 1) {
+      await vi.waitFor(() => expect(client.getGenerationView).toHaveBeenCalledTimes(expectedCalls));
+      if (expectedCalls < 4) await runNextTimer();
+    }
+    await vi.waitFor(() => expect(controller.getSnapshot().generation).toMatchObject({
+      phase: 'unavailable',
+      errorCode: 'ROOM_GENERATION_RECOVERY_TRANSIENT',
+    }));
+    expect(client.getGenerationView).toHaveBeenCalledTimes(4);
+    expect(client.startGeneration).not.toHaveBeenCalled();
+  });
+
+  it('generation recovery 的 retry 在 Room fence 变化后停止，不会继续读取旧 generation', async () => {
+    const { client, controller, sockets, runNextTimer } = createHarness({
+      recoveryDelayMs: () => 0,
+    });
+    vi.mocked(client.getGenerationView).mockRejectedValueOnce(new ArenaRoomClientError(
+      'ROOM_UNAVAILABLE',
+      503,
+      '房间运行时暂不可用',
+    ));
+    await controller.create({
+      displayName: '房主',
+      directory: { title: '测试房', visibility: 'public' },
+      sharedConfig,
+    });
+    sockets[0]!.open();
+    sockets[0]!.message(JSON.stringify({
+      protocolVersion: 1,
+      roomId: 'room-1',
+      roomEpoch: 'epoch-1',
+      controlSeq: 1,
+      timestamp: '2026-08-28T00:01:00.000Z',
+      type: 'generation.started',
+      payload: {
+        generationRequestId: generationMirror.generationRequestId,
+        generationId: generationMirror.generationId,
+        attempt: generationMirror.attempt,
+        configRevision: generationMirror.configRevision,
+        snapshotDigest: generationMirror.snapshotDigest,
+        collaborativeInfluence: generationMirror.collaborativeInfluence,
+        participantUserIds: generationMirror.participantUserIds,
+      },
+    }));
+    await vi.waitFor(() => expect(client.getGenerationView).toHaveBeenCalledOnce());
+
+    controller.reset();
+    await runNextTimer();
+
+    expect(client.getGenerationView).toHaveBeenCalledOnce();
+    expect(controller.getSnapshot().session).toBeNull();
+  });
+
   it('terminal control 先更新 mirror，再由权威 GET 恢复最终 markdown', async () => {
     const { client, controller, sockets } = createHarness();
     let resolveRecovery!: (value: typeof generationView) => void;

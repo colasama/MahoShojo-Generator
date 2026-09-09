@@ -2,7 +2,7 @@ import type { ArenaRoomGenerationControllerView } from '@/lib/arena-room/control
 
 type GenerationView = Pick<
   ArenaRoomGenerationControllerView,
-  'phase' | 'finalAuthoritative'
+  'phase' | 'finalAuthoritative' | 'errorCode'
 >;
 
 /**
@@ -11,6 +11,7 @@ type GenerationView = Pick<
  */
 export const arenaRoomGenerationStatusLabel = (generation: GenerationView): string => {
   if (generation.finalAuthoritative) return '战报已完成';
+  if (generation.errorCode === 'ROOM_GENERATION_RECOVERY_NOT_FOUND') return '已停止等待';
   switch (generation.phase) {
     case 'completed':
       return '正在确认战报';
@@ -28,6 +29,27 @@ export const arenaRoomGenerationStatusLabel = (generation: GenerationView): stri
     default:
       return '暂不可用';
   }
+};
+
+const generationRecoveryErrorCodes = new Set([
+  'ROOM_GENERATION_RECOVERY_TRANSIENT',
+  'ROOM_GENERATION_RECOVERY_NOT_FOUND',
+  'ROOM_GENERATION_RECOVERY_PROTOCOL',
+]);
+
+export const arenaRoomGenerationRecoveryNotice = (
+  generation: Pick<ArenaRoomGenerationControllerView, 'phase' | 'errorCode'>,
+): string | null => {
+  if (!generation.errorCode || !generationRecoveryErrorCodes.has(generation.errorCode)) return null;
+  if (generation.errorCode === 'ROOM_GENERATION_RECOVERY_NOT_FOUND') {
+    return '当前房间已不再生成这份战报。';
+  }
+  if (generation.errorCode === 'ROOM_GENERATION_RECOVERY_PROTOCOL') {
+    return '战报状态无法核对，请重新连接。';
+  }
+  return generation.phase === 'resyncing'
+    ? '暂时无法同步战报，正在自动重试…'
+    : '暂时无法同步战报，请稍后重新连接或重试。';
 };
 
 /** generation unknown：正在向服务器确认是否已开始生成。 */

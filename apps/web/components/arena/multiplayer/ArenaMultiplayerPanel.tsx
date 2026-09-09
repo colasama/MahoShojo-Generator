@@ -28,6 +28,7 @@ import { StatusLine } from '@/components/shared/ui/StatusNotice';
 import {
   arenaRoomGenerationErrorCopy,
   arenaRoomGenerationGapNotice,
+  arenaRoomGenerationRecoveryNotice,
   arenaRoomGenerationStatusLabel,
   arenaRoomGenerationUnknownNotice,
 } from './presentation/generation-copy';
@@ -395,6 +396,7 @@ export const ArenaRoomGenerationResult = ({ state, onSaveImage }: {
   if (generation.phase === 'idle' && !generation.markdown) return null;
 
   const statusLabel = arenaRoomGenerationStatusLabel(generation);
+  const recoveryNotice = arenaRoomGenerationRecoveryNotice(generation);
   const errorCopy = generation.errorCode ? arenaRoomGenerationErrorCopy(generation.errorCode) : null;
 
   return (
@@ -419,7 +421,12 @@ export const ArenaRoomGenerationResult = ({ state, onSaveImage }: {
           {arenaRoomGenerationGapNotice}
         </p>
       ) : null}
-      {errorCopy ? (
+      {recoveryNotice ? (
+        <p role="status" className="mt-3 text-sm text-amber-800 dark:text-amber-200">
+          {recoveryNotice}
+        </p>
+      ) : null}
+      {errorCopy && !recoveryNotice ? (
         <div role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300" data-generation-error-code={generation.errorCode}>
           <p>{errorCopy.message}</p>
           <details className="mt-1 text-xs opacity-80">
@@ -458,7 +465,7 @@ export const ArenaRoomGenerationResult = ({ state, onSaveImage }: {
           adjudicationResults={generation.result?.adjudicationResults ?? null}
           combatantUpdates={generation.result?.combatantUpdates ?? null}
         />
-      ) : generation.phase !== 'unknown' ? (
+      ) : ['starting', 'running'].includes(generation.phase) ? (
         <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">等待服务器发布战报内容…</p>
       ) : null}
       {generation.finalAuthoritative && generation.generationRecordId ? (

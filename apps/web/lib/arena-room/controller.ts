@@ -125,6 +125,7 @@ type ArenaRoomControllerOptions = {
   readonly initialAccess?: { readonly enabled: boolean; readonly authenticated: boolean };
   readonly maxReconnectAttempts?: number;
   readonly reconnectDelayMs?: (attempt: number) => number;
+  readonly recoveryDelayMs?: (attempt: number, retryAfterSeconds?: number) => number;
   readonly reconnectRandom?: () => number;
   readonly setTimer?: (callback: () => void, delayMs: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
@@ -200,6 +201,52 @@ const phaseForAccess = (access: { enabled: boolean; authenticated: boolean }) =>
 const safeErrorMessage = (error: unknown): string => (
   error instanceof ArenaRoomClientError ? error.message : '房间运行时暂不可用'
 );
+
+type GenerationRecoveryFailureKind = 'not-found' | 'transient' | 'protocol';
+
+type GenerationRecoveryFailure = {
+  readonly kind: GenerationRecoveryFailureKind;
+  readonly retryAfterSeconds?: number;
+};
+
+const GENERATION_RECOVERY_MAX_ATTEMPTS = 4;
+const GENERATION_RECOVERY_TRANSIENT_CODE = 'ROOM_GENERATION_RECOVERY_TRANSIENT';
+const GENERATION_RECOVERY_NOT_FOUND_CODE = 'ROOM_GENERATION_RECOVERY_NOT_FOUND';
+const GENERATION_RECOVERY_PROTOCOL_CODE = 'ROOM_GENERATION_RECOVERY_PROTOCOL';
+
+const generationRecoveryFailureFor = (error: unknown): GenerationRecoveryFailure => {
+  if (!(error instanceof ArenaRoomClientError)) {
+    return { kind: 'protocol' };
+  }
+  if (error.status === 404 || error.code === 'ROOM_NOT_FOUND') {
+    return { kind: 'not-found' };
+  }
+  if (
+    error.code === 'ROOM_UNAVAILABLE'
+    || error.status === 408
+    || error.status === 425
+    || error.status === 429
+    || (error.status !== null && error.status >= 500)
+  ) {
+    return {
+      kind: 'transient',
+      retryAfterSeconds: error.retryAfterSeconds,
+    };
+  }
+  return { kind: 'protocol' };
+};
+
+const defaultGenerationRecoveryDelay = (
+  attempt: number,
+  random: () => number,
+  retryAfterSeconds?: number,
+): number => {
+  if (retryAfterSeconds !== undefined && Number.isFinite(retryAfterSeconds)) {
+    return Math.min(8_000, Math.max(0, Math.round(retryAfterSeconds * 1_000)));
+  }
+  const exponential = Math.min(4_000, 500 * (2 ** Math.max(0, attempt - 1)));
+  return Math.round(exponential * (0.8 + random() * 0.4));
+};
 
 /**
  * 重放管理 mutation 时服务器给出的确定性拒绝（权限/输入等 4xx）：
@@ -413,6 +460,10 @@ export const createArenaRoomController = (
   const reconnectRandom = options.reconnectRandom ?? Math.random;
   const reconnectDelayMs = options.reconnectDelayMs
     ?? ((attempt: number) => defaultReconnectDelay(attempt, reconnectRandom));
+  const recoveryDelayMs = options.recoveryDelayMs
+    ?? ((attempt: number, retryAfterSeconds?: number) => (
+      defaultGenerationRecoveryDelay(attempt, reconnectRandom, retryAfterSeconds)
+    ));
   const setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs));
   const clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
   const createRequestId = options.createRequestId ?? (() => globalThis.crypto.randomUUID());
@@ -689,26 +740,132 @@ export const createArenaRoomController = (
         mirror,
         phase: 'resyncing',
         status: state.generation.status ?? projectionStatusForMirror(mirror),
+        errorCode: null,
       },
     });
     const entry = {
       promise: Promise.resolve(),
       rerunAfterFlight: false,
     };
-    entry.promise = options.client.getGenerationView(current.roomId, mirror.generationId)
-      .then((view) => {
+    const recover = async (attempt: number): Promise<void> => {
+      if (!recoveryFenceIsCurrent(captured)) return;
+      try {
+        const view = await options.client.getGenerationView(current.roomId, mirror.generationId);
         if (!recoveryFenceIsCurrent(captured)) return;
-        installAuthoritativeGenerationView(view, captured);
-      })
-      .catch(() => {
+        const hadRecoveryNotice = state.notice === '正在核对战报状态，稍后重试…'
+          || state.notice === '暂时无法同步战报，正在自动重试…';
+        if (installAuthoritativeGenerationView(view, captured) && hadRecoveryNotice) {
+          publish({ notice: null });
+        }
+        return;
+      } catch (error) {
         if (!recoveryFenceIsCurrent(captured)) return;
+        const failure = generationRecoveryFailureFor(error);
+
+        if (failure.kind === 'not-found') {
+          try {
+            const authoritative = await options.client.getSession(captured.roomId);
+            if (!recoveryFenceIsCurrent(captured)) return;
+            const currentSession = state.session;
+            if (
+              !currentSession
+              || authoritative.roomId !== captured.roomId
+              || authoritative.self.userId !== currentSession.self.userId
+              || authoritative.self.membershipState !== 'active'
+            ) {
+              finishRoomSession({ notice: '当前房间成员资格已结束，无法继续恢复战报' });
+              return;
+            }
+            const active = authoritative.snapshot.activeGeneration;
+            const sameGeneration = authoritative.roomEpoch === captured.roomEpoch
+              && active?.generationId === captured.generationId
+              && active.attempt === captured.attempt;
+            if (!sameGeneration) {
+              const epochChanged = authoritative.roomEpoch !== captured.roomEpoch;
+              generationFence += 1;
+              controlCursor = {
+                roomEpoch: authoritative.roomEpoch,
+                controlSeq: authoritative.snapshot.controlSeq,
+              };
+              const reconciledGeneration = generationViewForSnapshot(active, true);
+              publish({
+                session: authoritative,
+                generation: active
+                  ? reconciledGeneration
+                  : {
+                    ...reconciledGeneration,
+                    phase: 'unavailable',
+                    errorCode: GENERATION_RECOVERY_NOT_FOUND_CODE,
+                  },
+                notice: active
+                  ? '房间已切换到新的战报，正在同步…'
+                  : '当前房间已不再生成这份战报',
+                error: null,
+              });
+              if (active) void requestGenerationRecovery('baseline');
+              if (epochChanged) {
+                void connectSession(authoritative, true, operationGeneration);
+              }
+              return;
+            }
+          } catch (sessionError) {
+            if (!recoveryFenceIsCurrent(captured)) return;
+            if (
+              sessionError instanceof ArenaRoomClientError
+              && (
+                sessionError.code === 'ROOM_NOT_FOUND'
+                || sessionError.code === 'ROOM_FORBIDDEN'
+              )
+            ) {
+              finishRoomSession({ notice: '当前房间已结束，无法继续恢复战报' });
+              return;
+            }
+            if (generationRecoveryFailureFor(sessionError).kind === 'protocol') {
+              publish({
+                generation: {
+                  ...state.generation,
+                  phase: 'unavailable',
+                  errorCode: GENERATION_RECOVERY_PROTOCOL_CODE,
+                },
+                notice: null,
+              });
+              return;
+            }
+          }
+        }
+
+        if (failure.kind === 'protocol' || attempt >= GENERATION_RECOVERY_MAX_ATTEMPTS) {
+          publish({
+            generation: {
+              ...state.generation,
+              phase: 'unavailable',
+              errorCode: failure.kind === 'protocol'
+                ? GENERATION_RECOVERY_PROTOCOL_CODE
+                : GENERATION_RECOVERY_TRANSIENT_CODE,
+            },
+            notice: null,
+          });
+          return;
+        }
+
         publish({
           generation: {
             ...state.generation,
-            phase: 'unavailable',
+            phase: 'resyncing',
+            errorCode: GENERATION_RECOVERY_TRANSIENT_CODE,
           },
+          notice: failure.kind === 'not-found'
+            ? '正在核对战报状态，稍后重试…'
+            : '暂时无法同步战报，正在自动重试…',
+          error: null,
         });
-      })
+        await new Promise<void>((resolve) => {
+          setTimer(resolve, recoveryDelayMs(attempt, failure.retryAfterSeconds));
+        });
+        if (recoveryFenceIsCurrent(captured)) await recover(attempt + 1);
+      }
+    };
+    entry.promise = recover(1)
       .finally(() => {
         if (generationRecoveries.get(key) !== entry) return;
         generationRecoveries.delete(key);
