@@ -25,6 +25,7 @@ import {
   ArenaRoomClientError,
   type ArenaRoomClient,
 } from './client';
+import { secureRandomUUID } from '@/lib/crypto';
 
 export type ArenaRoomControllerPhase =
   | 'closed'
@@ -508,7 +509,7 @@ export const createArenaRoomController = (
     ?? ((callback, delayMs) => setTimeout(callback, delayMs));
   const clearRecoveryAttemptTimer = options.clearRecoveryAttemptTimer
     ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
-  const createRequestId = options.createRequestId ?? (() => globalThis.crypto.randomUUID());
+  const createRequestId = options.createRequestId ?? secureRandomUUID;
   let access = options.initialAccess ?? { enabled: false, authenticated: false };
   let state: ArenaRoomControllerState = {
     ...READY_STATE,

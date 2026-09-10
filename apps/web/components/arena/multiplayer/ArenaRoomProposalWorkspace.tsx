@@ -28,6 +28,7 @@ import { ArenaEditorWorkspaceLayout } from '../editor/ArenaEditorWorkspaceLayout
 import { useLanguagesQuery } from '../hooks/useArenaData';
 import type { ArenaRoomController, ArenaRoomControllerState } from '@/lib/arena-room/controller';
 import { PRESET_LIST, type Preset } from '@/lib/presets';
+import { randomUUID } from '@/lib/crypto';
 import { ARENA_ROOM_PRESET_CATALOG } from '@/lib/arena-room/generated/arena-room-preset-catalog';
 import {
   ArenaProposalSelectionDetails,
@@ -96,8 +97,7 @@ const toExactRef = <Kind extends DataCardRef['kind']>(
 };
 
 const proposalId = (): string => {
-  const random = globalThis.crypto?.randomUUID?.();
-  return `proposal-${random ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
+  return `proposal-${randomUUID()}`;
 };
 
 const ProposalPreviewDialog = ({

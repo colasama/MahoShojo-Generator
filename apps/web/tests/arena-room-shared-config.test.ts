@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ArenaRoomShareabilityError,
   buildArenaRoomHostWorkspaceBundleFromBattleState,
   buildArenaRoomSharedConfigFromBattleState,
+  computeArenaRoomContentDigest,
   tryBuildArenaRoomHostWorkspaceBundleFromBattleState,
   type ArenaRoomBattleStateSource,
 } from '@/lib/arena-room/shared-config';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const settings = {
   readArenaHistory: true,
@@ -84,6 +89,16 @@ const source = (): ArenaRoomBattleStateSource => ({
 });
 
 describe('Arena Room Battle store projection', () => {
+  it('在 SubtleCrypto 缺失时仍生成兼容的内容摘要', async () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (array: Uint8Array) => array,
+    });
+
+    await expect(computeArenaRoomContentDigest({ value: 'abc' })).resolves.toBe(
+      'sha256:afef793fc69ce78450c4c66b8d52dd7c7779bfa4871c521469741f22d5dde564',
+    );
+  });
+
   it('只构造 allowlist refs/stubs，绝不复制本地 payload 或 provider secret', async () => {
     const input = source();
     const before = structuredClone(input);

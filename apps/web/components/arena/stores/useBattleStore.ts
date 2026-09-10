@@ -23,6 +23,7 @@ import {
   restoreArenaAdjudicationDraft,
 } from '@/lib/arena/adjudication-draft-persistence';
 import { canAddArenaReferenceItems } from '@/lib/arena/resource-budget';
+import { randomUUID } from '@/lib/crypto';
 import { createHydrationSafeJsonStorage } from '@/lib/zustand-persist-storage';
 
 const normalizeSourceKey = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -521,9 +522,7 @@ export const useBattleStore = create<BattleStoreState>()(
 
           const createSelectionSuffix = () => {
             try {
-              if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-                return crypto.randomUUID();
-              }
+              return randomUUID();
             } catch {
               // ignore
             }

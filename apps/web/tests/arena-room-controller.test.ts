@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ArenaRoomClientError,
@@ -305,6 +305,30 @@ const createHarness = (overrides: HarnessOverrides = {}) => {
 describe('Arena Room browser controller', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('在 randomUUID 缺失时默认房间创建请求仍使用兼容 UUID', async () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (array: Uint8Array) => {
+        array.fill(0);
+        return array;
+      },
+    });
+    const { client, controller } = createHarness({ createRequestId: undefined });
+
+    await controller.create({
+      displayName: '房主',
+      directory: { title: '测试房', visibility: 'public' },
+      sharedConfig,
+    });
+
+    expect(client.create).toHaveBeenCalledWith(expect.objectContaining({
+      creationRequestId: '00000000-0000-4000-8000-000000000000',
+    }));
   });
 
   it('disabled/unauthenticated 状态不发任何 Room 请求', async () => {

@@ -7,6 +7,7 @@ import { MAX_COMBATANTS, type ArenaRoomSharedConfig } from '@mahoshojo/contracts
 import { useArenaEditorSelector, useArenaEditorSession } from '../../context';
 import type { RoomProposalArenaEditorSession } from '../../types';
 import { moveItemInList } from '../move-item';
+import { randomUUID } from '@/lib/crypto';
 import type {
   ArenaRosterSectionModel,
   ArenaRosterRowView,
@@ -215,7 +216,7 @@ export const useProposalRosterSectionModel = (input: {
         addPlaceholder: () => undefined,
         clearRoster: () => undefined,
         createTeam: () => {
-          const key = `${TEAM_KEY_PREFIX}${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
+          const key = `${TEAM_KEY_PREFIX}${randomUUID()}`;
           const displayName = `分队 ${state.teams.length + 1}`;
           update((draft) => ({
             ...draft,

@@ -51,7 +51,8 @@ describe('Arena resumable stream transport cutover', () => {
     expect(serviceSource).not.toContain('parseGenerationSseBlock');
     expect(serviceSource).not.toMatch(/\bfetch\s*\(/u);
     expect(hookSource).not.toContain('baseRevisionHash');
-    expect(hookSource).toContain('generationRequestId: crypto.randomUUID()');
+    expect(hookSource).toContain('generationRequestId: secureRandomUUID()');
+    expect(hookSource).not.toContain('generationRequestId: crypto.randomUUID()');
   });
 
   it('reuses create authentication semantics for every local-card reconciliation request', () => {

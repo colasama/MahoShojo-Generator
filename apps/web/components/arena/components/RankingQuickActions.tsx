@@ -7,6 +7,7 @@ import { AI_PROVIDER_CATALOG } from '@/lib/ai/constants';
 import { isStrictRankedModelBlacklisted } from '@/lib/arena/ranked-model-policy';
 import { authStorage } from '@/lib/auth';
 import { normalizeQuestionnaireDefinition, type QuestionnairePresetEntry } from '@/lib/questionnaires';
+import { randomUUID } from '@/lib/crypto';
 import { deriveSeasonStrictRules, formatSeasonTitle, getCurrentSeason, type SeasonBattleMode, type SeasonsConfig } from '@/lib/seasons';
 import { getScenarioPresetByFilename } from '@/lib/scenario-presets';
 import { useAuth } from '@/lib/useAuth';
@@ -495,9 +496,7 @@ export function RankingQuickActions() {
 
         const createSelectionSuffix = () => {
           try {
-            if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-              return crypto.randomUUID();
-            }
+            return randomUUID();
           } catch {
             // ignore
           }

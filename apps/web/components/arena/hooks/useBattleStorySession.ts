@@ -44,6 +44,7 @@ import type {
   BattleStorySessionSource,
 } from '@/lib/ai-session/battle-story/types';
 import { authStorage } from '@/lib/auth';
+import { secureRandomUUID } from '@/lib/crypto';
 import { useGenerationApiIntentLatch } from '@/lib/use-generation-api-intent-latch';
 import { readJsonOrTextFromResponse, resolveApiErrorMessage } from '@/lib/client/apiError';
 import { formatHttpErrorMessage } from '@/lib/client/httpError';
@@ -903,7 +904,7 @@ export function useBattleStorySession() {
           signal: generationController.signal,
           body: JSON.stringify({
             sessionId: input.sessionId,
-            generationRequestId: crypto.randomUUID(),
+            generationRequestId: secureRandomUUID(),
             action: input.action,
             ...(input.sourceChapterId ? { sourceChapterId: input.sourceChapterId } : {}),
             ...(typeof input.chapterIndexHint === 'number' ? { chapterIndex: input.chapterIndexHint } : {}),

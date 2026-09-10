@@ -19,6 +19,7 @@ import type {
   StoryLengthOption,
 } from '@/components/arena/types';
 import type { ArenaMaterialState } from '@/lib/arena/materials';
+import { sha256Hex } from '@/lib/crypto';
 
 export type ArenaRoomBattleStateSource = {
   battleMode: BattleMode;
@@ -190,11 +191,7 @@ const stableJsonValue = (value: unknown, seen: WeakSet<object>): unknown => {
 
 export const computeArenaRoomContentDigest = async (value: unknown): Promise<string> => {
   const canonical = JSON.stringify(stableJsonValue(value, new WeakSet()));
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
-  const hex = Array.from(new Uint8Array(digest), (byte) => (
-    byte.toString(16).padStart(2, '0')
-  )).join('');
-  return `sha256:${hex}`;
+  return `sha256:${await sha256Hex(canonical)}`;
 };
 
 const contentDigest = computeArenaRoomContentDigest;

@@ -34,6 +34,7 @@ import {
   StreamReadTimeoutError,
 } from '@/lib/stream/timeout';
 import { authStorage } from '@/lib/auth';
+import { secureRandomUUID } from '@/lib/crypto';
 import {
   createPinnedGenerationApiSafeReadDispatcher,
   createGenerationApiIntent,
@@ -632,7 +633,7 @@ export const useBattleEngine = () => {
       const narrativeHistoryReadLimit = localNarrativeHistory.readLimit;
       const narrativeHistoryForRequest = localNarrativeHistory.entries;
 
-      const generationRequestId = crypto.randomUUID();
+      const generationRequestId = secureRandomUUID();
       const questionnaireSelections = selectedQuestionnaires.length > 0
         ? selectedQuestionnaires.map((selection) => ({
           source: selection.source,

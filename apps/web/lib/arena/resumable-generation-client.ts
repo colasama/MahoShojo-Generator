@@ -8,6 +8,7 @@ import {
   isGenerationApiRoutePin,
   type GenerationApiRoutePin,
 } from '@/lib/hono-api-client';
+import { encodeUtf8, secureRandomUUID, sha256Hex } from '@/lib/crypto';
 
 export const ARENA_GENERATION_CLIENT_STATE_KEY = 'mahoshojo:arena:generation:v1';
 export const ARENA_GENERATION_ACTOR_TOKEN_KEY = 'mahoshojo:arena:generation-actor:v1';
@@ -178,11 +179,6 @@ const canonicalJson = (value: unknown): string => {
     .join(',')}}`;
 };
 
-const sha256 = async (value: string): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-};
-
 const compareDecimal = (left: string, right: string): number => {
   const normalizedLeft = left.replace(/^0+(?=\d)/u, '');
   const normalizedRight = right.replace(/^0+(?=\d)/u, '');
@@ -213,7 +209,7 @@ const actorToken = (storage: StoragePort | null): string | null => {
 const ensureActorToken = (storage: StoragePort | null): string | null => {
   const existing = actorToken(storage);
   if (existing) return existing;
-  const bootstrap = `bootstrap.${crypto.randomUUID()}`;
+  const bootstrap = `bootstrap.${secureRandomUUID()}`;
   inMemoryActorToken = bootstrap;
   try {
     storage?.setItem(ARENA_GENERATION_ACTOR_TOKEN_KEY, bootstrap);
@@ -336,8 +332,8 @@ export const openArenaGenerationStream = async (
   const cancelConfirmationTimeoutMs = Math.max(1, options.cancelConfirmationTimeoutMs ?? 5_000);
   const isInitialCreateOutcomeAmbiguous = options.isInitialCreateOutcomeAmbiguous
     ?? shouldRecoverInitialCreateError;
-  const bodyHash = await sha256(canonicalJson(options.body));
-  const stateIdentity = await sha256(`${options.endpoint}\n${bodyHash}`);
+  const bodyHash = await sha256Hex(canonicalJson(options.body));
+  const stateIdentity = await sha256Hex(`${options.endpoint}\n${bodyHash}`);
   const scopedStateKey = `${ARENA_GENERATION_CLIENT_STATE_KEY}:${stateIdentity}`;
   const previous = readPersistedArenaGeneration(storage, scopedStateKey);
   const resumablePrevious = previous
@@ -358,7 +354,7 @@ export const openArenaGenerationStream = async (
     : null;
   const generationRequestId = resumablePrevious?.generationRequestId
     ?? options.generationRequestId
-    ?? crypto.randomUUID();
+    ?? secureRandomUUID();
   let generationId = resumablePrevious?.generationId ?? null;
   let lastEventId = resumablePrevious?.lastEventId ?? null;
   let routePin = resumablePrevious?.version === 3
@@ -651,7 +647,7 @@ export const openArenaGenerationStream = async (
   }
   updateState(connectedViaResume ? 'resuming' : 'generating');
 
-  const encoder = new TextEncoder();
+  const encoder = { encode: encodeUtf8 };
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const pump = async (): Promise<void> => {

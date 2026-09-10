@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ARENA_GENERATION_ACTOR_TOKEN_HEADER,
@@ -25,6 +25,10 @@ class MemoryStorage {
   setItem(key: string, value: string) { this.values.set(key, value); }
   removeItem(key: string) { this.values.delete(key); }
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const response = (body: ReadableStream<Uint8Array> | string, generationId = 'generation-1') => new Response(body, {
   status: 200,
@@ -118,6 +122,12 @@ describe('resumable Arena generation client', () => {
     });
   });
   it('persists a bootstrap actor credential before the first POST', async () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (array: Uint8Array) => {
+        array.fill(0);
+        return array;
+      },
+    });
     const storage = new MemoryStorage();
     const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
       const headers = new Headers(init?.headers);
@@ -132,6 +142,34 @@ describe('resumable Arena generation client', () => {
       endpoint: '/api/arena/generate-stream',
       body: {}, headers: {}, fetcher, storage,
       generationRequestId: 'request-1234',
+    });
+    await opened.text();
+  });
+
+  it('在 randomUUID 缺失时仍为首次请求和 actor token 使用兼容 UUID', async () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (array: Uint8Array) => {
+        array.fill(0);
+        return array;
+      },
+    });
+    const storage = new MemoryStorage();
+    const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      const requestBody = JSON.parse(String(init?.body)) as { generationRequestId?: string };
+      expect(requestBody.generationRequestId).toBe('00000000-0000-4000-8000-000000000000');
+      expect(headers.get(ARENA_GENERATION_ACTOR_TOKEN_HEADER)).toBe(
+        'bootstrap.00000000-0000-4000-8000-000000000000',
+      );
+      return response('id: 1-0\nevent: done\ndata: {"status":"completed"}\n\n', 'generation-compat');
+    });
+
+    const opened = await openArenaGenerationStream({
+      endpoint: '/api/arena/generate-stream',
+      body: { mode: 'classic' },
+      headers: {},
+      fetcher,
+      storage,
     });
     await opened.text();
   });
