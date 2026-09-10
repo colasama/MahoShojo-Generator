@@ -353,6 +353,31 @@ describe('Arena multiplayer panel accessibility/permissions', () => {
     expect(notFound).not.toContain('等待服务器发布战报内容');
   });
 
+  it('生成业务失败与战报恢复失败分别呈现，并提供安全手动重试', () => {
+    const onRetryRecovery = vi.fn();
+    const failedState: ArenaRoomControllerState = {
+      ...readyState,
+      phase: 'connected',
+      session,
+      generation: {
+        ...readyState.generation,
+        phase: 'failed',
+        status: 'failed',
+        errorCode: 'ARENA_PROVIDER_UNKNOWN',
+        recoveryCode: 'ROOM_GENERATION_RECOVERY_TRANSIENT',
+      },
+    };
+    const html = renderToStaticMarkup(
+      <ArenaRoomGenerationResult state={failedState} onRetryRecovery={onRetryRecovery} />,
+    );
+
+    expect(html).toContain('模型服务配置无效');
+    expect(html).toContain('暂时无法同步战报，请稍后重新同步');
+    expect(html).toContain('重新同步战报');
+    expect(html).toContain('data-generation-error-code="ARENA_PROVIDER_UNKNOWN"');
+    expect(html).not.toContain('ROOM_GENERATION_RECOVERY_TRANSIENT');
+  });
+
   it('重连/降级/replacement 文案明确，不声称透明 failover', () => {
     const reconnecting = render({
       ...readyState,

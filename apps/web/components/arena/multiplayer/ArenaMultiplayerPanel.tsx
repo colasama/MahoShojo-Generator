@@ -28,9 +28,11 @@ import { StatusLine } from '@/components/shared/ui/StatusNotice';
 import {
   arenaRoomGenerationErrorCopy,
   arenaRoomGenerationGapNotice,
+  arenaRoomGenerationRecoveryCode,
   arenaRoomGenerationRecoveryNotice,
   arenaRoomGenerationStatusLabel,
   arenaRoomGenerationUnknownNotice,
+  isArenaRoomGenerationRecoveryCode,
 } from './presentation/generation-copy';
 import { arenaRoomConfigSyncLabel } from './presentation/room-copy';
 import { useBattleStore } from '@/components/arena/stores/useBattleStore';
@@ -388,16 +390,26 @@ const ArenaRoomLobbyDialog = ({
   );
 };
 
-export const ArenaRoomGenerationResult = ({ state, onSaveImage }: {
+export const ArenaRoomGenerationResult = ({ state, onSaveImage, onRetryRecovery }: {
   readonly state: ArenaRoomControllerState;
   readonly onSaveImage?: (imageUrl: string) => void;
+  readonly onRetryRecovery?: () => void | Promise<void>;
 }) => {
   const generation = state.generation;
   if (generation.phase === 'idle' && !generation.markdown) return null;
 
   const statusLabel = arenaRoomGenerationStatusLabel(generation);
   const recoveryNotice = arenaRoomGenerationRecoveryNotice(generation);
-  const errorCopy = generation.errorCode ? arenaRoomGenerationErrorCopy(generation.errorCode) : null;
+  const recoveryCode = arenaRoomGenerationRecoveryCode(generation);
+  const generationErrorCode = generation.errorCode
+    && !isArenaRoomGenerationRecoveryCode(generation.errorCode)
+    ? generation.errorCode
+    : null;
+  const errorCopy = generationErrorCode ? arenaRoomGenerationErrorCopy(generationErrorCode) : null;
+  const canRetryRecovery = Boolean(onRetryRecovery)
+    && recoveryCode !== null
+    && recoveryCode !== 'ROOM_GENERATION_RECOVERY_NOT_FOUND'
+    && generation.phase !== 'resyncing';
 
   return (
     <section
@@ -426,12 +438,23 @@ export const ArenaRoomGenerationResult = ({ state, onSaveImage }: {
           {recoveryNotice}
         </p>
       ) : null}
-      {errorCopy && !recoveryNotice ? (
-        <div role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300" data-generation-error-code={generation.errorCode}>
+      {canRetryRecovery ? (
+        <ActionBar className="mt-3">
+          <button
+            type="button"
+            className={buttonClassName()}
+            onClick={() => { void onRetryRecovery?.(); }}
+          >
+            重新同步战报
+          </button>
+        </ActionBar>
+      ) : null}
+      {errorCopy ? (
+        <div role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300" data-generation-error-code={generationErrorCode}>
           <p>{errorCopy.message}</p>
           <details className="mt-1 text-xs opacity-80">
             <summary className="cursor-pointer select-none">技术详情</summary>
-            <p className="mt-1">错误代码：{generation.errorCode}</p>
+            <p className="mt-1">错误代码：{generationErrorCode}</p>
           </details>
         </div>
       ) : null}
@@ -1183,7 +1206,13 @@ export function ArenaMultiplayerContextResult({ onSaveImage }: ArenaMultiplayerR
   if (!runtime?.state.session) return null;
   const generation = runtime.state.generation;
   if (generation.phase !== 'idle' || generation.markdown) {
-    return <ArenaRoomGenerationResult state={runtime.state} onSaveImage={onSaveImage} />;
+    return (
+      <ArenaRoomGenerationResult
+        state={runtime.state}
+        onSaveImage={onSaveImage}
+        onRetryRecovery={() => runtime.controller.retryGenerationRecovery()}
+      />
+    );
   }
   return <ArenaRoomLatestHistoryResult history={runtime.latestGenerationHistory} onSaveImage={onSaveImage} />;
 }

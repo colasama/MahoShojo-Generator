@@ -3,7 +3,29 @@ import type { ArenaRoomGenerationControllerView } from '@/lib/arena-room/control
 type GenerationView = Pick<
   ArenaRoomGenerationControllerView,
   'phase' | 'finalAuthoritative' | 'errorCode'
->;
+> & Partial<Pick<ArenaRoomGenerationControllerView, 'recoveryCode'>>;
+
+const generationRecoveryErrorCodes = new Set([
+  'ROOM_GENERATION_RECOVERY_TRANSIENT',
+  'ROOM_GENERATION_RECOVERY_NOT_FOUND',
+  'ROOM_GENERATION_RECOVERY_PROTOCOL',
+]);
+
+export const isArenaRoomGenerationRecoveryCode = (
+  code: string | null | undefined,
+): boolean => Boolean(code && generationRecoveryErrorCodes.has(code));
+
+export const arenaRoomGenerationRecoveryCode = (
+  generation: Pick<ArenaRoomGenerationControllerView, 'errorCode'>
+    & Partial<Pick<ArenaRoomGenerationControllerView, 'recoveryCode'>>,
+): string | null => {
+  if (isArenaRoomGenerationRecoveryCode(generation.recoveryCode)) {
+    return generation.recoveryCode ?? null;
+  }
+  return isArenaRoomGenerationRecoveryCode(generation.errorCode)
+    ? generation.errorCode
+    : null;
+};
 
 /**
  * 房间战报状态 → 用户文案 presentation。
@@ -11,7 +33,12 @@ type GenerationView = Pick<
  */
 export const arenaRoomGenerationStatusLabel = (generation: GenerationView): string => {
   if (generation.finalAuthoritative) return '战报已完成';
-  if (generation.errorCode === 'ROOM_GENERATION_RECOVERY_NOT_FOUND') return '已停止等待';
+  const recoveryCode = arenaRoomGenerationRecoveryCode(generation);
+  if (recoveryCode === 'ROOM_GENERATION_RECOVERY_NOT_FOUND') return '已停止等待';
+  if (recoveryCode && generation.phase === 'completed') return '生成已完成';
+  if (recoveryCode && generation.phase !== 'resyncing' && generation.phase !== 'failed') {
+    return '战报同步受阻';
+  }
   switch (generation.phase) {
     case 'completed':
       return '正在确认战报';
@@ -31,25 +58,21 @@ export const arenaRoomGenerationStatusLabel = (generation: GenerationView): stri
   }
 };
 
-const generationRecoveryErrorCodes = new Set([
-  'ROOM_GENERATION_RECOVERY_TRANSIENT',
-  'ROOM_GENERATION_RECOVERY_NOT_FOUND',
-  'ROOM_GENERATION_RECOVERY_PROTOCOL',
-]);
-
 export const arenaRoomGenerationRecoveryNotice = (
-  generation: Pick<ArenaRoomGenerationControllerView, 'phase' | 'errorCode'>,
+  generation: Pick<ArenaRoomGenerationControllerView, 'phase' | 'errorCode'>
+    & Partial<Pick<ArenaRoomGenerationControllerView, 'recoveryCode'>>,
 ): string | null => {
-  if (!generation.errorCode || !generationRecoveryErrorCodes.has(generation.errorCode)) return null;
-  if (generation.errorCode === 'ROOM_GENERATION_RECOVERY_NOT_FOUND') {
+  const recoveryCode = arenaRoomGenerationRecoveryCode(generation);
+  if (!recoveryCode) return null;
+  if (recoveryCode === 'ROOM_GENERATION_RECOVERY_NOT_FOUND') {
     return '当前房间已不再生成这份战报。';
   }
-  if (generation.errorCode === 'ROOM_GENERATION_RECOVERY_PROTOCOL') {
-    return '战报状态无法核对，请重新连接。';
+  if (recoveryCode === 'ROOM_GENERATION_RECOVERY_PROTOCOL') {
+    return '战报状态无法核对，请重新同步。';
   }
   return generation.phase === 'resyncing'
     ? '暂时无法同步战报，正在自动重试…'
-    : '暂时无法同步战报，请稍后重新连接或重试。';
+    : '暂时无法同步战报，请稍后重新同步。';
 };
 
 /** generation unknown：正在向服务器确认是否已开始生成。 */

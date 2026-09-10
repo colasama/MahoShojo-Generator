@@ -527,13 +527,19 @@ describe('Arena Room browser client', () => {
       fetch: fetcher,
       getAuthHeader: async () => 'Bearer verified-key',
     });
+    const abortController = new AbortController();
 
-    await expect(client.getGenerationView('room/1', 'generation-1')).resolves.toEqual(generationView);
+    await expect(client.getGenerationView(
+      'room/1',
+      'generation-1',
+      abortController.signal,
+    )).resolves.toEqual(generationView);
     const [url, init] = fetcher.mock.calls[0]!;
     expect(String(url)).toBe(
       'https://api.example.test/api/arena/rooms/v1/room%2F1/generations/generation-1',
     );
     expect(init).toMatchObject({ method: 'GET', credentials: 'omit' });
+    expect(init?.signal).toBe(abortController.signal);
     expect(init?.body).toBeUndefined();
     expect(new Headers(init?.headers).get('accept')).toBe(
       'application/json; arena-error-taxonomy=2',

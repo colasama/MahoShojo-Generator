@@ -92,6 +92,8 @@ export type ArenaRoomGenerationControllerView = {
   readonly finalAuthoritative: boolean;
   readonly generationRecordId: string | null;
   readonly errorCode: string | null;
+  /** safe-read recovery outcome; kept separate from the generation/provider outcome above. */
+  readonly recoveryCode?: string | null;
   readonly pendingRequestId: string | null;
   readonly startResultUnknown: boolean;
   readonly result: ArenaRoomGenerationResult | null;
@@ -126,9 +128,12 @@ type ArenaRoomControllerOptions = {
   readonly maxReconnectAttempts?: number;
   readonly reconnectDelayMs?: (attempt: number) => number;
   readonly recoveryDelayMs?: (attempt: number, retryAfterSeconds?: number) => number;
+  readonly generationRecoveryAttemptTimeoutMs?: number;
   readonly reconnectRandom?: () => number;
   readonly setTimer?: (callback: () => void, delayMs: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
+  readonly setRecoveryAttemptTimer?: (callback: () => void, delayMs: number) => unknown;
+  readonly clearRecoveryAttemptTimer?: (handle: unknown) => void;
   readonly createRequestId?: () => string;
 };
 
@@ -153,6 +158,8 @@ export type ArenaRoomController = {
   publishConfig(request: ArenaRoomPublishConfigRequest): Promise<void>;
   startGeneration(request: ArenaRoomGenerationStartRequest): Promise<void>;
   retryGenerationStart(): Promise<void>;
+  /** 仅重新读取当前 generation，不创建新的 generation intent。 */
+  retryGenerationRecovery(): Promise<void>;
   reconnect(): void;
   reset(): void;
   dispose(): void;
@@ -169,6 +176,7 @@ const EMPTY_GENERATION_VIEW: ArenaRoomGenerationControllerView = Object.freeze({
   finalAuthoritative: false,
   generationRecordId: null,
   errorCode: null,
+  recoveryCode: null,
   pendingRequestId: null,
   startResultUnknown: false,
   result: null,
@@ -209,14 +217,37 @@ type GenerationRecoveryFailure = {
   readonly retryAfterSeconds?: number;
 };
 
+type GenerationRecoveryEntry = {
+  promise: Promise<void>;
+  rerunAfterFlight: boolean;
+  cancelled: boolean;
+  activeAbortController: AbortController | null;
+  activeReject: ((reason?: unknown) => void) | null;
+  activeTimeoutTimer: unknown;
+  delayTimer: unknown;
+  resolveDelay: (() => void) | null;
+};
+
 const GENERATION_RECOVERY_MAX_ATTEMPTS = 4;
+const GENERATION_RECOVERY_ATTEMPT_TIMEOUT_MS = 10_000;
+const GENERATION_RECOVERY_MAX_AUTOMATIC_DELAY_MS = 8_000;
 const GENERATION_RECOVERY_TRANSIENT_CODE = 'ROOM_GENERATION_RECOVERY_TRANSIENT';
 const GENERATION_RECOVERY_NOT_FOUND_CODE = 'ROOM_GENERATION_RECOVERY_NOT_FOUND';
 const GENERATION_RECOVERY_PROTOCOL_CODE = 'ROOM_GENERATION_RECOVERY_PROTOCOL';
 
+const isAbortError = (error: unknown): boolean => (
+  error instanceof Error && error.name === 'AbortError'
+);
+
 const generationRecoveryFailureFor = (error: unknown): GenerationRecoveryFailure => {
   if (!(error instanceof ArenaRoomClientError)) {
-    return { kind: 'protocol' };
+    // The concrete Room client maps transport failures to ROOM_UNAVAILABLE. Keep
+    // direct client implementations/mocks equally conservative: TypeError and
+    // AbortError are browser fetch transport failure shapes, while other errors
+    // remain protocol faults.
+    return error instanceof TypeError || isAbortError(error)
+      ? { kind: 'transient' }
+      : { kind: 'protocol' };
   }
   if (error.status === 404 || error.code === 'ROOM_NOT_FOUND') {
     return { kind: 'not-found' };
@@ -242,7 +273,7 @@ const defaultGenerationRecoveryDelay = (
   retryAfterSeconds?: number,
 ): number => {
   if (retryAfterSeconds !== undefined && Number.isFinite(retryAfterSeconds)) {
-    return Math.min(8_000, Math.max(0, Math.round(retryAfterSeconds * 1_000)));
+    return Math.max(0, Math.round(retryAfterSeconds * 1_000));
   }
   const exponential = Math.min(4_000, 500 * (2 ** Math.max(0, attempt - 1)));
   return Math.round(exponential * (0.8 + random() * 0.4));
@@ -432,6 +463,7 @@ const reduceGenerationControl = (
       finalAuthoritative: false,
       generationRecordId: null,
       errorCode: null,
+      recoveryCode: null,
       pendingRequestId: null,
       startResultUnknown: false,
     };
@@ -445,6 +477,7 @@ const reduceGenerationControl = (
     finalAuthoritative: false,
     generationRecordId: null,
     errorCode: event.type === 'generation.failed' ? event.payload.errorCode : null,
+    recoveryCode: null,
     pendingRequestId: null,
     startResultUnknown: false,
   };
@@ -464,8 +497,17 @@ export const createArenaRoomController = (
     ?? ((attempt: number, retryAfterSeconds?: number) => (
       defaultGenerationRecoveryDelay(attempt, reconnectRandom, retryAfterSeconds)
     ));
+  const generationRecoveryAttemptTimeoutMs = options.generationRecoveryAttemptTimeoutMs
+    ?? GENERATION_RECOVERY_ATTEMPT_TIMEOUT_MS;
+  if (!Number.isSafeInteger(generationRecoveryAttemptTimeoutMs) || generationRecoveryAttemptTimeoutMs < 1) {
+    throw new Error('generationRecoveryAttemptTimeoutMs 必须是正安全整数');
+  }
   const setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs));
   const clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+  const setRecoveryAttemptTimer = options.setRecoveryAttemptTimer
+    ?? ((callback, delayMs) => setTimeout(callback, delayMs));
+  const clearRecoveryAttemptTimer = options.clearRecoveryAttemptTimer
+    ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
   const createRequestId = options.createRequestId ?? (() => globalThis.crypto.randomUUID());
   let access = options.initialAccess ?? { enabled: false, authenticated: false };
   let state: ArenaRoomControllerState = {
@@ -499,10 +541,7 @@ export const createArenaRoomController = (
   let pendingCreateRequest: ArenaRoomCreateRequest | null = null;
   let pendingJoinRoomId: string | null = null;
   let controlCursor: RoomControlCursor | undefined;
-  const generationRecoveries = new Map<string, {
-    promise: Promise<void>;
-    rerunAfterFlight: boolean;
-  }>();
+  const generationRecoveries = new Map<string, GenerationRecoveryEntry>();
   const listeners = new Set<() => void>();
 
   const publish = (patch: Partial<ArenaRoomControllerState>): void => {
@@ -536,6 +575,43 @@ export const createArenaRoomController = (
     reconnectTimer = null;
   };
 
+  /**
+   * 取消当前 recovery 的 transport/delay，但保留 promise entry 直到 finally。
+   * 同 generation 的 terminal event 可以借此保持 single-flight，并在旧请求
+   * 结束后补一次新权威读取；reset/dispose 则会额外清空 map，禁止旧任务续跑。
+   */
+  const cancelGenerationRecoveries = (clearEntries: boolean): void => {
+    for (const entry of generationRecoveries.values()) {
+      entry.cancelled = true;
+      entry.activeAbortController?.abort();
+      entry.activeAbortController = null;
+      const rejectActiveRead = entry.activeReject;
+      entry.activeReject = null;
+      rejectActiveRead?.(new ArenaRoomClientError(
+        'ROOM_UNAVAILABLE',
+        null,
+        '房间运行时暂不可用',
+      ));
+      if (entry.activeTimeoutTimer !== null) {
+        clearRecoveryAttemptTimer(entry.activeTimeoutTimer);
+        entry.activeTimeoutTimer = null;
+      }
+      if (entry.delayTimer !== null) {
+        clearTimer(entry.delayTimer);
+        entry.delayTimer = null;
+      }
+      const resolveDelay = entry.resolveDelay;
+      entry.resolveDelay = null;
+      resolveDelay?.();
+    }
+    if (clearEntries) generationRecoveries.clear();
+  };
+
+  const advanceGenerationFence = (clearRecoveries = false): void => {
+    generationFence += 1;
+    cancelGenerationRecoveries(clearRecoveries);
+  };
+
   const detachSocket = (close = false): void => {
     const current = socket;
     socket = null;
@@ -554,7 +630,7 @@ export const createArenaRoomController = (
     operationGeneration += 1;
     proposalMutationGeneration += 1;
     generationStartOperation += 1;
-    generationFence += 1;
+    advanceGenerationFence(true);
     invalidateConfigPublish();
     invalidateManagementMutation();
     proposalMutationPending = false;
@@ -700,6 +776,7 @@ export const createArenaRoomController = (
         finalAuthoritative: view.finalAuthoritative,
         generationRecordId: view.generationRecordId ?? null,
         errorCode: view.errorCode ?? null,
+        recoveryCode: null,
         pendingRequestId: null,
         startResultUnknown: false,
         result: view.result ?? null,
@@ -716,7 +793,7 @@ export const createArenaRoomController = (
   };
 
   const requestGenerationRecovery = (
-    reason: 'baseline' | 'gap' | 'reconnect' | 'resync' | 'terminal',
+    reason: 'baseline' | 'gap' | 'manual' | 'reconnect' | 'resync' | 'terminal',
   ): Promise<void> | null => {
     const current = state.session;
     const mirror = current?.snapshot.activeGeneration;
@@ -740,31 +817,110 @@ export const createArenaRoomController = (
         mirror,
         phase: 'resyncing',
         status: state.generation.status ?? projectionStatusForMirror(mirror),
-        errorCode: null,
+        recoveryCode: GENERATION_RECOVERY_TRANSIENT_CODE,
       },
     });
-    const entry = {
+    const entry: GenerationRecoveryEntry = {
       promise: Promise.resolve(),
       rerunAfterFlight: false,
+      cancelled: false,
+      activeAbortController: null,
+      activeReject: null,
+      activeTimeoutTimer: null,
+      delayTimer: null,
+      resolveDelay: null,
+    };
+    const readWithTimeout = async <T>(
+      read: (signal: AbortSignal) => Promise<T>,
+    ): Promise<T> => {
+      const abortController = new AbortController();
+      entry.activeAbortController = abortController;
+      let timeoutHandle: unknown = null;
+      let rejectTimeout: ((reason?: unknown) => void) | null = null;
+      const timeoutPromise = new Promise<never>((_resolve, reject) => {
+        rejectTimeout = reject;
+      });
+      try {
+        entry.activeReject = rejectTimeout;
+        timeoutHandle = setRecoveryAttemptTimer(
+          () => {
+            abortController.abort();
+            const rejectCurrentRead = entry.activeReject;
+            entry.activeReject = null;
+            rejectCurrentRead?.(new ArenaRoomClientError(
+              'ROOM_UNAVAILABLE',
+              null,
+              '房间运行时暂不可用',
+            ));
+          },
+          generationRecoveryAttemptTimeoutMs,
+        );
+        entry.activeTimeoutTimer = timeoutHandle;
+        return await Promise.race([
+          read(abortController.signal),
+          timeoutPromise,
+        ]);
+      } finally {
+        if (timeoutHandle !== null && entry.activeTimeoutTimer === timeoutHandle) {
+          clearRecoveryAttemptTimer(timeoutHandle);
+          entry.activeTimeoutTimer = null;
+        }
+        if (entry.activeReject === rejectTimeout) {
+          entry.activeReject = null;
+        }
+        if (entry.activeAbortController === abortController) {
+          entry.activeAbortController = null;
+        }
+      }
+    };
+    const phaseAfterRecoveryFailure = (): ArenaRoomGenerationPhase => {
+      switch (state.generation.status) {
+        case 'completed': return 'completed';
+        case 'failed':
+        case 'producer_lost': return 'failed';
+        case 'cancelled': return 'cancelled';
+        default: return 'unavailable';
+      }
+    };
+    const finishRecovery = (recoveryCode: string): void => {
+      publish({
+        generation: {
+          ...state.generation,
+          phase: phaseAfterRecoveryFailure(),
+          recoveryCode,
+        },
+        notice: null,
+      });
     };
     const recover = async (attempt: number): Promise<void> => {
-      if (!recoveryFenceIsCurrent(captured)) return;
+      if (entry.cancelled || !recoveryFenceIsCurrent(captured)) return;
       try {
-        const view = await options.client.getGenerationView(current.roomId, mirror.generationId);
+        const view = await readWithTimeout((signal) => (
+          options.client.getGenerationView(captured.roomId, captured.generationId, signal)
+        ));
         if (!recoveryFenceIsCurrent(captured)) return;
         const hadRecoveryNotice = state.notice === '正在核对战报状态，稍后重试…'
-          || state.notice === '暂时无法同步战报，正在自动重试…';
-        if (installAuthoritativeGenerationView(view, captured) && hadRecoveryNotice) {
+          || state.notice === '暂时无法同步战报，正在自动重试…'
+          || state.generation.recoveryCode != null;
+        const noticeBeforeInstall = state.notice;
+        if (
+          installAuthoritativeGenerationView(view, captured)
+          && hadRecoveryNotice
+          && state.notice === noticeBeforeInstall
+        ) {
           publish({ notice: null });
         }
         return;
       } catch (error) {
         if (!recoveryFenceIsCurrent(captured)) return;
         const failure = generationRecoveryFailureFor(error);
+        let retryFailure = failure;
 
         if (failure.kind === 'not-found') {
           try {
-            const authoritative = await options.client.getSession(captured.roomId);
+            const authoritative = await readWithTimeout((signal) => (
+              options.client.getSession(captured.roomId, signal)
+            ));
             if (!recoveryFenceIsCurrent(captured)) return;
             const currentSession = state.session;
             if (
@@ -782,7 +938,7 @@ export const createArenaRoomController = (
               && active.attempt === captured.attempt;
             if (!sameGeneration) {
               const epochChanged = authoritative.roomEpoch !== captured.roomEpoch;
-              generationFence += 1;
+              advanceGenerationFence();
               controlCursor = {
                 roomEpoch: authoritative.roomEpoch,
                 controlSeq: authoritative.snapshot.controlSeq,
@@ -795,7 +951,8 @@ export const createArenaRoomController = (
                   : {
                     ...reconciledGeneration,
                     phase: 'unavailable',
-                    errorCode: GENERATION_RECOVERY_NOT_FOUND_CODE,
+                    errorCode: state.generation.errorCode,
+                    recoveryCode: GENERATION_RECOVERY_NOT_FOUND_CODE,
                   },
                 notice: active
                   ? '房间已切换到新的战报，正在同步…'
@@ -821,30 +978,33 @@ export const createArenaRoomController = (
               return;
             }
             if (generationRecoveryFailureFor(sessionError).kind === 'protocol') {
-              publish({
-                generation: {
-                  ...state.generation,
-                  phase: 'unavailable',
-                  errorCode: GENERATION_RECOVERY_PROTOCOL_CODE,
-                },
-                notice: null,
-              });
+              finishRecovery(GENERATION_RECOVERY_PROTOCOL_CODE);
               return;
             }
+            const sessionFailure = generationRecoveryFailureFor(sessionError);
+            if (sessionFailure.kind === 'transient') retryFailure = sessionFailure;
           }
+
         }
 
-        if (failure.kind === 'protocol' || attempt >= GENERATION_RECOVERY_MAX_ATTEMPTS) {
-          publish({
-            generation: {
-              ...state.generation,
-              phase: 'unavailable',
-              errorCode: failure.kind === 'protocol'
-                ? GENERATION_RECOVERY_PROTOCOL_CODE
-                : GENERATION_RECOVERY_TRANSIENT_CODE,
-            },
-            notice: null,
-          });
+        // A valid Retry-After is a server instruction, not a value the
+        // client may shorten. If it exceeds the automatic recovery window,
+        // stop here and let the user explicitly retry later.
+        if (
+          retryFailure.retryAfterSeconds !== undefined
+          && Number.isFinite(retryFailure.retryAfterSeconds)
+          && retryFailure.retryAfterSeconds * 1_000 > GENERATION_RECOVERY_MAX_AUTOMATIC_DELAY_MS
+        ) {
+          finishRecovery(GENERATION_RECOVERY_TRANSIENT_CODE);
+          return;
+        }
+
+        if (retryFailure.kind === 'protocol' || attempt >= GENERATION_RECOVERY_MAX_ATTEMPTS) {
+          finishRecovery(
+            retryFailure.kind === 'protocol'
+              ? GENERATION_RECOVERY_PROTOCOL_CODE
+              : GENERATION_RECOVERY_TRANSIENT_CODE,
+          );
           return;
         }
 
@@ -852,17 +1012,24 @@ export const createArenaRoomController = (
           generation: {
             ...state.generation,
             phase: 'resyncing',
-            errorCode: GENERATION_RECOVERY_TRANSIENT_CODE,
+            recoveryCode: GENERATION_RECOVERY_TRANSIENT_CODE,
           },
-          notice: failure.kind === 'not-found'
+          notice: retryFailure.kind === 'not-found'
             ? '正在核对战报状态，稍后重试…'
             : '暂时无法同步战报，正在自动重试…',
           error: null,
         });
         await new Promise<void>((resolve) => {
-          setTimer(resolve, recoveryDelayMs(attempt, failure.retryAfterSeconds));
+          entry.resolveDelay = resolve;
+          let timer: unknown = null;
+          timer = setTimer(() => {
+            if (entry.delayTimer === timer) entry.delayTimer = null;
+            entry.resolveDelay = null;
+            resolve();
+          }, recoveryDelayMs(attempt, retryFailure.retryAfterSeconds));
+          entry.delayTimer = timer;
         });
-        if (recoveryFenceIsCurrent(captured)) await recover(attempt + 1);
+        if (!entry.cancelled && recoveryFenceIsCurrent(captured)) await recover(attempt + 1);
       }
     };
     entry.promise = recover(1)
@@ -900,7 +1067,8 @@ export const createArenaRoomController = (
       gap: null,
       finalAuthoritative: false,
       generationRecordId: null,
-      errorCode: null,
+      errorCode: base.errorCode ?? null,
+      recoveryCode: null,
       pendingRequestId,
       startResultUnknown: false,
     };
@@ -1002,7 +1170,7 @@ export const createArenaRoomController = (
         invalidateManagementMutation();
       } else if (configReconciled) configPublishIntent = null;
       unknownProposalMutation = null;
-      generationFence += 1;
+      advanceGenerationFence();
       publish({
         session: {
           protocolVersion: 1,
@@ -1146,7 +1314,7 @@ export const createArenaRoomController = (
       || event.type === 'generation.failed'
     ) {
       const generation = reduceGenerationControl(state.generation, event);
-      generationFence += 1;
+      advanceGenerationFence();
       publish({
         session: {
           ...current,
@@ -1272,7 +1440,7 @@ export const createArenaRoomController = (
     pendingCreateRequest = null;
     pendingJoinRoomId = null;
     invalidateManagementMutation();
-    generationFence += 1;
+    advanceGenerationFence();
     publish({
       session,
       generation: generationViewForSnapshot(session.snapshot.activeGeneration, true),
@@ -1334,7 +1502,7 @@ export const createArenaRoomController = (
       unknownProposalMutation = null;
       configPublishIntent = null;
       configPublishPending = false;
-      generationFence += 1;
+      advanceGenerationFence();
       publish({
         session: authoritative,
         generation: generationViewForSnapshot(
@@ -1836,7 +2004,7 @@ export const createArenaRoomController = (
       publish({ session: authoritative, notice });
       return false;
     }
-    generationFence += 1;
+    advanceGenerationFence();
     publish({
       session: authoritative,
       generation: generationViewForSnapshot(authoritative.snapshot.activeGeneration, true),
@@ -2188,6 +2356,9 @@ export const createArenaRoomController = (
     const operation = generationStartOperation;
     const expectedRoomId = current.roomId;
     const expectedRoomEpoch = current.roomEpoch;
+    // Establish the new generation intent before awaiting its POST response;
+    // an older safe-read recovery must not be able to write into this start.
+    advanceGenerationFence(true);
     publish({
       generation: {
         ...(retry ? state.generation : EMPTY_GENERATION_VIEW),
@@ -2206,7 +2377,7 @@ export const createArenaRoomController = (
         || state.session?.roomId !== expectedRoomId
         || state.session.roomEpoch !== expectedRoomEpoch
       ) return;
-      generationFence += 1;
+      advanceGenerationFence(true);
       if (!installAuthoritativeGenerationView(view, {
         roomId: expectedRoomId,
         roomEpoch: expectedRoomEpoch,
@@ -2268,7 +2439,7 @@ export const createArenaRoomController = (
       operationGeneration += 1;
       proposalMutationGeneration += 1;
       generationStartOperation += 1;
-      generationFence += 1;
+      advanceGenerationFence(true);
       invalidateConfigPublish();
       proposalMutationPending = false;
       generationStartPending = false;
@@ -2355,7 +2526,7 @@ export const createArenaRoomController = (
       operationGeneration += 1;
       proposalMutationGeneration += 1;
       generationStartOperation += 1;
-      generationFence += 1;
+      advanceGenerationFence(true);
       invalidateConfigPublish();
       invalidateManagementMutation();
       proposalMutationPending = false;
@@ -2389,7 +2560,7 @@ export const createArenaRoomController = (
       operationGeneration += 1;
       proposalMutationGeneration += 1;
       generationStartOperation += 1;
-      generationFence += 1;
+      advanceGenerationFence(true);
       invalidateConfigPublish();
       invalidateManagementMutation();
       proposalMutationPending = false;
@@ -2478,7 +2649,7 @@ export const createArenaRoomController = (
       operationGeneration += 1;
       proposalMutationGeneration += 1;
       generationStartOperation += 1;
-      generationFence += 1;
+      advanceGenerationFence(true);
       invalidateConfigPublish();
       proposalMutationPending = false;
       generationStartPending = false;
@@ -2547,7 +2718,7 @@ export const createArenaRoomController = (
       operationGeneration += 1;
       proposalMutationGeneration += 1;
       generationStartOperation += 1;
-      generationFence += 1;
+      advanceGenerationFence(true);
       invalidateConfigPublish();
       proposalMutationPending = false;
       generationStartPending = false;
@@ -2641,6 +2812,39 @@ export const createArenaRoomController = (
       await runGenerationStart(request, true);
     },
 
+    async retryGenerationRecovery() {
+      const current = state.session;
+      const mirror = current?.snapshot.activeGeneration;
+      const recoveryCode = state.generation.recoveryCode;
+      if (
+        !current
+        || !mirror
+        || !recoveryCode
+        || recoveryCode === GENERATION_RECOVERY_NOT_FOUND_CODE
+        || disposed
+        || !access.enabled
+        || !access.authenticated
+      ) return;
+      const key = recoveryKeyFor(current.roomId, current.roomEpoch, mirror);
+      const existing = generationRecoveries.get(key);
+      const flight = requestGenerationRecovery('manual');
+      if (!flight) return;
+      await flight;
+      const latest = state.session?.snapshot.activeGeneration;
+      if (
+        existing !== undefined
+        && !disposed
+        && state.generation.recoveryCode === recoveryCode
+        && state.session?.roomId === current.roomId
+        && state.session.roomEpoch === current.roomEpoch
+        && latest?.generationId === mirror.generationId
+        && latest.attempt === mirror.attempt
+        && state.generation.phase !== 'resyncing'
+      ) {
+        await requestGenerationRecovery('manual');
+      }
+    },
+
     reconnect() {
       if (!state.session || disposed || !access.enabled || !access.authenticated) return;
       operationGeneration += 1;
@@ -2662,7 +2866,7 @@ export const createArenaRoomController = (
       operationGeneration += 1;
       proposalMutationGeneration += 1;
       generationStartOperation += 1;
-      generationFence += 1;
+      advanceGenerationFence(true);
       invalidateConfigPublish();
       invalidateManagementMutation();
       proposalMutationPending = false;
@@ -2685,7 +2889,7 @@ export const createArenaRoomController = (
       operationGeneration += 1;
       proposalMutationGeneration += 1;
       generationStartOperation += 1;
-      generationFence += 1;
+      advanceGenerationFence(true);
       invalidateConfigPublish();
       invalidateManagementMutation();
       proposalMutationPending = false;
