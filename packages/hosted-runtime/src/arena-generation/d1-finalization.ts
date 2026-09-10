@@ -78,6 +78,10 @@ const numberOf = (value: unknown): number | null => (
   typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : null
 );
 
+const integerOf = (value: unknown): number | null => (
+  typeof value === 'number' && Number.isSafeInteger(value) ? value : null
+);
+
 const stringOf = (value: unknown): string | null => (
   typeof value === 'string' && value.trim() ? value.trim() : null
 );
@@ -379,10 +383,12 @@ const buildExtraJson = async (
     impacts: terminalImpacts(input).slice(0, MAX_ARENA_TERMINAL_IMPACTS).flatMap((impact) => {
       const characterName = boundedString(impact.characterName, 300);
       if (!characterName) return [];
-      const explicitIndex = numberOf(impact.combatantIndex);
+      const hasCombatantIndex = Object.prototype.hasOwnProperty.call(impact, 'combatantIndex');
+      const explicitIndex = integerOf(impact.combatantIndex);
       const hasValidExplicitIndex = explicitIndex !== null
         && explicitIndex >= 0
         && explicitIndex < combatantsFallback.length;
+      if (hasCombatantIndex && !hasValidExplicitIndex) return [];
       if (hasValidExplicitIndex && explicitIndex !== null) {
         const explicitCombatant = combatantsFallback[explicitIndex];
         const explicitKey = explicitCombatant?.name.replace(/\s+/gu, '').toLocaleLowerCase();
@@ -582,55 +588,120 @@ const buildRoomSafeResult = (
   row: StoredTerminalRow,
   extra: Record<string, unknown>,
 ): Readonly<Record<string, unknown>> | null => {
+  type RoomSafeCombatantCandidate = Readonly<{
+    combatantIndex: number;
+    combatantKey: string;
+    displayName: string;
+  }>;
+  type RoomSafeImpact = Readonly<{
+    impact?: string;
+    currentStateSummary?: string;
+  }>;
+
+  const normalizeDisplayName = (value: unknown): string | null => {
+    const text = stringOf(value);
+    return text ? text.replace(/\s+/gu, ' ').toLocaleLowerCase() : null;
+  };
   const render = parseBattleReportRenderSnapshotV1(extra.battleReportRenderSnapshotV1);
   const fallback = Array.isArray(extra.combatantsFallback)
     ? extra.combatantsFallback.slice(0, MAX_ARENA_TERMINAL_COMBATANTS)
     : [];
-  const candidates = fallback.flatMap((value) => {
+  const candidates = fallback.flatMap((value, fallbackIndex) => {
     const combatant = recordOf(value);
     const combatantKey = stringOf(combatant?.roomCombatantKey);
     const displayName = boundedString(combatant?.name, 300);
+    const storedIndex = integerOf(combatant?.sortIndex);
+    const combatantIndex = storedIndex !== null
+      && storedIndex >= 0
+      && storedIndex < fallback.length
+      ? storedIndex
+      : fallbackIndex;
     return combatantKey && /^(data-card|preset|host-local):.+$/u.test(combatantKey) && displayName
-      ? [{ combatantKey, displayName }]
+      ? [{ combatantIndex, combatantKey, displayName } satisfies RoomSafeCombatantCandidate]
       : [];
   });
   const countsByName = new Map<string, number>();
   for (const candidate of candidates) {
-    countsByName.set(candidate.displayName, (countsByName.get(candidate.displayName) ?? 0) + 1);
+    const normalizedName = normalizeDisplayName(candidate.displayName);
+    if (!normalizedName) continue;
+    countsByName.set(normalizedName, (countsByName.get(normalizedName) ?? 0) + 1);
   }
-  const uniqueByName = new Map(candidates
-    .filter((candidate) => countsByName.get(candidate.displayName) === 1)
-    .map((candidate) => [candidate.displayName, candidate]));
+  const uniqueByName = new Map(candidates.flatMap((candidate) => {
+    const normalizedName = normalizeDisplayName(candidate.displayName);
+    return normalizedName && countsByName.get(normalizedName) === 1
+      ? [[normalizedName, candidate] as const]
+      : [];
+  }));
+  const candidateByIndex = new Map<number, RoomSafeCombatantCandidate>();
+  const duplicateCandidateIndexes = new Set<number>();
+  for (const candidate of candidates) {
+    if (duplicateCandidateIndexes.has(candidate.combatantIndex)) continue;
+    if (candidateByIndex.has(candidate.combatantIndex)) {
+      candidateByIndex.delete(candidate.combatantIndex);
+      duplicateCandidateIndexes.add(candidate.combatantIndex);
+      continue;
+    }
+    candidateByIndex.set(candidate.combatantIndex, candidate);
+  }
   const characterGuidances = render?.characterGuidances?.flatMap((entry) => {
-    const candidate = uniqueByName.get(entry.characterName);
-    return candidate ? [{ ...candidate, guidance: entry.guidance }] : [];
+    const candidate = uniqueByName.get(normalizeDisplayName(entry.characterName) ?? '');
+    return candidate ? [{
+      combatantKey: candidate.combatantKey,
+      displayName: candidate.displayName,
+      guidance: entry.guidance,
+    }] : [];
   });
   const reconciliation = recordOf(extra.localCardReconciliation);
-  const impacts = Array.isArray(reconciliation?.impacts)
+  const impacts = reconciliation?.available !== false && Array.isArray(reconciliation?.impacts)
     ? reconciliation.impacts.slice(0, MAX_ARENA_TERMINAL_IMPACTS)
     : [];
-  const impactByName = new Map<string, Record<string, unknown>>();
-  const duplicateImpacts = new Set<string>();
+  const impactByIndex = new Map<number, {
+    fingerprint: string;
+    detail: RoomSafeImpact;
+  }>();
+  const conflictedIndexes = new Set<number>();
   for (const value of impacts) {
     const impact = recordOf(value);
     const displayName = boundedString(impact?.characterName, 300);
-    if (!impact || !displayName) continue;
-    if (impactByName.has(displayName)) duplicateImpacts.add(displayName);
-    else impactByName.set(displayName, impact);
-  }
-  const combatantUpdates = candidates.map((candidate) => {
-    const impact = duplicateImpacts.has(candidate.displayName)
-      ? null
-      : impactByName.get(candidate.displayName) ?? null;
-    return {
-      ...candidate,
-      ...(boundedString(impact?.impact, 2_000) ? {
-        impact: boundedString(impact?.impact, 2_000)!,
-      } : {}),
-      ...(boundedString(impact?.currentStateSummary, 2_000) ? {
-        currentStateSummary: boundedString(impact?.currentStateSummary, 2_000)!,
-      } : {}),
+    const impactText = boundedString(impact?.impact, 2_000);
+    const currentStateSummary = boundedString(impact?.currentStateSummary, 2_000);
+    if (!impact || (!impactText && !currentStateSummary)) continue;
+
+    const explicitIndex = integerOf(impact.combatantIndex);
+    const hasValidExplicitIndex = explicitIndex !== null
+      && explicitIndex >= 0
+      && explicitIndex < fallback.length;
+    if (
+      Object.prototype.hasOwnProperty.call(impact, 'combatantIndex')
+      && !hasValidExplicitIndex
+    ) continue;
+    const candidate = hasValidExplicitIndex
+      ? candidateByIndex.get(explicitIndex)
+      : uniqueByName.get(normalizeDisplayName(displayName) ?? '');
+    if (!candidate) continue;
+
+    const detail: RoomSafeImpact = {
+      ...(impactText ? { impact: impactText } : {}),
+      ...(currentStateSummary ? { currentStateSummary } : {}),
     };
+    const fingerprint = JSON.stringify(detail);
+    if (conflictedIndexes.has(candidate.combatantIndex)) continue;
+    const existing = impactByIndex.get(candidate.combatantIndex);
+    if (!existing) {
+      impactByIndex.set(candidate.combatantIndex, { fingerprint, detail });
+    } else if (existing.fingerprint !== fingerprint) {
+      impactByIndex.delete(candidate.combatantIndex);
+      conflictedIndexes.add(candidate.combatantIndex);
+    }
+  }
+  const combatantUpdates = candidates.flatMap((candidate) => {
+    if (candidateByIndex.get(candidate.combatantIndex) !== candidate) return [];
+    const detail = impactByIndex.get(candidate.combatantIndex)?.detail;
+    return detail ? [{
+      combatantKey: candidate.combatantKey,
+      displayName: candidate.displayName,
+      ...detail,
+    }] : [];
   });
   const usage = {
     ...(numberOf(row.prompt_tokens) === null ? {} : { promptTokens: numberOf(row.prompt_tokens)! }),

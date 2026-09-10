@@ -50,6 +50,7 @@ import {
   BattleResultPresentation,
   type BattleResultPresentationProps,
 } from '@/components/arena/components/BattleResultPresentation';
+import { CombatantUpdatesPresentation } from '@/components/arena/components/CombatantUpdatesPresentation';
 import { ArenaRoomGenerationResult } from '@/components/arena/multiplayer/ArenaMultiplayerPanel';
 import type { ArenaRoomControllerState } from '@/lib/arena-room/controller';
 
@@ -113,6 +114,55 @@ describe('BattleResultPresentation', () => {
 
     expect(html).toContain('data-testid="structured-report-card"');
     expect(html).toContain('结构化终局');
+  });
+
+  it('共享角色变化 presentation 支持类型、Markdown、动作插槽和重复显示名', () => {
+    const html = renderToStaticMarkup(
+      <CombatantUpdatesPresentation
+        title="角色更新"
+        items={[
+          {
+            key: 'combatant-a',
+            displayName: '重复角色',
+            typeLabel: '魔法少女',
+            impact: '**甲的变化**',
+            currentStateSummary: '甲的状态',
+          },
+          {
+            key: 'combatant-b',
+            displayName: '重复角色',
+            impact: '乙的变化',
+          },
+        ]}
+        renderActions={(item) => (
+          <button type="button" data-action-key={item.key}>动作</button>
+        )}
+      />
+    );
+
+    expect(html.match(/aria-label="重复角色的战后变化"/g)).toHaveLength(2);
+    expect(html).toContain('魔法少女');
+    expect(html).toContain('<strong>甲的变化</strong>');
+    expect(html).toContain('甲的状态');
+    expect(html).toContain('data-action-key="combatant-a"');
+    expect(html).toContain('data-action-key="combatant-b"');
+  });
+
+  it('name-only 的 Room-safe item 不渲染空更新卡，只显示明确空态', () => {
+    const html = render({
+      report: {
+        format: 'stream-markdown',
+        content: '# 房间终局',
+        isStreaming: false,
+      },
+      combatantUpdates: [{
+        combatantKey: 'host-local:character-only-name',
+        displayName: '仅名字角色',
+      }],
+    });
+
+    expect(html).toContain('本场没有可公开的角色变化。');
+    expect(html).not.toContain('仅名字角色');
   });
 
   it('房间 viewer 可以沿用主战报卡的保存图片动作', async () => {

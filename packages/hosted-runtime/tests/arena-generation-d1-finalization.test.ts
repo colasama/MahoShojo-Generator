@@ -121,6 +121,45 @@ const rejectedInput: ArenaGenerationRejectedTerminalRecordInput = {
   pvpContext: { roomId: 'room-1', matchId: 'match-1', roundId: 'round-1' },
 };
 
+const sha256Hex = async (value: string): Promise<string> => crypto.subtle.digest(
+  'SHA-256',
+  new TextEncoder().encode(value),
+).then((bytes) => Array.from(
+  new Uint8Array(bytes),
+  (byte) => byte.toString(16).padStart(2, '0'),
+).join(''));
+
+const readRoomSafeResult = async (extra: Record<string, unknown>) => {
+  const actorKey = 'anonymous:room-safe-test';
+  const client = sequentialD1([result([{
+    id: 'generation-room-safe-test',
+    status: 'completed',
+    updated_at: '2026-08-25T04:00:00.000Z',
+    mode: 'classic',
+    extra_json: JSON.stringify({
+      generationRequestId: 'request-room-safe-test',
+      generationOwnerHash: await sha256Hex(actorKey),
+      generationPayloadHash: 'payload-room-safe-test',
+      generationTerminalStatus: 'completed',
+      finalizationCompleted: true,
+      resultRef: 'r2:room-safe-test',
+      ...extra,
+    }),
+    r2_key: 'room-safe-test',
+  }])]);
+  const store = createNodeArenaGenerationTerminalStore({
+    getD1Client: () => client,
+    objectStore: {
+      put: vi.fn(),
+      getText: vi.fn(async () => ({ kind: 'found' as const, text: 'room-safe body' })),
+    },
+  });
+  return (await store.readOwnedTerminal({
+    generationId: 'generation-room-safe-test',
+    actorKey,
+  }))?.roomSafeResult;
+};
+
 describe('Arena D1/R2 finalization ports', () => {
   it('records a bounded failed PVP rejection without success-side-effect data', async () => {
     const client = sequentialD1([result([], 1)]);
@@ -381,6 +420,170 @@ describe('Arena D1/R2 finalization ports', () => {
       expect.objectContaining({ combatantIndex: 0, impact: '显式目标' }),
       expect.objectContaining({ combatantIndex: 1, impact: '队列目标' }),
     ]);
+  });
+
+  it('builds Room-safe updates by combatantIndex even when the model display name differs', async () => {
+    const result = await readRoomSafeResult({
+      combatantsFallback: [
+        { sortIndex: 0, roomCombatantKey: 'data-card:character-a', name: '角色甲' },
+        { sortIndex: 1, roomCombatantKey: 'data-card:character-b', name: '双头猎犬-蠖' },
+      ],
+      localCardReconciliation: {
+        impacts: [{
+          combatantIndex: 1,
+          characterName: '双头猎犬 - 蠖',
+          impact: '完成逆阶进化准备',
+          currentStateSummary: '进入消化阶段',
+        }],
+      },
+    });
+
+    expect(result?.combatantUpdates).toEqual([{
+      combatantKey: 'data-card:character-b',
+      displayName: '双头猎犬-蠖',
+      impact: '完成逆阶进化准备',
+      currentStateSummary: '进入消化阶段',
+    }]);
+  });
+
+  it('does not use a name fallback when an explicit combatantIndex is invalid', async () => {
+    const result = await readRoomSafeResult({
+      combatantsFallback: [{
+        sortIndex: 0,
+        roomCombatantKey: 'data-card:character-a',
+        name: '唯一角色',
+      }],
+      localCardReconciliation: {
+        impacts: [{
+          combatantIndex: 99,
+          characterName: '唯一角色',
+          impact: '错误索引不应绑定',
+        }],
+      },
+    });
+
+    expect(result).not.toHaveProperty('combatantUpdates');
+  });
+
+  it('keeps duplicate-name updates on their indexed Room-safe combatants', async () => {
+    const result = await readRoomSafeResult({
+      combatantsFallback: [
+        { sortIndex: 0, roomCombatantKey: 'host-local:character-a', name: '同名角色' },
+        { sortIndex: 1, roomCombatantKey: 'host-local:character-b', name: '同名角色' },
+      ],
+      localCardReconciliation: {
+        impacts: [
+          { combatantIndex: 0, characterName: '同名角色', impact: '甲的变化' },
+          { combatantIndex: 1, characterName: '同名角色', impact: '乙的变化' },
+        ],
+      },
+    });
+
+    expect(result?.combatantUpdates).toEqual([
+      { combatantKey: 'host-local:character-a', displayName: '同名角色', impact: '甲的变化' },
+      { combatantKey: 'host-local:character-b', displayName: '同名角色', impact: '乙的变化' },
+    ]);
+  });
+
+  it('uses the unique normalized display name only as the legacy fallback', async () => {
+    const result = await readRoomSafeResult({
+      combatantsFallback: [{
+        sortIndex: 0,
+        roomCombatantKey: 'data-card:character-a',
+        name: '唯一 角色',
+      }],
+      localCardReconciliation: {
+        impacts: [{ characterName: '  唯一   角色  ', impact: '旧数据中的变化' }],
+      },
+    });
+
+    expect(result?.combatantUpdates).toEqual([{
+      combatantKey: 'data-card:character-a',
+      displayName: '唯一 角色',
+      impact: '旧数据中的变化',
+    }]);
+  });
+
+  it('skips ambiguous legacy name matches instead of emitting name-only updates', async () => {
+    const result = await readRoomSafeResult({
+      combatantsFallback: [
+        { sortIndex: 0, roomCombatantKey: 'data-card:character-a', name: '同名角色' },
+        { sortIndex: 1, roomCombatantKey: 'data-card:character-b', name: '同名角色' },
+      ],
+      localCardReconciliation: {
+        impacts: [{ characterName: '同名角色', impact: '无法确定目标' }],
+      },
+    });
+
+    expect(result).not.toHaveProperty('combatantUpdates');
+  });
+
+  it('fails locally on conflicting effects for one indexed combatant and deduplicates identical effects', async () => {
+    const conflicted = await readRoomSafeResult({
+      combatantsFallback: [{
+        sortIndex: 0,
+        roomCombatantKey: 'data-card:character-a',
+        name: '角色甲',
+      }],
+      localCardReconciliation: {
+        impacts: [
+          { combatantIndex: 0, characterName: '角色甲', impact: '第一条变化' },
+          { combatantIndex: 0, characterName: '角色甲', impact: '第二条变化' },
+        ],
+      },
+    });
+    expect(conflicted).not.toHaveProperty('combatantUpdates');
+
+    const deduplicated = await readRoomSafeResult({
+      combatantsFallback: [{
+        sortIndex: 0,
+        roomCombatantKey: 'data-card:character-a',
+        name: '角色甲',
+      }],
+      localCardReconciliation: {
+        impacts: [
+          { combatantIndex: 0, characterName: '角色甲', impact: '同一条变化' },
+          { combatantIndex: 0, characterName: '角色甲', impact: '同一条变化' },
+        ],
+      },
+    });
+    expect(deduplicated?.combatantUpdates).toEqual([{
+      combatantKey: 'data-card:character-a',
+      displayName: '角色甲',
+      impact: '同一条变化',
+    }]);
+  });
+
+  it('does not materialize combatant updates when reconciliation is unavailable or has no details', async () => {
+    const unavailable = await readRoomSafeResult({
+      combatantsFallback: [{
+        sortIndex: 0,
+        roomCombatantKey: 'data-card:character-a',
+        name: '角色甲',
+      }],
+      localCardReconciliation: {
+        available: false,
+        reason: 'manifest_budget_exceeded',
+        impacts: [{
+          combatantIndex: 0,
+          characterName: '角色甲',
+          impact: '不可公开的变化',
+        }],
+      },
+    });
+    expect(unavailable).not.toHaveProperty('combatantUpdates');
+
+    const nameOnly = await readRoomSafeResult({
+      combatantsFallback: [{
+        sortIndex: 0,
+        roomCombatantKey: 'data-card:character-a',
+        name: '角色甲',
+      }],
+      localCardReconciliation: {
+        impacts: [{ combatantIndex: 0, characterName: '角色甲' }],
+      },
+    });
+    expect(nameOnly).not.toHaveProperty('combatantUpdates');
   });
 
   it.each([

@@ -9,12 +9,13 @@ import { useBattleEngine } from '../hooks/useBattleEngine';
 import { useCombatantRepair } from '../hooks/useCombatantRepair';
 import { getCombatantDisplayName } from '../utils/characterValidator';
 import { inferTemplate } from '@/lib/data-card-converter';
-import { BattleStoreState, CombatantData, UpdatedCombatantData } from '../types';
+import { BattleStoreState, CombatantData } from '../types';
 import { MarkdownBlock } from '@/components/MarkdownBlock';
 import { CollapsibleSection } from '@/components/shared/CollapsibleSection';
 import { JsonSizeIndicator } from '@/components/shared/JsonSizeIndicator';
 import { BattleIllustrationPanel } from './BattleIllustrationPanel';
 import { BattleResultPresentation } from './BattleResultPresentation';
+import { CombatantUpdatesPresentation } from './CombatantUpdatesPresentation';
 import { resolveBattleReportCardManualWidthPx } from '../utils/battleReportCardWidth';
 
 interface BattleResultProps {
@@ -68,6 +69,41 @@ export function BattleResult({ onSaveImage }: BattleResultProps) {
   const promptCombatants = useMemo(
     () => combatants.filter((item): item is CombatantData => 'data' in item),
     [combatants]
+  );
+  const updatedCombatantPresentationItems = useMemo(() => (
+    updatedCombatants.flatMap((character, index) => {
+      const entries = character.arena_history?.entries;
+      const latestEntry = Array.isArray(entries) && entries.length > 0
+        ? entries[entries.length - 1]
+        : null;
+      const impact = typeof latestEntry?.impact === 'string' ? latestEntry.impact.trim() : null;
+      const stateSummary = typeof character.current_state?.summary === 'string'
+        ? character.current_state.summary.trim()
+        : null;
+      if (!impact && !stateSummary) return [];
+
+      const name = getCombatantDisplayName(character);
+      const template = inferTemplate(character);
+      const typeDisplay = template === 'magical-girl'
+        ? '魔法少女'
+        : template === 'canshou'
+          ? '残兽'
+          : '通用角色';
+      return [{
+        key: `updated-combatant-${index}`,
+        displayName: name,
+        typeLabel: typeDisplay,
+        impact,
+        currentStateSummary: stateSummary,
+      }];
+    })
+  ), [updatedCombatants]);
+  const updatedCombatantsByPresentationKey = useMemo(
+    () => new Map(updatedCombatants.map((character, index) => [
+      `updated-combatant-${index}`,
+      character,
+    ])),
+    [updatedCombatants]
   );
   const canWriteUpdates = settings.writeArenaHistory || settings.writeCurrentState;
   const shouldShowCombatantUpdates =
@@ -161,37 +197,36 @@ export function BattleResult({ onSaveImage }: BattleResultProps) {
       )}
 
       {hasBattleReport && shouldShowCombatantUpdates && (
-        <div className="card mt-6">
-          <CollapsibleSection
-            title="角色更新"
-            description={`可下载/保存本次更新的角色设定（共 ${updatedCombatants.length} 个）`}
-            defaultOpen
-            storageKey="arena.section.updatedCombatants.open"
-            variant="plain"
-            titleClassName="text-lg font-bold text-gray-800"
-            headerClassName="mb-3"
-            headerRight={!combatantRepair.isInRoom ? (
-              <button
-                onClick={() => handleRetryUpdates()}
-                disabled={
-                  isGenerating
-                  || isRedoingUpdates
-                  || combatantRepair.isCombatantMutationPending
-                  || !lastGenerationId
-                  || combatantRepair.isRepairAppliedForGeneration
-                }
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
-                title={combatantRepair.isRepairAppliedForGeneration
-                  ? '当前 roster 已应用自定义修复；需要生成新战报后才能再次权威重试'
-                  : lastGenerationId
-                    ? '重试应用本次服务器已生成的角色更新'
-                    : '本次战报缺少 generationId，无法安全重试'}
-              >
-                {isRedoingUpdates ? '重试中...' : '重试角色更新'}
-              </button>
-            ) : undefined}
-          >
-            <div className="space-y-4">
+        <CombatantUpdatesPresentation
+          title="角色更新"
+          description={`可下载/保存本次更新的角色设定（共 ${updatedCombatants.length} 个）`}
+          defaultOpen
+          itemDefaultOpen={false}
+          storageKey="arena.section.updatedCombatants.open"
+          emptyMessage="本次尚未产生可展示的角色更新。你可以点击“重试角色更新”，重试应用本次服务器已生成的历战记录/当前状态摘要。"
+          headerRight={!combatantRepair.isInRoom ? (
+            <button
+              onClick={() => handleRetryUpdates()}
+              disabled={
+                isGenerating
+                || isRedoingUpdates
+                || combatantRepair.isCombatantMutationPending
+                || !lastGenerationId
+                || combatantRepair.isRepairAppliedForGeneration
+              }
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
+              title={combatantRepair.isRepairAppliedForGeneration
+                ? '当前 roster 已应用自定义修复；需要生成新战报后才能再次权威重试'
+                : lastGenerationId
+                  ? '重试应用本次服务器已生成的角色更新'
+                  : '本次战报缺少 generationId，无法安全重试'}
+            >
+              {isRedoingUpdates ? '重试中...' : '重试角色更新'}
+            </button>
+          ) : undefined}
+          items={updatedCombatantPresentationItems}
+          renderBeforeItems={(
+            <>
               {combatantRepair.hasRepairContext && !combatantRepair.isInRoom && (
                 <CollapsibleSection
                   title="自定义修复本次角色变化"
@@ -321,75 +356,36 @@ export function BattleResult({ onSaveImage }: BattleResultProps) {
                   </div>
                 </CollapsibleSection>
               )}
-              {updatedCombatants.length === 0 && (
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
-                  本次尚未产生可展示的角色更新。你可以点击“重试角色更新”，重试应用本次服务器已生成的历战记录/当前状态摘要。
-                </div>
-              )}
-              {updatedCombatants.map((character: UpdatedCombatantData) => {
-                const entries = character.arena_history?.entries;
-                const latestEntry = Array.isArray(entries) && entries.length > 0 ? entries[entries.length - 1] : null;
-                const stateSummary = character.current_state?.summary?.trim();
-                const name = getCombatantDisplayName(character);
-                const template = inferTemplate(character);
-                const typeDisplay =
-                  template === 'magical-girl' ? '魔法少女' : template === 'canshou' ? '残兽' : '通用角色';
-
-                if (!latestEntry && !stateSummary) return null;
-
-                return (
-                  <CollapsibleSection
-                    key={name}
-                    title={
-                      <span className="font-semibold text-gray-700">
-                        {name} <span className="text-xs text-gray-500">({typeDisplay})</span>
-                      </span>
-                    }
-                    defaultOpen={false}
-                    variant="panel"
+            </>
+          )}
+          renderActions={(item) => {
+            const character = updatedCombatantsByPresentationKey.get(item.key);
+            if (!character) return null;
+            return (
+              <>
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    onClick={() => downloadUpdatedJson(character)}
+                    className="shrink-0 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-600"
                   >
-                    <div className="text-sm text-gray-600">
-                      <div className="font-medium text-gray-700">历战记录</div>
-                      <div className="mt-1">
-                        <MarkdownBlock
-                          content={latestEntry ? latestEntry.impact : '已跳过写入，改为仅更新其它字段。'}
-                          variant="light"
-                        />
-                      </div>
-                    </div>
-                    {stateSummary && (
-                      <div className="text-sm text-gray-600 mt-3">
-                        <div className="font-medium text-gray-700">当前状态</div>
-                        <div className="mt-1">
-                          <MarkdownBlock content={stateSummary} variant="light" />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex gap-2 mt-2 justify-end">
-                      <button
-                        onClick={() => downloadUpdatedJson(character)}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors shrink-0"
-                      >
-                        下载更新设定
-                      </button>
-                      <SaveToCloudButton
-                        data={character}
-                        buttonText="保存到云端"
-                        className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg transition-colors shrink-0"
-                        style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)' }}
-                      />
-                    </div>
-                    <JsonSizeIndicator
-                      data={character}
-                      className="mt-2"
-                      warningText="⚠️ 接近云端 300KB 上限，保存/替换可能失败，请先精简数据。"
-                    />
-                  </CollapsibleSection>
-                );
-              })}
-            </div>
-          </CollapsibleSection>
-        </div>
+                    下载更新设定
+                  </button>
+                  <SaveToCloudButton
+                    data={character}
+                    buttonText="保存到云端"
+                    className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+                    style={{ backgroundColor: '#22c55e', backgroundImage: 'linear-gradient(to right, #22c55e, #16a34a)' }}
+                  />
+                </div>
+                <JsonSizeIndicator
+                  data={character}
+                  className="mt-2"
+                  warningText="⚠️ 接近云端 300KB 上限，保存/替换可能失败，请先精简数据。"
+                />
+              </>
+            );
+          }}
+        />
       )}
     </>
   );

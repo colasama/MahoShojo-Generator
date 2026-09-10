@@ -6,12 +6,12 @@ import BattleReportCard, {
   type BattleReportIllustrationAsset,
   type NewsReport,
 } from '@/components/BattleReportCard';
-import { MarkdownBlock } from '@/components/MarkdownBlock';
 import { CollapsibleSection } from '@/components/shared/CollapsibleSection';
 import StreamingBattleReportCard from '@/components/stream/StreamingBattleReportCard';
 import { resolveAdjudicationOutcomeTone } from '@/lib/adjudicator/presentation';
 import type { AIReasoningEnvelope } from '@/types/ai-reasoning';
 import type { AdjudicationResult } from '@/types/arena';
+import { CombatantUpdatesPresentation } from './CombatantUpdatesPresentation';
 
 type ArenaBattleMode = 'classic' | 'kizuna' | 'daily' | 'scenario';
 
@@ -115,48 +115,6 @@ const AdjudicationResults = ({
   </div>
 );
 
-const SafeCombatantUpdates = ({
-  updates,
-}: {
-  readonly updates: ReadonlyArray<BattleResultSafeCombatantUpdate>;
-}) => (
-  <div className="card mt-6" data-arena-safe-combatant-updates="v1">
-    <CollapsibleSection
-      title="战后角色变化"
-      description={`服务器公开的安全摘要（共 ${updates.length} 个）`}
-      defaultOpen={false}
-      storageKey="arena.section.safeCombatantUpdates.open"
-      variant="plain"
-      titleClassName="text-lg font-bold text-gray-800"
-      headerClassName="mb-3"
-    >
-      <div className="space-y-3">
-        {updates.map((update) => (
-          <section
-            key={update.combatantKey}
-            aria-label={`${update.displayName}的战后变化`}
-            className="rounded-lg border border-gray-200 bg-gray-50 p-3"
-          >
-            <h4 className="font-semibold text-gray-800">{update.displayName}</h4>
-            {update.impact ? (
-              <div className="mt-2 text-sm text-gray-600">
-                <div className="font-medium text-gray-700">历战影响</div>
-                <MarkdownBlock content={update.impact} variant="light" />
-              </div>
-            ) : null}
-            {update.currentStateSummary ? (
-              <div className="mt-2 text-sm text-gray-600">
-                <div className="font-medium text-gray-700">当前状态</div>
-                <MarkdownBlock content={update.currentStateSummary} variant="light" />
-              </div>
-            ) : null}
-          </section>
-        ))}
-      </div>
-    </CollapsibleSection>
-  </div>
-);
-
 export function BattleResultPresentation({
   report,
   onSaveImage,
@@ -200,7 +158,23 @@ export function BattleResultPresentation({
         />
       ) : null}
 
-      {combatantUpdates?.length ? <SafeCombatantUpdates updates={combatantUpdates} /> : null}
+      {combatantUpdates?.length ? (
+        <div data-arena-safe-combatant-updates="v1">
+          <CombatantUpdatesPresentation
+            title="战后角色变化"
+            description={`服务器公开的安全摘要（共 ${combatantUpdates.length} 个）`}
+            items={combatantUpdates.map((update) => ({
+              key: update.combatantKey,
+              displayName: update.displayName,
+              impact: update.impact,
+              currentStateSummary: update.currentStateSummary,
+            }))}
+            defaultOpen={false}
+            storageKey="arena.section.safeCombatantUpdates.open"
+            emptyMessage="本场没有可公开的角色变化。"
+          />
+        </div>
+      ) : null}
       {afterReport}
     </div>
   );
