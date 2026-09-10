@@ -72,7 +72,7 @@ export const createHonoApp = (
     failureMode: config.redisRequired ? 'closed' : 'open',
   }));
 
-  registerHealthRoutes(app, config, redis);
+  registerHealthRoutes(app, config, redis, telemetry);
   if (config.arenaMultiplayerEnabled && services.arenaRoom) {
     registerArenaRoomHttpRoutes(app, services.arenaRoom, {
       isAllowedOrigin: (origin) => isExactAllowedOrigin(

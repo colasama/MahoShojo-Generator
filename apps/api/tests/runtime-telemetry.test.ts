@@ -60,6 +60,44 @@ describe('Hono runtime telemetry', () => {
     });
   });
 
+  it('聚合 Hosted readiness 的到达、状态、延迟 bucket 与依赖分类', () => {
+    const telemetry = new HonoRuntimeTelemetry();
+    telemetry.observeReadiness({
+      outcome: 'ready',
+      durationMs: 42,
+      redisReady: true,
+      d1Ready: true,
+      d1Transport: 'gateway',
+    });
+    telemetry.observeReadiness({
+      outcome: 'not-ready',
+      durationMs: 1_200,
+      redisReady: false,
+      d1Ready: false,
+      d1Transport: 'cloudflare-api',
+    });
+
+    expect(telemetry.snapshot().hostedReadiness).toEqual({
+      arrivals: 2,
+      outcomes: { ready: 1, notReady: 1 },
+      latencyBuckets: {
+        '0-49ms': 1,
+        '50-199ms': 0,
+        '200-999ms': 0,
+        '1000-2999ms': 1,
+        '3000ms+': 0,
+      },
+      dependencies: {
+        redisReady: { true: 1, false: 1 },
+        d1Ready: { true: 1, false: 1 },
+        d1Transport: { gateway: 1, 'cloudflare-api': 1, none: 0 },
+      },
+    });
+
+    telemetry.emitSnapshot();
+    expect(telemetry.snapshot().hostedReadiness.arrivals).toBe(0);
+  });
+
   it('聚合 AI upstream、D1 和 Redis 的低基数运行时指标', () => {
     const telemetry = new HonoRuntimeTelemetry();
     const unregister = registerHostedRuntimeObserver(telemetry);

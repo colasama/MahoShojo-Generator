@@ -68,13 +68,15 @@ Arena 战后角色更新的权威对账与可编辑修复使用以下专项入�
   - 在该专项范围内，本文档列出的新 ADR/spec 优先于较早的 stable control plane / Cloudflare LB 目标口径。
   - 2026-09-01 复杂度预算 ADR 已进一步撤回大型 manifest/generated projection/version gate/evidence CI；
     `config/hosted-routing.json`、真实 fault tests 与 dispatch 后 no-replay 是当前口径。
+  - 2026-09-07 已接受的路由预检修订进一步区分 known Hono primary-only、DR-selectable 与 unknown
+    route/method；客户端与 Hono readiness telemetry 均采用低基数、失败不阻断语义。
   - 当前仓库实现与审查证据见 [低成本 Hosted DR 客户端预检实施与审查日志](./logs/2026-08-29_085000_低成本HostedDR客户端预检实施与审查日志.md)。
 - [平台重整与本地优先架构主题](./topics/2026-08-22_022000_平台重整与本地优先架构.md)
   - 平台重整、Local-first、Monorepo、应用边界、管理后台、Desktop/Mobile、数据所有权与发行的综合入口。
   - Admin G3-P0 当前实现与审查证据见
     [Admin 回归 G3-P0 安全基座实施与审查日志](./logs/2026-08-29_184200_Admin回归G3-P0安全基座实施与审查日志.md)。
 
-两个主题页共同明确当前稳定决策、目标架构、可测试实施规格、阶段计划、仍然有效的领域规格与只作为历史背景的旧方案；发生 Hosted DR 专项冲突时，以 2026-08-29 的专项主题及其 accepted ADR/spec 为准。
+两个主题页共同明确当前稳定决策、目标架构、可测试实施规格、阶段计划、仍然有效的领域规格与只作为历史背景的旧方案；发生 Hosted DR 专项冲突时，以专项主题及其 accepted ADR/spec（包括 2026-09-07 路由预检修订）为准。
 
 ## 目录说明
 

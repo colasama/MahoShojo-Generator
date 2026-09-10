@@ -82,6 +82,8 @@ Hono 主进程启动 `HonoRuntimeTelemetry`，默认每 60 秒向 stdout 输出�
   只记录 generation ID、固定 outcome/runtime、reasoning 聚合事实与故障事实，不记录 actor、request body、prompt、正文或凭据；
 - Arena companion 的受信 operation、Hono primary / Next DR placement、固定 outcome 与 duration；Hono 聚合
   到 runtime snapshot，Cloudflare DR 使用同一 bounded observation vocabulary 输出结构化日志；
+- Hosted readiness 的 probe arrival、ready/not-ready、固定 latency bucket、Redis/D1 ready boolean 与 D1 transport
+  class；这些数据按采样周期聚合，不为每个成功 readiness GET 输出普通 request log；
 - Details / Sublimation 四路的固定 operation、Hono primary / Next DR placement、固定 outcome 与 duration；
   流式请求在响应体完成、取消或异常时结算，既不把正文、问卷、URL 或 Provider 配置写入 observation，也不新增
   response header/CORS wire；
@@ -183,8 +185,9 @@ Hono 服务配置相同的 `D1_GATEWAY_HMAC_SECRET`。生产建议再用 Cloudfl
 
 生产 Web 使用 `apps/web/config/hono-api.ts` 的 `client-preflight` 模式。客户端从 `config/hosted-routing.json` 读取公开
 Hono primary、同源 Next DR placement、probe path、timeout 和最小 route/method safety；Hono route/method inventory
-独立由 `config/hono-api-routes.json` 持有。每个新的 generation intent 在业务 dispatch 前最多探测 primary 一次，
-并只对运行配置明确允许的 operation 最多探测 DR 一次。
+独立由 `config/hono-api-routes.json` 持有。客户端先按 inventory 区分 primary-only 与 DR-selectable；只有后者在业务
+dispatch 前最多探测 primary 一次，并在需要时最多探测 DR 一次。已知 Hono primary-only 直接向 Hono primary dispatch，
+未知 route/method 在业务 dispatch 前 fail closed。
 选择后固定 placement；POST/stream 一旦越过 dispatch boundary，任何断线、timeout 或未知终态都不得改发另一 runtime。
 Tachie 与其他 exited route 继续使用原同源 Next 路由。
 

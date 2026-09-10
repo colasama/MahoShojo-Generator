@@ -41,11 +41,13 @@ server-owned adapter fail closed。所有 shared Next route 在 production 进�
 production cross-origin 请求还必须配置 `HONO_CORS_ORIGINS`；空值、`*`、HTTP、
 localhost/loopback 或非法 origin 均 fail closed，OPTIONS 与实际响应复用同一 policy。非 production 本地开发可显式
 使用既有 HTTP D1 adapter，但不会被标记成 native binding，也不能作为 DR 验收证据。
-production 默认使用小型运行配置的 `client-preflight`：每个新 generation intent 先以无凭据、`no-store`
-的有界 GET 探测 Hono primary；只有 primary non-ready 且 route + method 明确为 `safe-read` 或已验证
-`new-non-idempotent` 时，才再探测同源 Next DR 并固定唯一 placement。未登记或 `durably-idempotent` 的 operation
-不会探测或 dispatch DR；业务 fetch 一旦调用，写操作的 transport、未知 5xx、SSE EOF-before-done 或 stream 断链只记录
-ambiguous outcome，不跨 runtime 重放；明确 SSE `done` / `error` 分别作为成功/失败终态释放 intent latch。production 不接受
+production 默认使用小型运行配置的 `client-preflight`：客户端先用 `config/hono-api-routes.json` 的公开
+route/method inventory 分类新 generation intent；已知 Hono primary-only operation 不执行无收益 probe，直接向 Hono
+primary dispatch，只有 DR-selectable operation 才以无凭据、`no-store` 的有界 GET 探测 Hono primary，并在必要时再探测同源
+Next DR。真正未知 route/method 在业务 dispatch 前 fail closed。DR-selectable 仅包括明确的 `safe-read` 或已验证
+`new-non-idempotent`；业务 fetch 一旦调用，写操作的 transport、未知 5xx、SSE EOF-before-done 或 stream 断链只记录
+ambiguous outcome，不跨 runtime 重放；明确 SSE `done` / `error` 分别作为成功/失败终态释放 intent latch。selection telemetry
+只发送 canonical route、枚举和耗时 bucket，同源 intake best-effort 且不接收业务凭据或内容。production 不接受
 `NEXT_PUBLIC_HONO_API_ORIGIN` 覆盖；preview 仍必须显式使用小型 routing config 的 preview origin，local/test 只允许
 loopback。Next 与 OpenNext build 在产物生成后都会执行 Hosted DR client bundle safety gate：完整公开 routing token 必须存在，
 所有客户端 JavaScript 中的服务端 secret/binding 名称与静态 internal/IP
