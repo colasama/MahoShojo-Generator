@@ -429,6 +429,12 @@ export const createGenerationApiIntent = ({
       try {
         headers = await buildGenerationApiHeaders(auth, init.headers);
       } catch (error) {
+        if (decision) {
+          emitHostedDrClientTelemetry(
+            observe,
+            createHostedDrTerminalTelemetry(decision, 'not-dispatched'),
+          );
+        }
         settle();
         throw error;
       }

@@ -416,6 +416,39 @@ describe('Hono API 客户端', () => {
     });
   });
 
+  test('selection 成功但 auth/activity header 构造失败时记录 not-dispatched 且不发送业务请求', async () => {
+    honoApiConfig.enabled = true;
+    honoApiConfig.origin = hostedDrManifest.controlPlane.primaryOrigin;
+    honoApiConfig.routingMode = 'client-preflight';
+    const observe = vi.fn();
+    const fetchMock = vi.fn(async () => Response.json({
+      ok: true,
+      service: 'mahoshojo-hono',
+      placement: 'hono-primary',
+      contractVersion: hostedDrManifest.contractVersion,
+    }, { headers: { 'Cache-Control': 'no-store' } }));
+    const auth = {
+      getAuthHeader: vi.fn(async () => {
+        throw new TypeError('auth storage unavailable');
+      }),
+      getActivityHeaders: vi.fn(async () => ({})),
+    };
+    vi.stubGlobal('fetch', fetchMock);
+
+    const intent = createGenerationApiIntent({ fetcher: fetchMock, observe, auth });
+    await expect(intent.dispatch('/api/generate-free', { method: 'POST' }))
+      .rejects.toThrow('auth storage unavailable');
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(intent.getRoutePin()).toEqual({ placement: 'hono-primary' });
+    expect(observe).toHaveBeenNthCalledWith(1, expect.objectContaining({ phase: 'selection' }));
+    expect(observe).toHaveBeenLastCalledWith(expect.objectContaining({
+      phase: 'dispatch-terminal',
+      selectedPlacement: 'hono-primary',
+      terminalClass: 'not-dispatched',
+    }));
+  });
+
   test('client-preflight 对已知 Hono route 的未知 method fail closed 且不发送业务请求', async () => {
     honoApiConfig.enabled = true;
     honoApiConfig.origin = hostedDrManifest.controlPlane.primaryOrigin;

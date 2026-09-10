@@ -47,7 +47,9 @@ primary dispatch，只有 DR-selectable operation 才以无凭据、`no-store` �
 Next DR。真正未知 route/method 在业务 dispatch 前 fail closed。DR-selectable 仅包括明确的 `safe-read` 或已验证
 `new-non-idempotent`；业务 fetch 一旦调用，写操作的 transport、未知 5xx、SSE EOF-before-done 或 stream 断链只记录
 ambiguous outcome，不跨 runtime 重放；明确 SSE `done` / `error` 分别作为成功/失败终态释放 intent latch。selection telemetry
-只发送 canonical route、枚举和耗时 bucket，同源 intake best-effort 且不接收业务凭据或内容。production 不接受
+只发送 canonical route、枚举和耗时 bucket，同源 intake best-effort 且不接收业务凭据或内容；运行在 Cloudflare 时由
+`wrangler.jsonc` 声明 source 与 aggregate Rate Limiting binding，binding 不可用时只使用有界的进程内 best-effort 兜底，
+不将其描述为部署级精确配额。production 不接受
 `NEXT_PUBLIC_HONO_API_ORIGIN` 覆盖；preview 仍必须显式使用小型 routing config 的 preview origin，local/test 只允许
 loopback。Next 与 OpenNext build 在产物生成后都会执行 Hosted DR client bundle safety gate：完整公开 routing token 必须存在，
 所有客户端 JavaScript 中的服务端 secret/binding 名称与静态 internal/IP

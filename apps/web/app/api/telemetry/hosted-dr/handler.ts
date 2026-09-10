@@ -4,18 +4,20 @@ import type {
 } from '@/lib/hosted-dr/client-preflight-telemetry';
 import type { HostedDrProbeOutcome, HostedDrDecisionReason, HostedDrPlacement } from '@/lib/hosted-dr/client-preflight';
 import {
+  createHostedDrTelemetryLocalRateLimiter,
+  enforceHostedDrTelemetryRateLimit,
+  getHostedDrTelemetryRateLimitBindings,
+  type HostedDrTelemetryLocalRateLimiter,
+  type HostedDrTelemetryRateLimitBindings,
+} from '@/lib/hosted-dr/client-telemetry-rate-limit';
+import {
   HOSTED_DR_CONTRACT_VERSION,
   isHostedDrContractVersionCompatible,
 } from '@mahoshojo/hosted-api/hosted-dr';
 import honoApiRoutes from '../../../../../../config/hono-api-routes.json';
 
 const MAX_BODY_BYTES = 8 * 1024;
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_EVENTS = 120;
-const GLOBAL_RATE_LIMIT_MAX_EVENTS = 2_048;
-const MAX_RATE_LIMIT_KEYS = 1_024;
 const MAX_CONTRACT_VERSION_LENGTH = 32;
-const GLOBAL_RATE_LIMIT_KEY = '__all__';
 
 const routeFamilies = new Set([
   'undeclared',
@@ -65,13 +67,6 @@ const terminalClasses: ReadonlySet<Extract<
   'not-dispatched',
 ]);
 
-type RateLimitBucket = {
-  startedAt: number;
-  count: number;
-};
-
-const rateLimitBuckets = new Map<string, RateLimitBucket>();
-
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
 );
@@ -102,6 +97,51 @@ const isProbePairValid = (
   && ((outcome === 'not-run') === (durationBucket === 'not-run'))
 );
 
+const isProbeReady = (
+  outcome: unknown,
+  durationBucket: unknown,
+): boolean => outcome === 'ready' && durationBucket !== 'not-run';
+
+const isProbeNotReady = (
+  outcome: unknown,
+  durationBucket: unknown,
+): boolean => outcome !== 'ready' && outcome !== 'not-run' && durationBucket !== 'not-run';
+
+const isProbeNotRun = (
+  outcome: unknown,
+  durationBucket: unknown,
+): boolean => outcome === 'not-run' && durationBucket === 'not-run';
+
+const isSelectionCombinationValid = (value: Record<string, unknown>): boolean => {
+  const primaryReady = isProbeReady(value.primaryProbeOutcome, value.primaryProbeDurationBucket);
+  const primaryNotReady = isProbeNotReady(value.primaryProbeOutcome, value.primaryProbeDurationBucket);
+  const primaryNotRun = isProbeNotRun(value.primaryProbeOutcome, value.primaryProbeDurationBucket);
+  const drReady = isProbeReady(value.drProbeOutcome, value.drProbeDurationBucket);
+  const drNotReady = isProbeNotReady(value.drProbeOutcome, value.drProbeDurationBucket);
+  const drNotRun = isProbeNotRun(value.drProbeOutcome, value.drProbeDurationBucket);
+
+  switch (value.selectionReason) {
+    case 'PRIMARY_ONLY':
+      return value.selectedPlacement === 'hono-primary' && primaryNotRun && drNotRun;
+    case 'PRIMARY_READY':
+      return value.selectedPlacement === 'hono-primary' && primaryReady && drNotRun;
+    case 'DR_READY':
+      return value.selectedPlacement === 'next-dr' && primaryNotReady && drReady;
+    case 'OPERATION_NOT_DECLARED':
+      // Older clients probed primary before discovering an undeclared operation.
+      return value.selectedPlacement === 'unavailable'
+        && (primaryNotRun || primaryNotReady)
+        && drNotRun;
+    case 'DR_NOT_ELIGIBLE':
+      // Preserve the pre-9531beaa event shape for clients that still emit it.
+      return value.selectedPlacement === 'unavailable' && primaryNotReady && drNotRun;
+    case 'NO_READY_PLACEMENT':
+      return value.selectedPlacement === 'unavailable' && primaryNotReady && drNotReady;
+    default:
+      return false;
+  }
+};
+
 const parseTelemetryEvent = (value: unknown): HostedDrClientTelemetryEvent | null => {
   if (!isRecord(value)
     || value.schemaVersion !== 1
@@ -128,7 +168,8 @@ const parseTelemetryEvent = (value: unknown): HostedDrClientTelemetryEvent | nul
     if (!hasExactKeys(value, validKeys)
       || !isStringIn(value.selectionReason, decisionReasons)
       || !isProbePairValid(value.primaryProbeOutcome, value.primaryProbeDurationBucket)
-      || !isProbePairValid(value.drProbeOutcome, value.drProbeDurationBucket)) {
+      || !isProbePairValid(value.drProbeOutcome, value.drProbeDurationBucket)
+      || !isSelectionCombinationValid(value)) {
       return null;
     }
     return value as unknown as HostedDrClientTelemetryEvent;
@@ -150,42 +191,6 @@ const parseTelemetryEvent = (value: unknown): HostedDrClientTelemetryEvent | nul
   }
 
   return null;
-};
-
-const clientKeyOf = (request: Request): string => {
-  const forwardedAddress = request.headers.get('cf-connecting-ip')?.trim() ?? '';
-  return forwardedAddress.length > 0 && forwardedAddress.length <= 128
-    ? `source:${forwardedAddress}`
-    : 'source:anonymous';
-};
-
-const consumeRateLimit = (key: string, now = Date.now()): boolean => {
-  const bucketFor = (bucketKey: string): RateLimitBucket => {
-    const existing = rateLimitBuckets.get(bucketKey);
-    if (existing && now - existing.startedAt < RATE_LIMIT_WINDOW_MS) return existing;
-
-    if (!existing && rateLimitBuckets.size >= MAX_RATE_LIMIT_KEYS) {
-      const oldestKey = [...rateLimitBuckets.keys()]
-        .find((candidate) => candidate !== GLOBAL_RATE_LIMIT_KEY);
-      if (oldestKey) rateLimitBuckets.delete(oldestKey);
-    }
-
-    const bucket = { startedAt: now, count: 0 };
-    rateLimitBuckets.set(bucketKey, bucket);
-    return bucket;
-  };
-
-  const sourceBucket = bucketFor(key);
-  if (sourceBucket.count >= RATE_LIMIT_MAX_EVENTS) return false;
-
-  const globalBucket = bucketFor(GLOBAL_RATE_LIMIT_KEY);
-  if (globalBucket.count >= GLOBAL_RATE_LIMIT_MAX_EVENTS) return false;
-
-  // cf-connecting-ip is expected to be edge-injected; this global bucket still bounds
-  // direct callers that rotate/spoof that header or reach multiple source buckets.
-  sourceBucket.count += 1;
-  globalBucket.count += 1;
-  return true;
 };
 
 const responseHeaders = (extra: Record<string, string> = {}): Headers => new Headers({
@@ -240,11 +245,28 @@ const readBodyWithinLimit = async (request: Request): Promise<BodyReadResult> =>
   return { kind: 'ok', body: body.buffer };
 };
 
-export const appRouteHandler = async (request: Request): Promise<Response> => {
+export type HostedDrTelemetryHandlerDependencies = Readonly<{
+  getRateLimitBindings?: () => HostedDrTelemetryRateLimitBindings | null;
+  localRateLimiter?: HostedDrTelemetryLocalRateLimiter;
+  now?: () => number;
+}>;
+
+export const createHostedDrTelemetryHandler = ({
+  getRateLimitBindings = getHostedDrTelemetryRateLimitBindings,
+  localRateLimiter = createHostedDrTelemetryLocalRateLimiter(),
+  now = Date.now,
+}: HostedDrTelemetryHandlerDependencies = {}) => async (request: Request): Promise<Response> => {
   if (request.method !== 'POST') {
     return errorResponse(405, 'METHOD_NOT_ALLOWED', { Allow: 'POST' });
   }
-  if (!consumeRateLimit(clientKeyOf(request))) {
+
+  const rateLimit = await enforceHostedDrTelemetryRateLimit({
+    request,
+    bindings: getRateLimitBindings(),
+    localLimiter: localRateLimiter,
+    now: now(),
+  });
+  if (!rateLimit.allowed) {
     return errorResponse(429, 'TELEMETRY_RATE_LIMITED', { 'Retry-After': '60' });
   }
 
@@ -277,5 +299,7 @@ export const appRouteHandler = async (request: Request): Promise<Response> => {
   console.info(JSON.stringify({ event: 'hosted.dr.client.telemetry', ...event }));
   return new Response(null, { status: 204, headers: responseHeaders() });
 };
+
+export const appRouteHandler = createHostedDrTelemetryHandler();
 
 export default appRouteHandler;

@@ -60,6 +60,7 @@ const isProbeFailure = (
 
 const shouldSendToServer = (event: HostedDrClientTelemetryEvent): boolean => {
   if (event.phase === 'dispatch-terminal') return event.terminalClass !== 'response-ok';
+  if (event.selectedPlacement === 'unavailable') return true;
   return isProbeFailure(event.primaryProbeOutcome) || isProbeFailure(event.drProbeOutcome)
     || Math.random() < 0.1;
 };

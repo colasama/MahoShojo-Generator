@@ -78,6 +78,29 @@ describe('Hosted DR client telemetry intake', () => {
     expect(info.mock.calls[0]?.[0]).toContain('hosted.dr.client.telemetry');
   });
 
+  it('unavailable selection 即使不含 probe failure 也始终 best-effort 上报', () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      () => Promise.resolve(new Response(null, { status: 204 })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+    observeHostedDrClientTelemetry({
+      schemaVersion: 1,
+      phase: 'selection',
+      contractVersion: 'g25e1-v1',
+      routeFamily: 'undeclared',
+      selectedPlacement: 'unavailable',
+      selectionReason: 'OPERATION_NOT_DECLARED',
+      primaryProbeOutcome: 'not-run',
+      primaryProbeDurationBucket: 'not-run',
+      drProbeOutcome: 'not-run',
+      drProbeDurationBucket: 'not-run',
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it('拒绝未知字段与敏感内容，不把无效事件写入日志', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
 
@@ -95,6 +118,28 @@ describe('Hosted DR client telemetry intake', () => {
       code: 'INVALID_TELEMETRY_EVENT',
     });
     expect(info).not.toHaveBeenCalled();
+  });
+
+  it('拒绝 selection reason 与 placement/probe 不一致的事件，同时兼容旧客户端形状', async () => {
+    const impossible = await postEvent({
+      ...selectionEvent,
+      selectedPlacement: 'next-dr',
+      selectionReason: 'PRIMARY_READY',
+    }, {
+      'cf-connecting-ip': '198.51.100.20',
+    });
+    expect(impossible.status).toBe(400);
+
+    const legacyDrNotEligible = await postEvent({
+      ...selectionEvent,
+      selectedPlacement: 'unavailable',
+      selectionReason: 'DR_NOT_ELIGIBLE',
+      primaryProbeOutcome: 'not-ready',
+      primaryProbeDurationBucket: '50-199ms',
+    }, {
+      'cf-connecting-ip': '198.51.100.21',
+    });
+    expect(legacyDrNotEligible.status).toBe(204);
   });
 
   it('限制 content type 与 body 大小', async () => {
