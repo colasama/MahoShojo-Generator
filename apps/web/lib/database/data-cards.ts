@@ -56,7 +56,7 @@ type DataCardsRepoBundle = {
       payload: { name?: string; description?: string; data?: string };
     },
   ) => Promise<boolean>;
-  countUserUsedDataCardSlots: (db: unknown, userId: number) => Promise<number>;
+  countUserUsedDataCardSlots: (db: unknown, userId: number, excludeCardId?: string) => Promise<number>;
   getDataCardUpdateByDataCardId: (db: unknown, dataCardId: string) => Promise<any | null>;
   deleteDataCardUpdateByDataCardId: (db: unknown, dataCardId: string) => Promise<void>;
   softDeleteDataCardByIdAndUser: (db: unknown, cardId: string, userId: number) => Promise<number>;
@@ -368,12 +368,12 @@ export async function upsertDataCardUpdate(
   }
 }
 
-// 计算用户已占用的槽位数量（热门卡片不计入）
-export async function getUserUsedSlots(userId: number): Promise<number> {
+// 计算用户已占用的槽位数量（按体积计费，热门卡仅减免 1 个基础槽位）
+export async function getUserUsedSlots(userId: number, excludeCardId?: string): Promise<number> {
   try {
     const bundle = await readDataCardsRepoBundle();
     if (!bundle) return 0;
-    return await bundle.countUserUsedDataCardSlots(bundle.db, userId);
+    return await bundle.countUserUsedDataCardSlots(bundle.db, userId, excludeCardId);
   } catch (error) {
     console.error('获取已用槽位失败:', error);
     return 0;
