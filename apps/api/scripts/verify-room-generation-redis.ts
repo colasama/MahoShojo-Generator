@@ -226,13 +226,18 @@ const readAll = async <T>(stream: ReadableStream<T>): Promise<T[]> => {
   }
 };
 
+const verifierCombatantImpact = '验证历战影响';
+const verifierCombatantStateSummary = '验证当前状态';
+
 const hasVerifierRoomSafeResult = (value: unknown): boolean => {
   const parsed = ArenaRoomGenerationResultSchema.safeParse(value);
-  return parsed.success
-    && parsed.data.mode === 'classic'
-    && Boolean(parsed.data.combatantUpdates?.some((update) => (
-      update.combatantKey === 'data-card:character-1'
-    )));
+  if (!parsed.success || parsed.data.mode !== 'classic') return false;
+  const update = parsed.data.combatantUpdates?.find((item) => (
+    item.combatantKey === 'data-card:character-1'
+  ));
+  return update?.displayName === 'Verifier character-1'
+    && update.impact === verifierCombatantImpact
+    && update.currentStateSummary === verifierCombatantStateSummary;
 };
 
 const waitFor = async <T>(
@@ -372,7 +377,16 @@ try {
         actorKey: input.actorKey,
         payloadHash: input.payloadHash,
         payload: input.payload,
-        metadata: {},
+        metadata: {
+          streamMeta: {
+            impacts: [{
+              combatantIndex: 0,
+              characterName: 'Verifier character-1',
+              impact: verifierCombatantImpact,
+              currentStateSummary: verifierCombatantStateSummary,
+            }],
+          },
+        },
         markdown: expectedMarkdown,
         telemetry: {},
         status: 'completed' as const,
@@ -666,10 +680,7 @@ try {
     || recoveredView.status !== 'completed'
     || recoveredView.markdown !== expectedMarkdown
     || recoveredView.generationRecordId !== generationId
-    || recoveredView.result?.mode !== 'classic'
-    || !recoveredView.result.combatantUpdates?.some((update) => (
-      update.combatantKey === 'data-card:character-1'
-    ))
+    || !hasVerifierRoomSafeResult(recoveredView.result)
     || providerStarts !== 1
   ) throw new Error('ROOM_GENERATION_DURABLE_PROCESS_RECOVERY_INVALID');
 
