@@ -287,6 +287,7 @@ export const createArenaSessionCompanionService = (
     if (!validation.ok) return jsonResponse({ error: validation.error }, 400);
     const chapterIndex = validation.chapterIndex;
     const promptContext = buildBattleStoryPromptContext({
+      baseContext: 'arena-provided',
       source: {
         mode: payload.seed.mode,
         language: payload.seed.language,

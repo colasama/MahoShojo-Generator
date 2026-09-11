@@ -5,6 +5,7 @@ import type {
 } from '@mahoshojo/hosted-api/arena-generation/service';
 import { parseGenerationSseBlock } from '@mahoshojo/hosted-api/arena-generation/sse';
 import type { SignatureService } from '../src/signature';
+import { buildArenaGenerationPrompt } from '../src/arena-generation/prompt';
 import {
   buildArenaSessionUpstreamRequestBody,
   createArenaSessionCompanionService,
@@ -166,6 +167,16 @@ describe('Arena session companion service', () => {
       forceStreamMeta: true,
       internalGuidance: expect.stringContaining('连续战报会话'),
     });
+    const guidance = String(captured[0]!.body.internalGuidance);
+    expect(guidance).not.toContain('角色甲');
+    expect(guidance).not.toContain('推进剧情');
+    expect(captured[0]!.body.combatants).toEqual(requestBody().chapterContext.workingCombatants);
+    const finalPrompt = await buildArenaGenerationPrompt({
+      actorKey: 'test', payload: captured[0]!.body,
+    });
+    expect(finalPrompt.prompt).toContain('角色甲');
+    expect(finalPrompt.prompt.split('推进剧情').length - 1).toBe(1);
+    expect(finalPrompt.prompt).toContain('第 1 章 / 共 3 章');
     expect(createSubscription).not.toHaveBeenCalled();
     expect(events.map(({ event, id }) => [event, id])).toEqual([
       ['session_meta', null],
