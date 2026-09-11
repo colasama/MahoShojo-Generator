@@ -310,6 +310,13 @@ export async function getUserDataCardCapacity(userId: number, defaultCapacity: n
   }
 }
 
+export async function increaseUserSlotCountStrict(userId: number, increaseBy: number): Promise<boolean> {
+  const bundle = await readUsersRepoBundle();
+  if (!bundle) throw new Error('未检测到可用的 D1 连接，无法增加用户槽位');
+  const affected = await bundle.increaseBusinessUserSlotCountById(bundle.db, userId, increaseBy);
+  return affected > 0;
+}
+
 // 增加用户的槽位数量
 export async function increaseUserSlotCount(userId: number, increaseBy: number): Promise<boolean> {
   try {
