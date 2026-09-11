@@ -310,12 +310,14 @@ export const increaseBusinessUserSlotCountById = async (
   db: AppDrizzleDb,
   userId: number,
   increaseBy: number,
+  baseIfNull: number = 0,
 ): Promise<number> => {
   const delta = Math.max(0, Math.trunc(increaseBy));
+  const base = Math.max(0, Math.trunc(baseIfNull));
   const rows = await db
     .update(users)
     .set({
-      slotCount: sql`COALESCE(${users.slotCount}, 0) + ${delta}`,
+      slotCount: sql`COALESCE(${users.slotCount}, ${base}) + ${delta}`,
       updatedAt: sql`CURRENT_TIMESTAMP`,
     })
     .where(eq(users.id, userId))
