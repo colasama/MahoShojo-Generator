@@ -317,7 +317,7 @@ export const increaseBusinessUserSlotCountById = async (
   const rows = await db
     .update(users)
     .set({
-      slotCount: sql`COALESCE(${users.slotCount}, ${base}) + ${delta}`,
+      slotCount: sql`(CASE WHEN COALESCE(${users.slotCount}, 0) > 0 THEN ${users.slotCount} ELSE ${base} END) + ${delta}`,
       updatedAt: sql`CURRENT_TIMESTAMP`,
     })
     .where(eq(users.id, userId))

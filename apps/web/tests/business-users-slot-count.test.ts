@@ -17,21 +17,25 @@ describe('business user slot count', () => {
         slot_count INTEGER,
         updated_at TEXT
       );
-      INSERT INTO users (id, slot_count) VALUES (1, NULL), (2, 50);
+      INSERT INTO users (id, slot_count) VALUES (1, NULL), (2, 50), (3, 0), (4, -5);
     `);
     db = drizzle(sqlite, { schema }) as unknown as AppDrizzleDb;
   });
 
   afterEach(() => sqlite.close());
 
-  test('NULL 槽位从默认容量起算，已有覆盖值继续累加', async () => {
+  test('NULL/非正槽位从默认容量起算，已有覆盖值继续累加', async () => {
     await expect(increaseBusinessUserSlotCountById(db, 1, 128, 20)).resolves.toBe(1);
     await expect(increaseBusinessUserSlotCountById(db, 2, 10, 20)).resolves.toBe(1);
+    await expect(increaseBusinessUserSlotCountById(db, 3, 5, 20)).resolves.toBe(1);
+    await expect(increaseBusinessUserSlotCountById(db, 4, 5, 20)).resolves.toBe(1);
 
     const rows = sqlite.prepare('SELECT id, slot_count FROM users ORDER BY id').all();
     expect(rows).toEqual([
       { id: 1, slot_count: 148 },
       { id: 2, slot_count: 60 },
+      { id: 3, slot_count: 25 },
+      { id: 4, slot_count: 25 },
     ]);
   });
 });
