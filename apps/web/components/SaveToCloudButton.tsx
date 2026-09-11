@@ -57,6 +57,7 @@ export default function SaveToCloudButton({
   const [preparedData, setPreparedData] = useState<any>(null);
   const [userDataCards, setUserDataCards] = useState<any[]>([]);
   const [userCapacity, setUserCapacity] = useState(config.DEFAULT_DATA_CARD_CAPACITY);
+  const [userUsedSlots, setUserUsedSlots] = useState(0);
   const [showDataCardsForReplace, setShowDataCardsForReplace] = useState(false);
   const [replaceEditingCard, setReplaceEditingCard] = useState<any | null>(null);
   const [replaceCurrentPage, setReplaceCurrentPage] = useState(1);
@@ -82,13 +83,14 @@ export default function SaveToCloudButton({
       error: current.error,
     }));
     try {
-      const [cardsResult, capacity] = await Promise.all([
+      const [cardsResult, capacityInfo] = await Promise.all([
         dataCardApi.getCardsDetailed(),
         dataCardApi.getUserCapacity()
       ]);
       setUserDataCards(cardsResult.cards);
-      if (capacity !== null) {
-        setUserCapacity(capacity);
+      if (capacityInfo !== null) {
+        setUserCapacity(capacityInfo.capacity);
+        setUserUsedSlots(capacityInfo.usedSlots);
       }
       setCardsLoadState({
         status: cardsResult.success ? 'success' : 'error',
@@ -359,7 +361,7 @@ export default function SaveToCloudButton({
         onPublicChange={setIsPublic}
         error={saveError}
         isSaving={isSaving}
-        currentCardCount={userDataCards.length}
+        usedSlots={userUsedSlots}
         userCapacity={userCapacity}
       />
 
@@ -381,6 +383,7 @@ export default function SaveToCloudButton({
         onCancelEdit={() => setReplaceEditingCard(null)}
         onReplaceCard={handleReplaceFromDataCards}
         userCapacity={userCapacity}
+        userUsedSlots={userUsedSlots}
         title="替换已有数据卡"
         emptyText="暂无数据卡"
         defaultFilters={cardType ? { type: cardType } : undefined}

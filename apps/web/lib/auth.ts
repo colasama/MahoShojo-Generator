@@ -495,14 +495,18 @@ export const dataCardApi = {
     return result.cards;
   },
 
-  // 获取用户数据卡容量
-  async getUserCapacity(): Promise<number | null> {
+  // 获取用户数据卡容量与已用槽位
+  async getUserCapacity(): Promise<{ capacity: number; usedSlots: number } | null> {
     try {
       const response = await authStorage.fetch('/api/user-capacity');
 
       if (response.ok) {
         const data = await response.json();
-        return data.capacity || null;
+        const capacity = Number(data?.capacity);
+        const usedSlots = Number(data?.usedSlots);
+        if (Number.isFinite(capacity) && capacity > 0 && Number.isFinite(usedSlots) && usedSlots >= 0) {
+          return { capacity: Math.floor(capacity), usedSlots: Math.floor(usedSlots) };
+        }
       }
       return null;
     } catch (error) {

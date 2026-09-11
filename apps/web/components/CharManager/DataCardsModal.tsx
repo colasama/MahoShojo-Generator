@@ -28,6 +28,7 @@ interface DataCardsModalProps {
   onShareCard?: (card: any) => void;
   onReplaceCard?: (card: any) => void;
   userCapacity?: number;
+  userUsedSlots?: number;
   onOpenRecycleBin?: () => void;
   recycleCount?: number;
   recycleLimit?: number;
@@ -201,6 +202,7 @@ export default function DataCardsModal({
   onShareCard,
   onReplaceCard,
   userCapacity = config.DEFAULT_DATA_CARD_CAPACITY,
+  userUsedSlots = 0,
   onOpenRecycleBin,
   recycleCount = 0,
   recycleLimit = config.RECYCLE_BIN_LIMIT,
@@ -511,14 +513,14 @@ export default function DataCardsModal({
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold">{title}</h2>
             <div className="text-sm text-gray-600">
-              {dataCards.length}/{userCapacity}
+              {userUsedSlots}/{userCapacity} 槽（{dataCards.length} 张）
               {filteredAndSortedCards.length !== dataCards.length && (
                 <span className="ml-2 text-gray-500">筛选后 {filteredAndSortedCards.length}</span>
               )}
             </div>
             {showHotHint && (
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
-                🔥 热门卡片（收藏&gt;10 且使用&gt;30）不占槽位
+                🔥 热门卡片仅减免 1 个基础槽；超出 300KiB 的额外槽位仍计费
               </div>
             )}
           </div>

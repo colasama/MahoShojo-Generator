@@ -264,6 +264,7 @@ export const QuestionnaireEditorPage: React.FC = () => {
   const [userDataCards, setUserDataCards] = useState<any[]>([]);
   const [recycleBinCards, setRecycleBinCards] = useState<any[]>([]);
   const [userCapacity, setUserCapacity] = useState<number | null>(null);
+  const [userUsedSlots, setUserUsedSlots] = useState(0);
   const [editingCard, setEditingCard] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const cardsPerPage = 12;
@@ -319,15 +320,16 @@ export const QuestionnaireEditorPage: React.FC = () => {
   const loadUserQuestionnaireCards = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const [cards, capacity, recycleCards] = await Promise.all([
+      const [cards, capacityInfo, recycleCards] = await Promise.all([
         dataCardApi.getCards(),
         dataCardApi.getUserCapacity(),
         dataCardApi.getRecycleBin(),
       ]);
       setUserDataCards(cards);
       setRecycleBinCards(recycleCards);
-      if (capacity !== null) {
-        setUserCapacity(capacity);
+      if (capacityInfo !== null) {
+        setUserCapacity(capacityInfo.capacity);
+        setUserUsedSlots(capacityInfo.usedSlots);
       }
     } catch (error) {
       console.error('加载问卷数据卡失败:', error);
@@ -341,6 +343,7 @@ export const QuestionnaireEditorPage: React.FC = () => {
       setUserDataCards([]);
       setRecycleBinCards([]);
       setUserCapacity(null);
+      setUserUsedSlots(0);
       setShowDataCardsModal(false);
       setShowRecycleBinModal(false);
     }
@@ -1748,6 +1751,7 @@ export const QuestionnaireEditorPage: React.FC = () => {
         onCancelEdit={() => setEditingCard(null)}
         onReplaceCard={handleReplaceQuestionnaireCard}
         userCapacity={userCapacity ?? undefined}
+        userUsedSlots={userUsedSlots}
         onOpenRecycleBin={() => {
           setShowDataCardsModal(false);
           setShowRecycleBinModal(true);

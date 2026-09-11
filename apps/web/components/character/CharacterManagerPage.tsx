@@ -311,6 +311,7 @@ export const CharacterManagerPage: React.FC = () => {
     // 数据卡管理相关状态
     const [userDataCards, setUserDataCards] = useState<any[]>([]);
     const [userCapacity, setUserCapacity] = useState(config.DEFAULT_DATA_CARD_CAPACITY);
+    const [userUsedSlots, setUserUsedSlots] = useState(0);
   const [showDataCardsModal, setShowDataCardsModal] = useState(false);
   const [recycleBinCards, setRecycleBinCards] = useState<any[]>([]);
   const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
@@ -376,15 +377,16 @@ export const CharacterManagerPage: React.FC = () => {
     // 加载用户数据卡和容量
     const loadUserDataCards = useCallback(async () => {
         if (!isAuthenticated) return;
-        const [cards, capacity, recycleCards] = await Promise.all([
+        const [cards, capacityInfo, recycleCards] = await Promise.all([
             dataCardApi.getCards(),
             dataCardApi.getUserCapacity(),
             dataCardApi.getRecycleBin()
         ]);
         setUserDataCards(cards);
         setRecycleBinCards(recycleCards);
-        if (capacity !== null) {
-            setUserCapacity(capacity);
+        if (capacityInfo !== null) {
+            setUserCapacity(capacityInfo.capacity);
+            setUserUsedSlots(capacityInfo.usedSlots);
         }
     }, [isAuthenticated]);
 
@@ -2049,7 +2051,7 @@ export const CharacterManagerPage: React.FC = () => {
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                                 </svg>
                                                 <span className="text-sm">
-                                                    我的数据卡 <span className="font-bold">({userDataCards.length}/{userCapacity})</span>
+                                                    我的数据卡 <span className="font-bold">({userUsedSlots}/{userCapacity} 槽)</span>
                                                 </span>
                                             </button>
                                         </div>
@@ -2725,6 +2727,7 @@ export const CharacterManagerPage: React.FC = () => {
             onReplaceCard={handleReplaceExistingCard}
             allowHistoryReplace={true}
             userCapacity={userCapacity}
+            userUsedSlots={userUsedSlots}
             onOpenRecycleBin={() => {
                 setShowDataCardsModal(false);
                 setShowRecycleBinModal(true);
@@ -2790,7 +2793,7 @@ export const CharacterManagerPage: React.FC = () => {
                 onPublicChange={(value) => setNewCardForm({ ...newCardForm, isPublic: value })}
                 error={saveCardError}
                 isSaving={isSavingCard}
-                currentCardCount={userDataCards.length}
+                usedSlots={userUsedSlots}
                 userCapacity={userCapacity}
             />
 
