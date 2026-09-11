@@ -263,7 +263,8 @@ const buildCombatantProfilesForPrompt = (params: {
     } = params;
     const allNames = combatants.map(c => c.data.codename || c.data.name);
     const isPureBattle = !userGuidance && !scenario && !(auxScenarios && auxScenarios.length > 0);
-    const sanitizeOptions = { readArenaHistory, readCurrentState };
+    // History and state have dedicated prompt sections.
+    const sanitizeOptions = { readArenaHistory: false, readCurrentState: false };
 
     return combatants.map((c, index) => {
         const { data, type } = c;
@@ -308,8 +309,13 @@ const buildCombatantProfilesForPrompt = (params: {
             return profileString;
         }
 
-        const sanitizedFallbackData = sanitizeStoryPromptValue(data, sanitizeOptions);
+        const fallbackData = data && typeof data === 'object' ? { ...data } : data;
+        if (fallbackData && typeof fallbackData === 'object') delete fallbackData.userAnswers;
+        const sanitizedFallbackData = sanitizeStoryPromptValue(fallbackData, sanitizeOptions);
         profileString += `// [注意] 该角色为非结构化设定参考，请基于以下文本内容进行理解和创作：\n${typeof sanitizedFallbackData === 'string' ? sanitizedFallbackData : safeJsonStringify(sanitizedFallbackData)}\n`;
+        if (includeQuestionnaireAnswers) {
+            profileString += formatUserAnswersForPrompt(data?.userAnswers, fallbackQuestions);
+        }
         return profileString;
     }).join('\n\n');
 };
@@ -385,9 +391,7 @@ export const createPromptBuilder = (
             }
             finalPrompt += `${scenario.content}\n\n`;
         } else {
-            const scenarioForPrompt = { ...scenario };
-            delete scenarioForPrompt.signature;
-            delete scenarioForPrompt.metadata;
+            const scenarioForPrompt = sanitizeStoryPromptRecord(scenario, { readArenaHistory: false, readCurrentState: false }) ?? {};
             finalPrompt += `## 【情景设定】\n这是本次故事必须严格遵守的背景和框架：\n\`\`\`json\n${JSON.stringify(scenarioForPrompt, null, 2)}\n\`\`\`\n\n`;
         }
     }
@@ -402,9 +406,7 @@ export const createPromptBuilder = (
                 return;
             }
 
-            const auxForPrompt: any = { ...aux };
-            delete auxForPrompt.signature;
-            delete auxForPrompt.metadata;
+            const auxForPrompt = sanitizeStoryPromptRecord(aux, { readArenaHistory: false, readCurrentState: false }) ?? {};
             const title = typeof auxForPrompt.title === 'string' && auxForPrompt.title.trim() ? auxForPrompt.title.trim() : '';
             finalPrompt += `### 辅助情景 #${index + 1}${title ? `：${title}` : ''}\n\`\`\`json\n${JSON.stringify(auxForPrompt, null, 2)}\n\`\`\`\n\n`;
         });
@@ -526,9 +528,7 @@ export const createStreamPromptBuilder = (
             }
             finalPrompt += `${scenario.content}\n\n`;
         } else {
-            const scenarioForPrompt = { ...scenario };
-            delete scenarioForPrompt.signature;
-            delete scenarioForPrompt.metadata;
+            const scenarioForPrompt = sanitizeStoryPromptRecord(scenario, { readArenaHistory: false, readCurrentState: false }) ?? {};
             finalPrompt += `## 【情景设定】\n这是本次故事必须严格遵守的背景和框架：\n\`\`\`json\n${JSON.stringify(scenarioForPrompt, null, 2)}\n\`\`\`\n\n`;
         }
     }
@@ -543,9 +543,7 @@ export const createStreamPromptBuilder = (
                 return;
             }
 
-            const auxForPrompt: any = { ...aux };
-            delete auxForPrompt.signature;
-            delete auxForPrompt.metadata;
+            const auxForPrompt = sanitizeStoryPromptRecord(aux, { readArenaHistory: false, readCurrentState: false }) ?? {};
             const title = typeof auxForPrompt.title === 'string' && auxForPrompt.title.trim() ? auxForPrompt.title.trim() : '';
             finalPrompt += `### 辅助情景 #${index + 1}${title ? `：${title}` : ''}\n\`\`\`json\n${JSON.stringify(auxForPrompt, null, 2)}\n\`\`\`\n\n`;
         });

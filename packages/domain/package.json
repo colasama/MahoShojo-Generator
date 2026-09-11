@@ -9,6 +9,11 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./story-prompt-data": {
+      "types": "./src/story-prompt-data.ts",
+      "import": "./src/story-prompt-data.ts",
+      "default": "./src/story-prompt-data.ts"
+    },
     "./data-cards": {
       "types": "./src/data-cards.ts",
       "import": "./src/data-cards.ts",

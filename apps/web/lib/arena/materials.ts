@@ -1,3 +1,4 @@
+import { projectStoryPromptMaterial } from '@mahoshojo/domain/story-prompt-data';
 import { parseWantuCard } from '@/lib/wantu-card/adapter';
 import { isWantuDataCard, convertWantuDataCardToArenaMaterialPayload } from '@/lib/wantu-card/wantu-data-card';
 import { MAX_ARENA_REFERENCE_ITEMS } from '@/lib/arena/resource-budget';
@@ -52,12 +53,6 @@ const TRANSPORT_META_KEYS = new Set([
   '_usageCount',
 ]);
 
-const INTERNAL_PROMPT_KEYS = new Set([
-  'signature',
-  'metadata',
-  ...TRANSPORT_META_KEYS,
-]);
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -91,16 +86,7 @@ const stripTransportMeta = (value: unknown): unknown => {
   return out;
 };
 
-export const stripArenaMaterialInternalFields = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map((item) => stripArenaMaterialInternalFields(item));
-  if (!isRecord(value)) return value;
-  const out: Record<string, unknown> = {};
-  for (const [key, nested] of Object.entries(value)) {
-    if (INTERNAL_PROMPT_KEYS.has(key)) continue;
-    out[key] = stripArenaMaterialInternalFields(nested);
-  }
-  return out;
-};
+export const stripArenaMaterialInternalFields = projectStoryPromptMaterial;
 
 const inferMahoshojoSourceType = (payload: unknown): string => {
   if (!isRecord(payload)) return 'raw-json';

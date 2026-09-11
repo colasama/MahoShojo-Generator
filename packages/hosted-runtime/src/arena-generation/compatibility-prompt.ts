@@ -1,5 +1,10 @@
 import { GENERAL_SCENARIO_TEMPLATE_ID } from '@mahoshojo/domain/data-cards';
 import {
+  STORY_PROMPT_CHARACTER_PARAMETERS_KEY, getStoryPromptCharacterParameters,
+  sanitizeStoryPromptRecord, sanitizeStoryPromptValue,
+  projectStoryPromptMaterial as stripArenaMaterialInternalFields,
+} from '@mahoshojo/domain/story-prompt-data';
+import {
   normalizeUserAnswers,
   type QuestionnaireAnswerItem,
 } from '@mahoshojo/domain/questionnaire';
@@ -80,37 +85,9 @@ const formatQuestionnaireAnswers = (answers: QuestionnaireAnswerItem[]): string 
   return blocks.join('\n');
 };
 
-const STORY_PROMPT_CHARACTER_PARAMETERS_KEY = '角色参数' as const;
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
 );
-const sanitizeStoryPromptValue = (
-  value: unknown,
-  options: { readArenaHistory: boolean; readCurrentState: boolean },
-): unknown => {
-  if (Array.isArray(value)) return value.map((item) => sanitizeStoryPromptValue(item, options));
-  if (!isRecord(value)) return value;
-  const sanitized: Record<string, unknown> = {};
-  for (const [key, rawValue] of Object.entries(value)) {
-    if (key === 'creationInputs' || key === 'isPreset' || key === 'signature') continue;
-    if (!options.readArenaHistory && key === 'arena_history') continue;
-    if (!options.readCurrentState && key === 'current_state') continue;
-    sanitized[key === 'buildState' ? STORY_PROMPT_CHARACTER_PARAMETERS_KEY : key] =
-      sanitizeStoryPromptValue(rawValue, options);
-  }
-  return sanitized;
-};
-const sanitizeStoryPromptRecord = (
-  value: unknown,
-  options: { readArenaHistory: boolean; readCurrentState: boolean },
-): Record<string, unknown> | null => {
-  const sanitized = sanitizeStoryPromptValue(value, options);
-  return isRecord(sanitized) ? sanitized : null;
-};
-const getStoryPromptCharacterParameters = (
-  value: unknown,
-  options: { readArenaHistory: boolean; readCurrentState: boolean },
-): unknown => sanitizeStoryPromptRecord(value, options)?.[STORY_PROMPT_CHARACTER_PARAMETERS_KEY] ?? null;
 
 const normalizeCustomStoryLength = (value: unknown): string => {
   if (typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0) {
@@ -141,20 +118,6 @@ const buildStoryLengthRequirementText = (input: {
     : null;
 };
 
-const stripArenaMaterialInternalFields = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(stripArenaMaterialInternalFields);
-  if (!isRecord(value)) return value;
-  const out: Record<string, unknown> = {};
-  for (const [key, nested] of Object.entries(value)) {
-    if (
-      key === 'signature'
-      || key === 'metadata'
-      || key.startsWith('_')
-    ) continue;
-    out[key] = stripArenaMaterialInternalFields(nested);
-  }
-  return out;
-};
 const materialJson = (value: unknown): string => {
   try {
     return JSON.stringify(value, null, 2);
@@ -619,7 +582,8 @@ const buildCombatantProfilesForPrompt = (params: {
     } = params;
     const allNames = combatants.map(c => c.data.codename || c.data.name);
     const isPureBattle = !userGuidance && !scenario && !(auxScenarios && auxScenarios.length > 0);
-    const sanitizeOptions = { readArenaHistory, readCurrentState };
+    // History and state have dedicated prompt sections.
+    const sanitizeOptions = { readArenaHistory: false, readCurrentState: false };
 
     return combatants.map((c, index) => {
         const { data, type } = c;
@@ -664,8 +628,13 @@ const buildCombatantProfilesForPrompt = (params: {
             return profileString;
         }
 
-        const sanitizedFallbackData = sanitizeStoryPromptValue(data, sanitizeOptions);
+        const fallbackData = data && typeof data === 'object' ? { ...data } : data;
+        if (fallbackData && typeof fallbackData === 'object') delete fallbackData.userAnswers;
+        const sanitizedFallbackData = sanitizeStoryPromptValue(fallbackData, sanitizeOptions);
         profileString += `// [注意] 该角色为非结构化设定参考，请基于以下文本内容进行理解和创作：\n${typeof sanitizedFallbackData === 'string' ? sanitizedFallbackData : safeJsonStringify(sanitizedFallbackData)}\n`;
+        if (includeQuestionnaireAnswers) {
+            profileString += formatUserAnswersForPrompt(data?.userAnswers, fallbackQuestions);
+        }
         return profileString;
     }).join('\n\n');
 };
@@ -744,9 +713,7 @@ export const createStreamPromptBuilder = (
             }
             finalPrompt += `${scenario.content}\n\n`;
         } else {
-            const scenarioForPrompt = { ...scenario };
-            delete scenarioForPrompt.signature;
-            delete scenarioForPrompt.metadata;
+            const scenarioForPrompt = sanitizeStoryPromptRecord(scenario, { readArenaHistory: false, readCurrentState: false }) ?? {};
             finalPrompt += `## 【情景设定】\n这是本次故事必须严格遵守的背景和框架：\n\`\`\`json\n${JSON.stringify(scenarioForPrompt, null, 2)}\n\`\`\`\n\n`;
         }
     }
@@ -761,9 +728,7 @@ export const createStreamPromptBuilder = (
                 return;
             }
 
-            const auxForPrompt: any = { ...aux };
-            delete auxForPrompt.signature;
-            delete auxForPrompt.metadata;
+            const auxForPrompt = sanitizeStoryPromptRecord(aux, { readArenaHistory: false, readCurrentState: false }) ?? {};
             const title = typeof auxForPrompt.title === 'string' && auxForPrompt.title.trim() ? auxForPrompt.title.trim() : '';
             finalPrompt += `### 辅助情景 #${index + 1}${title ? `：${title}` : ''}\n\`\`\`json\n${JSON.stringify(auxForPrompt, null, 2)}\n\`\`\`\n\n`;
         });
