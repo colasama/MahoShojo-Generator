@@ -3,6 +3,7 @@ import { AI_PROVIDER_CATALOG, CUSTOM_AI_MODEL_OPTION_VALUE, resolveAIProviderMod
 import { AdminAiReviewResultSchema } from '@mahoshojo/contracts/admin';
 import { api, statusLabels, textValue, type Action, type Row } from './ui-model';
 import { decisionItem, initialReviewDecision, reviewContextMatches, reviewTarget, submitReviewOperation, type ReviewResult } from './ai-review-model';
+import { OperationFeedback } from './operation-feedback';
 
 export function AiReviewPanel({ resource, rows, principalId, actions, close }: {
   resource: string; rows: Row[]; principalId: string; actions: Action[]; close(): void;
@@ -64,7 +65,7 @@ export function AiReviewResult({ jobId, actions, principalId }: { jobId: string;
   const [decisions, setDecisions] = useState<Record<string, string>>({}); const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [status, setStatus] = useState('');
   const [reason, setReason] = useState(''); const [confirmKind, setConfirmKind] = useState<'card' | 'update' | null>(null);
-  const [outcomes, setOutcomes] = useState<Row[]>([]); const [pending, setPending] = useState(false); const [submitted, setSubmitted] = useState<string[]>([]);
+  const [outcomes, setOutcomes] = useState<Array<{ outcome: Row; targets: string[] }>>([]); const [pending, setPending] = useState(false); const [submitted, setSubmitted] = useState<string[]>([]);
   const sending = useRef(false); const generation = useRef(0);
   async function load() {
     const sequence = ++generation.current; setLoading(true); setError(''); setConfirmKind(null);
@@ -104,12 +105,12 @@ export function AiReviewResult({ jobId, actions, principalId }: { jobId: string;
       const items = contexts.map(context => decisionItem(context, details[context.id], decisions[context.id]));
       if (action.name.endsWith('.batch')) {
         const { outcome } = await submitReviewOperation(principalId, action, { items, reason: reason.trim() });
-        setOutcomes(previous => [...previous, outcome]); setSubmitted(previous => [...previous, ...contexts.map(context => context.id)]);
+        setOutcomes(previous => [...previous, { outcome, targets: contexts.map(context => context.name + ' · ' + context.targetId) }]); setSubmitted(previous => [...previous, ...contexts.map(context => context.id)]);
       } else {
         // A deployment may enable only single-item writers. Stop on an unknown result, preserving completed items.
         for (const [index, item] of items.entries()) {
           const { outcome } = await submitReviewOperation(principalId, action, { ...item, reason: reason.trim() });
-          setOutcomes(previous => [...previous, outcome]); setSubmitted(previous => [...previous, contexts[index].id]);
+          setOutcomes(previous => [...previous, { outcome, targets: [contexts[index].name + ' · ' + contexts[index].targetId] }]); setSubmitted(previous => [...previous, contexts[index].id]);
         }
       }
       setConfirmKind(null);
@@ -138,7 +139,7 @@ export function AiReviewResult({ jobId, actions, principalId }: { jobId: string;
         })}
         {confirmKind && <section className="confirmation"><h3>确认人工审核</h3><ul>{selectedContexts(confirmKind).map(context => <li key={context.id}>{context.name} · {decisions[context.id] === 'approved' ? '通过' : '拒绝'}</li>)}</ul><p>{reason}</p><p>逐项校验版本，冲突项不会覆盖。拒绝操作按现行规则通知作者。</p><button type="button" disabled={pending} onClick={() => void apply()}>确认提交审核</button><button type="button" className="quiet" disabled={pending} onClick={() => setConfirmKind(null)}>返回修改</button></section>}
       </form>}
-      {outcomes.map((outcome, index) => <pre className="json-data" key={index}>{textValue(outcome)}</pre>)}
+      {outcomes.map((entry, index) => <OperationFeedback key={index} {...entry} />)}
       <p><a className="button quiet" href="/?view=operations">查询逐项操作结果</a></p>
     </>}
   </section>;

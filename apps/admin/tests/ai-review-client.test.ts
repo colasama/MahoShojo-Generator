@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AiReviewPanel } from '../src/client/ai-review-panel';
+import { OperationFeedback } from '../src/client/operation-feedback';
 import { decisionItem, initialReviewDecision, reviewContextMatches, reviewTarget, submitReviewOperation, type ReviewContext } from '../src/client/ai-review-model';
 import { savedOperations, saveOperation } from '../src/client/ui-model';
 const version = 'a'.repeat(64), cardVersion = 'b'.repeat(64);
@@ -73,5 +74,12 @@ describe('AI 人工审核闭环', () => {
   it('统一选择器包括系统渠道，恶意名称按文本渲染', () => {
     const html = renderToStaticMarkup(createElement(AiReviewPanel, { resource: 'data-cards', rows: [{ id: 'card', name: '<img src=x onerror=alert(1)>' }], principalId: 'admin', actions: [], close: () => {} }));
     expect(html).toContain('使用系统默认配置'); expect(html).toContain('&lt;img'); expect(html).not.toContain('<img');
+  });
+  it('批量反馈按目标展示成功与冲突，不把部分结果当作全部成功', () => {
+    const html = renderToStaticMarkup(createElement(OperationFeedback, { targets: ['<script>target</script>', '第二项'], outcome: { status: 'batch', items: [
+      { status: 'succeeded', result: { decision: 'approved' } }, { status: 'conflict', result: null },
+    ] } }));
+    expect(html).toContain('不能视为全部完成'); expect(html).toContain('冲突目标未修改');
+    expect(html).toContain('&lt;script&gt;target'); expect(html).not.toContain('<script>');
   });
 });
