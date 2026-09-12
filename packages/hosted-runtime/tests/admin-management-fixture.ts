@@ -11,7 +11,7 @@ type SQLite = { exec(_sql: string): void; close(): void; prepare(_sql: string): 
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as { DatabaseSync: new (_name: string) => SQLite };
 export async function adminManagementFixture(capabilities: string[]) {
   const sqlite = new DatabaseSync(':memory:');
-  for (const file of ['../../../apps/web/lib/database/schema.sql', '../../../drizzle/0000_auth_domain_bootstrap.sql', '../../../drizzle/0013_ai_channel_availability.sql', '../../../drizzle/0014_admin_foundation.sql', '../../../drizzle/0015_admin_actor_attribution.sql']) {
+  for (const file of ['../../../apps/web/lib/database/schema.sql', '../../../drizzle/0000_auth_domain_bootstrap.sql', '../../../drizzle/0013_ai_channel_availability.sql', '../../../drizzle/0014_admin_foundation.sql', '../../../drizzle/0015_admin_actor_attribution.sql', '../../../drizzle/0016_admin_object_tombstones.sql']) {
     sqlite.exec(readFileSync(new URL(file, import.meta.url), 'utf8'));
   }
   const db: AdminDatabase = {

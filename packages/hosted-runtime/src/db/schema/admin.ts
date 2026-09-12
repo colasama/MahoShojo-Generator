@@ -37,3 +37,7 @@ export const adminJobs=sqliteTable('admin_jobs',{
 },t=>[index('admin_jobs_retry_idx').on(t.status,t.nextAttemptAt),
  check('admin_job_status',sql`${t.status} IN ('queued','running','succeeded','failed','cancelled','uncertain')`),check('admin_job_scope',sql`json_valid(${t.scopeJson})`)]);
 
+export const adminObjectTombstones=sqliteTable('admin_object_tombstones',{
+ r2Key:text('r2_key').primaryKey().notNull(),jobId:text('job_id').notNull().references(()=>adminJobs.id),
+ largeObjectId:text('large_object_id').notNull(),createdAt:text('created_at').notNull(),
+});
