@@ -349,11 +349,34 @@
       "import": "./src/admin/read-models.ts",
       "types": "./src/admin/read-models.ts"
     },
+    "./admin/business-actions": {
+      "import": "./src/admin/business-actions.ts",
+      "default": "./src/admin/business-actions.ts",
+      "types": "./src/admin/business-actions.ts"
+    },
     "./admin/actions/core": {
       "import": "./src/admin/actions/core.ts",
       "default": "./src/admin/actions/core.ts",
       "types": "./src/admin/actions/core.ts"
-    }
+    },
+    "./admin/actions/messages": {
+      "import": "./src/admin/actions/messages.ts",
+      "default": "./src/admin/actions/messages.ts",
+      "types": "./src/admin/actions/messages.ts"
+    },
+    "./admin/analytics": {
+      "import": "./src/admin/analytics.ts",
+      "default": "./src/admin/analytics.ts",
+      "types": "./src/admin/analytics.ts"
+    },
+    "./admin/actions/analytics": {
+      "import": "./src/admin/actions/analytics.ts",
+      "default": "./src/admin/actions/analytics.ts",
+      "types": "./src/admin/actions/analytics.ts"
+    },
+    "./admin/moderation/transitions": "./src/admin/moderation/transitions.ts",
+    "./admin/moderation/notifications": "./src/admin/moderation/notifications.ts",
+    "./admin/actions/moderation": "./src/admin/actions/moderation.ts"
   },
   "scripts": {
     "assets:questionnaires": "node scripts/generate-questionnaire-assets.mjs",
