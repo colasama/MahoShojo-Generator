@@ -38,9 +38,13 @@ node apps/admin/scripts/local.mjs serve --writers
 
 审计文本与 mutation/主体控制工具共用 hosted-runtime 的 `admin/audit-text` 校验，拒绝可识别的凭据误粘贴（含 reason、安全引用、请求标识和版本字段）。作业审计沿用已校验的 operation 字段与服务器固定事件值，不接收自由格式日志；普通随机字符串是否含秘密仍需由调用方保证，不能把正则检查当成完整秘密检测。
 
-AI 审核请求必须同时指定 `/models` 返回的 `provider` 与 `model`，工作台按供应商筛选模型。执行时仅允许唯一匹配的配置项；缺失供应商、配置移除或重复组合均在付费调用前失败，不回退其他供应商。作业 scope、dispatch intent、结果与用量保留非敏感的供应商名称，不保存 endpoint 或凭据。
+AI 审核使用共享供应商目录的统一选择器。选择“使用系统默认配置”时，可选择默认模型或 `/models` 返回的任意系统模型；提交时按配置顺序冻结首个唯一有效供应商／模型组合，执行时配置失效则失败，不回退其他供应商。BYOK 使用预设供应商端点及同一模型解析器，不开放任意 Endpoint。旧 `provider + model` 请求仍按精确配置组合处理。
 
-兼容影响：旧的无 `provider` 待执行作业会以 `ADMIN_AI_PREPARATION_FAILED` 结束，需人工明确供应商后创建新操作；旧的 succeeded/uncertain 作业不重放，已完成旧结果仍可读取，`provider: null` 表示当时未记录。仅 JSON contract 扩展，不新增 SQL migration、环境变量或启用 writer；回滚时先关闭 `ai.review` writer，避免旧执行代码忽略供应商。
+系统渠道继续使用 Queue 作业；BYOK 在同源请求内执行，API Key 仅留页面及本次请求内存，不进入指纹、持久化或审计。两者共用持久操作、dispatch 前审计和结果查询。队列不会接管活跃 BYOK，丢失内存凭据且租约过期的未 dispatch 作业明确失败；已 dispatch 的未知结果禁止重放。关闭页面不保证 BYOK 继续运行。只有上次作业确认为已完成或执行前失败时，管理员才能明确创建同范围新请求。
+
+审核每次 1–10 项，卡片及更新版本由详情读取，更新同时冻结父卡版本。AI 建议通过且内容完整、版本匹配时预填“通过”；拒绝建议留空，最终写入仍需要人工理由及确认。版本变化或模型输入覆盖不足时必须重新核对；历史结果缺少版本只能参考。结果页面复用现有批量审核动作，逐项 CAS、通知与幂等恢复。
+
+兼容影响：旧的无 `provider` 待执行作业会以 `ADMIN_AI_PREPARATION_FAILED` 结束；旧的 succeeded/uncertain 作业不重放，已完成旧结果仍可读取，`provider: null` 表示当时未记录。新请求增加 `selection`，结果增加版本及覆盖信息 `contexts`。仅 JSON contract 扩展，不新增 SQL migration、环境变量或启用 writer；回滚前关闭 `ai.review` 并确认没有活跃作业，不让旧执行代码接管 BYOK。
 
 ## Principal 控制工具
 

@@ -6,7 +6,7 @@ import type { AdminDatabase } from '@mahoshojo/hosted-runtime/admin/database';
 import { AdminOperationError } from '@mahoshojo/hosted-runtime/admin/operations';
 import { AdminHttpError } from './business';
 import { parseAIProvidersFromEnv } from '@mahoshojo/hosted-runtime/node-runtime/providers';
-import { readAdminAiJobResult } from '@mahoshojo/hosted-runtime/admin/ai-review';
+import { adminAiSystemModels, readAdminAiJobResult } from '@mahoshojo/hosted-runtime/admin/ai-review';
 type Environment={ADMIN_ARENA_ORIGIN?:string;ADMIN_ARENA_OBSERVATION_SECRET?:string;ADMIN_AI_PROVIDERS_CONFIG?:string};
 function query(request:Request,allowed:string[]){const params=new URL(request.url).searchParams;if([...params.keys()].some(k=>!allowed.includes(k))||[...params.keys()].length!==new Set(params.keys()).size)throw new AdminHttpError(400,'ADMIN_QUERY_INVALID');return params;}
 function idQuery(request:Request){const id=query(request,['id']).get('id');if(!id||id.length>128)throw new AdminHttpError(400,'ADMIN_QUERY_INVALID');return id;}
@@ -24,7 +24,7 @@ function analyticsQuery(request:Request):AdminAnalyticsOptions{
 }
 export function createExtraReads(db:()=>AdminDatabase,bucket:()=>AdminPrivateBucket,env:Environment){
  const routes=[
-  {path:'models',capability:'ai.read',run:async(request:Request)=>{query(request,[]);return {items:parseAIProvidersFromEnv({AI_PROVIDERS_CONFIG:env.ADMIN_AI_PROVIDERS_CONFIG,HOSTED_API_ENVIRONMENT:'production'}).flatMap(provider=>(Array.isArray(provider.model)?provider.model:[provider.model]).map(model=>({provider:provider.name,model}))) };}},
+  {path:'models',capability:'ai.read',run:async(request:Request)=>{query(request,[]);const items=adminAiSystemModels(parseAIProvidersFromEnv({AI_PROVIDERS_CONFIG:env.ADMIN_AI_PROVIDERS_CONFIG,HOSTED_API_ENVIRONMENT:'production'}));return {items,systemDefault:items[0]??null};}},
   {path:'ai-review-result',capability:'ai.review',run:async(request:Request,principalId:string)=>{const id=query(request,['id']).get('id');if(!id||id.length>128)throw new AdminHttpError(400,'ADMIN_QUERY_INVALID');return readAdminAiJobResult(db(),bucket(),principalId,id);}},
   {path:'audit-events',capability:'audit.read',run:async(request:Request)=>{
    const cursor=query(request,['cursor']).get('cursor');let bound:string[]=[];

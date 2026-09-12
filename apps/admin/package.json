@@ -12,6 +12,7 @@
     "deploy": "node scripts/deploy.mjs"
   },
   "dependencies": {
+    "@mahoshojo/ai-core": "workspace:*",
     "hono": "^4.13.3",
     "jose": "^6.2.10",
     "@mahoshojo/contracts": "workspace:*",

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { adminManagementFixture } from './admin-management-fixture';
 import { adminActionVersion } from '../src/admin/actions/core';
-import { createAdminAiReviewJob, readAdminAiJobResult, runAdminAiJob } from '../src/admin/ai-review';
+import { adminAiSystemModels, createAdminAiReviewJob, readAdminAiJobResult, runAdminAiJob } from '../src/admin/ai-review';
 import { createAdminMetricsActions } from '../src/admin/actions/metrics';
 import { cancelAdminJob, type AdminPrivateBucket } from '../src/admin/jobs';
 
@@ -33,6 +33,96 @@ const completion = (reviews = [{ id: 'card:card', suggestion: 'approved', reason
 }), { headers: { 'Content-Type': 'application/json' } });
 
 describe('Persistent Admin AI review jobs', () => {
+  it('resolves the shared system selection once and replays its original intent after configuration changes', async () => {
+    const test = await setup();
+    const input = { targets: test.input.targets, selection: { providerId: 'system', modelId: 'default' }, reason: '系统默认审核', idempotencyKey: 'system-default' };
+    const enqueue = vi.fn(async () => {});
+    const created = await createAdminAiReviewJob(test.db, input, test.context, { providers, enqueue });
+    expect(enqueue).toHaveBeenCalledWith(created.result!.jobId);
+    expect(JSON.parse(String(test.sqlite.prepare('SELECT scope_json FROM admin_jobs WHERE id=?').get(created.result!.jobId)?.scope_json)))
+      .toMatchObject({ selection: input.selection, provider: 'fixture', model: 'fixture-model', execution: 'queue' });
+    expect(await createAdminAiReviewJob(test.db, input, test.context, { providers: [], enqueue })).toMatchObject({ replayed: true, result: created.result });
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    await expect(createAdminAiReviewJob(test.db, { ...input, selection: { providerId: 'system', modelId: 'changed' } }, test.context, { providers })).rejects.toMatchObject({ code: 'ADMIN_IDEMPOTENCY_CONFLICT' });
+  });
+
+  it('excludes ambiguous system pairs and selects the first uniquely configured model pair', async () => {
+    const test = await setup();
+    const duplicate = { ...providers[0], baseUrl: 'https://duplicate.test' };
+    const available = { ...providers[0], name: 'unique' };
+    expect(adminAiSystemModels([...providers, duplicate, available])).toEqual([{ provider: 'unique', model: 'fixture-model' }]);
+    const created = await createAdminAiReviewJob(test.db, { targets: test.input.targets, selection: { providerId: 'system', modelId: 'fixture-model' }, reason: '明确模型', idempotencyKey: 'unique' }, test.context, { providers: [...providers, duplicate, available] });
+    expect(JSON.parse(String(test.sqlite.prepare('SELECT scope_json FROM admin_jobs WHERE id=?').get(created.result!.jobId)?.scope_json)).provider).toBe('unique');
+  });
+
+  it('runs BYOK only inline, prevents a concurrent queue dispatch, and never persists or fingerprints its key', async () => {
+    const test = await setup();
+    const apiKey = 'opaque-fixture-secret-value';
+    const input = { targets: test.input.targets, selection: { providerId: 'deepseek', modelId: 'deepseek-v4-flash-0731' }, apiKey, reason: '自定渠道审核', idempotencyKey: 'byok' };
+    const fetcher = vi.fn<typeof fetch>(async (_request, init) => {
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer ' + apiKey);
+      expect(init?.redirect).toBe('error');
+      const job = test.sqlite.prepare("SELECT id,status FROM admin_jobs WHERE json_extract(scope_json,'$.execution')='inline'").get()!;
+      expect(job.status).toBe('uncertain');
+      await runAdminAiJob(test.db, test.bucket, String(job.id), { providers, fetch: fetcher });
+      expect(test.sqlite.prepare('SELECT status FROM admin_jobs WHERE id=?').get(job.id)?.status).toBe('uncertain');
+      return completion();
+    });
+    const result = await createAdminAiReviewJob(test.db, input, test.context, { providers: [], bucket: test.bucket, fetch: fetcher });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(await readAdminAiJobResult(test.db, test.bucket, 'operator', result.result!.jobId)).toMatchObject({ provider: 'deepseek', model: 'deepseek-v4-flash', contexts: [{ id: 'card:card', name: '测试卡', expectedVersion: test.expectedVersion, coverage: { contentTruncated: false, contentParseError: false } }] });
+    // A different transient key is the same durable intent, and cannot cause another charge.
+    expect(await createAdminAiReviewJob(test.db, { ...input, apiKey: 'different-transient-key' }, test.context, { providers: [], bucket: test.bucket, fetch: fetcher })).toMatchObject({ replayed: true });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    for (const table of ['admin_jobs', 'admin_operations', 'admin_audit_events']) expect(JSON.stringify(test.sqlite.prepare(`SELECT * FROM ${table}`).all())).not.toContain(apiKey);
+    expect(JSON.stringify([...test.objects.values()])).not.toContain(apiKey);
+    await expect(createAdminAiReviewJob(test.db, { ...input, reason: apiKey, idempotencyKey: 'leaked' }, test.context, { providers: [], bucket: test.bucket })).rejects.toMatchObject({ code: 'ADMIN_AI_SECRET_IN_INTENT' });
+  });
+
+  it('does not steal a live inline lease and terminates a lost pre-dispatch credential only after expiry', async () => {
+    const test = await setup();
+    const scope = { targets: test.input.targets, provider: 'deepseek', model: 'deepseek-v4-flash', selection: { providerId: 'deepseek', modelId: 'deepseek-v4-flash' }, execution: 'inline' };
+    test.sqlite.prepare("UPDATE admin_jobs SET scope_json=?,status='running',lease_token='live-request',lease_expires_at=? WHERE id=?").run(JSON.stringify(scope), new Date(Date.now() + 60000).toISOString(), test.jobId);
+    const fetcher = vi.fn<typeof fetch>(async () => completion());
+    await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher });
+    expect(test.sqlite.prepare('SELECT status,lease_token FROM admin_jobs WHERE id=?').get(test.jobId)).toEqual({ status: 'running', lease_token: 'live-request' });
+    test.sqlite.prepare('UPDATE admin_jobs SET lease_expires_at=? WHERE id=?').run('2020-01-01', test.jobId);
+    await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher });
+    expect(test.sqlite.prepare('SELECT status,error_code_safe FROM admin_jobs WHERE id=?').get(test.jobId)).toEqual({ status: 'failed', error_code_safe: 'ADMIN_AI_CREDENTIAL_LOST' });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each(['private-fixture-reflection-token', 'private-"quoted"-fixture', 'private-\\backslash-fixture'])('rejects key reflection even when JSON escapes the credential: %s', async apiKey => {
+    const test = await setup();
+    const input = { targets: test.input.targets, selection: { providerId: 'deepseek', modelId: 'deepseek-chat' }, apiKey, reason: '检查结果', idempotencyKey: 'reflection' };
+    await expect(createAdminAiReviewJob(test.db, { ...input, reason: `误粘贴 ${apiKey}`, idempotencyKey: 'input-reflection' }, test.context, { providers: [], bucket: test.bucket }))
+      .rejects.toMatchObject({ code: 'ADMIN_AI_SECRET_IN_INTENT' });
+    await expect(createAdminAiReviewJob(test.db, { ...input, selection: { ...input.selection, modelId: `model-${apiKey}` }, idempotencyKey: 'model-reflection' }, test.context, { providers: [], bucket: test.bucket }))
+      .rejects.toMatchObject({ code: 'ADMIN_AI_SECRET_IN_INTENT' });
+    const fetcher = vi.fn<typeof fetch>(async () => completion([{ id: 'card:card', suggestion: 'approved', reason: apiKey }]));
+    const created = await createAdminAiReviewJob(test.db, input, test.context, { providers: [], bucket: test.bucket, fetch: fetcher });
+    expect(test.sqlite.prepare('SELECT status,error_code_safe FROM admin_jobs WHERE id=?').get(created.result!.jobId)).toEqual({ status: 'uncertain', error_code_safe: 'ADMIN_AI_RESULT_UNCERTAIN' });
+    expect(test.objects.size).toBe(0);
+    await runAdminAiJob(test.db, test.bucket, created.result!.jobId, { providers, fetch: fetcher });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(test.sqlite.prepare('SELECT * FROM admin_jobs').all())).not.toContain(apiKey);
+  });
+
+  it('rejects a pending update when its parent card version changed and records extraction coverage', async () => {
+    const test = await setup();
+    test.sqlite.exec(`INSERT INTO data_card_updates (id,data_card_id,user_id,name,description,data,updated_at) VALUES ('update','card',1,NULL,NULL,'invalid-json','2026-01-01')`);
+    const expectedVersion = await adminActionVersion('data-card-updates', test.sqlite.prepare("SELECT * FROM data_card_updates WHERE id='update'").get()!);
+    const input = { targets: [{ kind: 'update', id: 'update', expectedVersion, cardId: 'card', cardVersion: test.expectedVersion }], selection: { providerId: 'system', modelId: 'default' }, reason: '更新内容审核', idempotencyKey: 'update-job' };
+    const created = await createAdminAiReviewJob(test.db, input, test.context, { providers });
+    const fetcher = vi.fn<typeof fetch>(async () => completion([{ id: 'update:update', suggestion: 'rejected', reason: '解析失败需人工复核' }]));
+    await runAdminAiJob(test.db, test.bucket, created.result!.jobId, { providers, fetch: fetcher });
+    expect(await readAdminAiJobResult(test.db, test.bucket, 'operator', created.result!.jobId)).toMatchObject({ contexts: [{ cardId: 'card', cardVersion: test.expectedVersion, coverage: { contentTruncated: true, contentParseError: true } }] });
+    const stale = await createAdminAiReviewJob(test.db, { ...input, idempotencyKey: 'stale-parent' }, test.context, { providers });
+    test.sqlite.exec("UPDATE data_cards SET name='changed' WHERE id='card'");
+    await runAdminAiJob(test.db, test.bucket, stale.result!.jobId, { providers, fetch: fetcher });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(test.sqlite.prepare('SELECT status FROM admin_jobs WHERE id=?').get(stale.result!.jobId)?.status).toBe('failed');
+  });
   it('selects the exact provider/model pair regardless of order and preserves its identity before dispatch', async () => {
     const test = await setup();
     const other = { ...providers[0], name: 'other', baseUrl: 'https://other.example.test/v1', apiKey: 'other-fixture-secret' };

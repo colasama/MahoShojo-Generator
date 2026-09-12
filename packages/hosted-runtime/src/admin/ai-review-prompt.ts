@@ -155,6 +155,7 @@ export function buildDataCardAiReviewPrompt(targets: DataCardAiReviewTarget[]): 
     `- 你必须严格按照 JSON Schema 返回：{ "reviews": [ { "id": string, "suggestion": "approved"|"rejected", "reason": string } ] }\n` +
     `- 每个输入项都必须输出一条对应 review；id 必须与输入完全一致。\n` +
     `- reason 不超过 50 字。\n` +
+    `- meta 表明解析失败或内容截断时，审核未覆盖完整内容；在理由中明确需人工检查的限制，不宣称整张卡无风险。\n` +
     `待审查列表（JSON）：\n` +
     `${JSON.stringify(items, null, 2)}\n`
   );

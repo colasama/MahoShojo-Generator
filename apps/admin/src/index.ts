@@ -19,12 +19,12 @@ function storage(env:AdminRuntimeBindings):AdminPrivateBucket{
  const select=(key:string)=>key.startsWith('admin/')?env.ADMIN_OBJECTS:env.LARGE_OBJECTS;
  return {get:key=>select(key).get(key),put:(key,body)=>select(key).put(key,body),delete:key=>select(key).delete(key)};
 }
-async function jobStep(env:AdminRuntimeBindings,id:string){
+async function jobStep(env:AdminRuntimeBindings,id:string,providerFetch?:typeof fetch){
  const job=await env.DB.prepare('SELECT kind FROM admin_jobs WHERE id=?').bind(id).first<{kind:string}>();
  const enabled=parseEnabledActions(env.ADMIN_ENABLED_ACTIONS);
  if(!job)return;
  if(job.kind==='ai-review'){
-  if(enabled.includes('ai.review'))await runAdminAiJob(env.DB,storage(env),id,{providers:parseAIProvidersFromEnv({AI_PROVIDERS_CONFIG:env.ADMIN_AI_PROVIDERS_CONFIG,HOSTED_API_ENVIRONMENT:'production'})});return;
+  if(enabled.includes('ai.review'))await runAdminAiJob(env.DB,storage(env),id,{providers:parseAIProvidersFromEnv({AI_PROVIDERS_CONFIG:env.ADMIN_AI_PROVIDERS_CONFIG,HOSTED_API_ENVIRONMENT:'production'}),fetch:providerFetch});return;
  }
  if(!enabled.includes('jobs.'+job.kind))return;
  await runAdminJobStep(env.DB,storage(env),id);
@@ -37,13 +37,14 @@ export const ADMIN_CAPABILITIES = [...new Set(['admin.shell.read','admin.princip
 const configError = (): Response => {
  const response=Response.json({error:'ADMIN_CONFIGURATION_INVALID'},{status:503});setAdminSecurityHeaders(response.headers);return response;
 };
-export const createAdminWorker = ({ createAccessVerifier = createAccessJwtVerifier }: {
+export const createAdminWorker = ({ createAccessVerifier = createAccessJwtVerifier, providerFetch }: {
  createAccessVerifier?: (options: AccessJwtVerifierOptions) => AccessVerifier;
+ providerFetch?: typeof fetch;
 } = {}) => {
  const verifiers = new Map<string,AccessVerifier>();
  return {
   async queue(batch:{messages:{body:unknown;ack():void;retry():void}[]},env:AdminRuntimeBindings){
-   for(const message of batch.messages){try{if(typeof message.body==='object'&&message.body!==null&&'id' in message.body&&typeof message.body.id==='string')await jobStep(env,message.body.id);message.ack();}catch{message.retry();}}
+   for(const message of batch.messages){try{if(typeof message.body==='object'&&message.body!==null&&'id' in message.body&&typeof message.body.id==='string')await jobStep(env,message.body.id,providerFetch);message.ack();}catch{message.retry();}}
   },
   async scheduled(_event:unknown,env:AdminRuntimeBindings){
    await expireAdminArtifacts(env.DB,storage(env));
@@ -70,7 +71,7 @@ export const createAdminWorker = ({ createAccessVerifier = createAccessJwtVerifi
        throw error;}
      },
      assets:request=>{if(!native.ASSETS)throw new AdminHttpError(503,'ADMIN_ASSET_UNAVAILABLE');return native.ASSETS.fetch(request);},
-     actions:createActions(db,env.ADMIN_ENABLED_ACTIONS,signature?.verifySignature),
+     actions:createActions(db,env.ADMIN_ENABLED_ACTIONS,signature?.verifySignature,()=>({providers:parseAIProvidersFromEnv({AI_PROVIDERS_CONFIG:env.ADMIN_AI_PROVIDERS_CONFIG,HOSTED_API_ENVIRONMENT:'production'}),bucket:storage(env),fetch:providerFetch,enqueue:id=>env.ADMIN_QUEUE.send({id})})),
      extraReads:createExtraReads(db,()=>storage(env),env),
      operationStatus:async(principalId,key)=>{
       const row=await db().prepare(`SELECT o.id,o.action,o.status,o.result_json,o.created_at,o.updated_at FROM admin_operations o

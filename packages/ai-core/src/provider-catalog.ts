@@ -245,8 +245,8 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
                 description: 'GPT-5.6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
             },
             {
-                value: 'gpt-6-astra', 
-                label: 'GPT-6 Astra', 
+                value: 'gpt-6-astra',
+                label: 'GPT-6 Astra',
                 description: 'GPT-6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
             },
             {
@@ -785,8 +785,8 @@ export const AI_PROVIDER_CATALOG: AIProviderOption[] = [
                 description: 'GPT-5.6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
             },
             {
-                value: 'gpt-6-astra', 
-                label: 'GPT-6 Astra', 
+                value: 'gpt-6-astra',
+                label: 'GPT-6 Astra',
                 description: 'GPT-6 系列旗舰模型，专为复杂编程、科研与多步推理等高端任务设计，支持深度推理与多智能体协作。'
             },
             {

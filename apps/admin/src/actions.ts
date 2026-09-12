@@ -4,7 +4,7 @@ import { ADMIN_ANALYTICS_ACTIONS } from '@mahoshojo/hosted-runtime/admin/actions
 import { ADMIN_ARENA_ACTIONS } from '@mahoshojo/hosted-runtime/admin/actions/arena';
 import { ADMIN_JOB_ACTIONS } from '@mahoshojo/hosted-runtime/admin/actions/jobs';
 import { ADMIN_MODERATION_ACTIONS } from '@mahoshojo/hosted-runtime/admin/actions/moderation';
-import { ADMIN_AI_REVIEW_ACTION } from '@mahoshojo/hosted-runtime/admin/ai-review';
+import { ADMIN_AI_REVIEW_ACTION, createAdminAiReviewJob, type AdminAiReviewExecutionOptions } from '@mahoshojo/hosted-runtime/admin/ai-review';
 import { createAdminMetricsActions } from '@mahoshojo/hosted-runtime/admin/actions/metrics';
 import { AdminOperationError,executeAdminOperation } from '@mahoshojo/hosted-runtime/admin/operations';
 import type { AdminDatabase } from '@mahoshojo/hosted-runtime/admin/database';
@@ -37,12 +37,12 @@ export function parseEnabledActions(enabled: string | undefined): string[] {
   if (!Array.isArray(names) || names.some(name => typeof name !== 'string' || !REGISTERED_ACTIONS.some(action => action.name === name))) throw new Error('ADMIN_ACTION_CONFIG_INVALID');
   return names;
 }
-export function createActions(db: () => AdminDatabase, enabled: string | undefined, verifySignature?: (data:unknown)=>Promise<boolean>): AdminAction[] {
+export function createActions(db: () => AdminDatabase, enabled: string | undefined, verifySignature?: (data:unknown)=>Promise<boolean>, aiOptions?: () => AdminAiReviewExecutionOptions): AdminAction[] {
   const names = parseEnabledActions(enabled);
   return REGISTERED_ACTIONS.filter(action => names.includes(action.name)).map(action=>action.name==='cards.metrics'?createAdminMetricsActions({verifySignature})[0]:action).map(action => ({
     ...action,
     async execute(input, context) {
-      try { return await action.execute(db(), input, context); }
+      try { return action.name === 'ai.review' ? await createAdminAiReviewJob(db(), input, context, aiOptions?.()) : await action.execute(db(), input, context); }
       catch (error) {
         if (error instanceof AdminOperationError && [400,403,409].includes(error.status)) throw new AdminHttpError(error.status as 400|403|409, error.code);
         if (error instanceof Error && error.name === 'ZodError') throw new AdminHttpError(400, 'ADMIN_INPUT_INVALID');

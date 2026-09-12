@@ -50,6 +50,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@mahoshojo/ai-core':
+        specifier: workspace:*
+        version: link:../../packages/ai-core
       '@mahoshojo/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

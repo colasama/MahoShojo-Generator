@@ -16,6 +16,9 @@ const ERRORS: Record<string, string> = {
   ADMIN_CONFLICT: '记录已变更，请重新读取详情。', ADMIN_VERSION_CONFLICT: '记录版本已变更。',
   ADMIN_IDEMPOTENCY_CONFLICT: '同一操作键的请求内容不同，服务器已拒绝覆盖。',
   ADMIN_ACTION_DISABLED: '此操作尚未启用。', ADMIN_INPUT_INVALID: '操作参数不符合要求。',
+  ADMIN_AI_SELECTION_UNAVAILABLE: '所选渠道或模型当前不可用，请重新选择。',
+  ADMIN_AI_SECRET_IN_INTENT: '密钥只能填写在 API Key 栏，不能出现在理由或其他字段中。',
+  ADMIN_AI_RESULT_UNAVAILABLE: '审核结果不可用，可能尚未完成、已过期或权限已撤销。',
 };
 export async function api(path: string, init?: RequestInit): Promise<any> {
   const response = await fetch(path.startsWith('/') ? path : '/api/admin/v1/' + path, {
@@ -88,8 +91,10 @@ export function savedOperations(principal: string): SavedOperation[] {
   } catch { return []; }
 }
 export function saveOperation(principal: string, operation: SavedOperation) {
-  const records = savedOperations(principal).filter(record => record.key !== operation.key);
-  localStorage.setItem(storageKey(principal), JSON.stringify([...records, operation].slice(-100)));
+  const records = savedOperations(principal);
+  const index = records.findIndex(record => record.key === operation.key);
+  if (index < 0) records.push(operation); else records[index] = operation;
+  localStorage.setItem(storageKey(principal), JSON.stringify(records.slice(-100)));
   window.dispatchEvent(new Event('admin-operations-changed'));
 }
 export async function operationFingerprint(action: string, payload: Row): Promise<string> {

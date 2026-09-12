@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, outcomeState, parseJson, savedOperations, saveOperation, statusLabels, textValue, type Action, type Row } from './ui-model';
 import { ActionPanel } from './action-panel';
+import { AiReviewResult } from './ai-review-panel';
 
 export function Values({ value, depth = 0 }: { value: unknown; depth?: number }) {
   const parsed = parseJson(value);
@@ -27,7 +28,7 @@ export function Observation({ path, title }: { path: string; title: string }) {
 }
 
 export function Jobs({ actions = [], principalId }: { actions?: Action[]; principalId?: string }) {
-  const [jobs, setJobs] = useState<Row[]>([]); const [error, setError] = useState(''); const [refresh, setRefresh] = useState(0); const [loading, setLoading] = useState(true); const [resultId, setResultId] = useState('');
+  const [jobs, setJobs] = useState<Row[]>([]); const [error, setError] = useState(''); const [refresh, setRefresh] = useState(0); const [loading, setLoading] = useState(true); const [resultId, setResultId] = useState(() => typeof location === 'undefined' ? '' : new URLSearchParams(location.search).get('jobId') ?? '');
   const [cancelling, setCancelling] = useState<Row | null>(null);
   const cancelAction = actions.find(action => action.name === 'jobs.cancel');
   useEffect(() => { let live = true; setLoading(true); setError(''); api('jobs').then(value => { if (live) setJobs(value.items); }).catch(e => { if (live) setError(e.message); }).finally(() => { if (live) setLoading(false); }); return () => { live = false; }; }, [refresh]);
@@ -41,7 +42,7 @@ export function Jobs({ actions = [], principalId }: { actions?: Action[]; princi
         {cancelAction && principalId && ['queued', 'running', 'uncertain'].includes(String(job.status)) && <button className="quiet" onClick={() => setCancelling(job)}>核对并取消此作业</button>}
         {job.kind === 'export' && job.status === 'succeeded' && !expired && Array.from({ length: Math.min(100, Math.max(0, Number(job.processed_count) || 0)) }, (_, index) => <span className="download" key={index}><a className="button quiet" href={'/api/admin/v1/export-download?id=' + encodeURIComponent(String(job.id)) + '&part=' + index}>下载第 {index + 1} 条</a>{job.target === 'generations' && <a className="button quiet" href={'/api/admin/v1/export-body?id=' + encodeURIComponent(String(job.id)) + '&part=' + index}>战报正文 {index + 1}</a>}</span>)}
       </article>;
-    })}</section>{cancelling && cancelAction && principalId && <ActionPanel key={String(cancelling.id) + ':' + String(cancelling.updated_at)} action={cancelAction} selected={cancelling} principalId={principalId} close={() => setCancelling(null)} applied={() => setRefresh(value => value + 1)} />}{resultId && <Observation title="AI 审核建议（仅供人工参考）" path={'ai-review-result?id=' + encodeURIComponent(resultId)} />}</>;
+    })}</section>{cancelling && cancelAction && principalId && <ActionPanel key={String(cancelling.id) + ':' + String(cancelling.updated_at)} action={cancelAction} selected={cancelling} principalId={principalId} close={() => setCancelling(null)} applied={() => setRefresh(value => value + 1)} />}{resultId && <AiReviewResult key={resultId} jobId={resultId} actions={actions} principalId={principalId} />}</>;
 }
 
 export function OperationHistory({ principalId }: { principalId: string }) {
