@@ -303,6 +303,31 @@
       "types": "./src/generation-lifecycle.ts",
       "import": "./src/generation-lifecycle.ts",
       "default": "./src/generation-lifecycle.ts"
+    },
+    "./db/drizzle": {
+      "types": "./src/db/drizzle.ts",
+      "import": "./src/db/drizzle.ts",
+      "default": "./src/db/drizzle.ts"
+    },
+    "./db/schema": {
+      "types": "./src/db/schema/index.ts",
+      "import": "./src/db/schema/index.ts",
+      "default": "./src/db/schema/index.ts"
+    },
+    "./db/schema/business": {
+      "types": "./src/db/schema/business.ts",
+      "import": "./src/db/schema/business.ts",
+      "default": "./src/db/schema/business.ts"
+    },
+    "./db/schema/auth": {
+      "types": "./src/db/schema/auth.ts",
+      "import": "./src/db/schema/auth.ts",
+      "default": "./src/db/schema/auth.ts"
+    },
+    "./db/schema/ai-availability": {
+      "types": "./src/db/schema/ai-availability.ts",
+      "import": "./src/db/schema/ai-availability.ts",
+      "default": "./src/db/schema/ai-availability.ts"
     }
   },
   "scripts": {
@@ -322,6 +347,7 @@
     "@mahoshojo/hosted-api": "workspace:*",
     "ai": "^6.0.184",
     "aws4fetch": "^1.0.20",
+    "drizzle-orm": "^0.45.2",
     "pinyin-pro": "^3.27.0",
     "zod": "^4.1.13"
   },
