@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { AdminDatabase, AdminPreparedStatement, AdminQueryResult } from '../src/admin/database';
-import { bootstrapAdminPrincipal, resolveAdminPrincipal, revokeAdminPrincipal } from '../src/admin/principals';
+import { bootstrapAdminPrincipal, resolveAdminPrincipal, revokeAdminPrincipal, restoreAdminPrincipal } from '../src/admin/principals';
 import { executeAdminOperation, type AdminOperationContext } from '../src/admin/operations';
 
 type SQLiteDatabase = {
@@ -48,6 +48,17 @@ const sqliteD1 = (sqlite: SQLiteDatabase): AdminDatabase => ({
 
 const identity = { issuer: 'https://fixture.cloudflareaccess.com', subject: 'stable-subject', kind: 'human' as const };
 const allowed = ['users.write', 'users.read', 'admin.shell.read'];
+// Synthetic examples only; exercise the actual persistence entry points below.
+const credentialPastes = [
+  'Bearer opaque-fixture-token', 'Authorization: Basic fixture-credential', 'secret=fixture-value',
+  '"api_key": "fixture-value"', 'access_token=fixture-token', 'session-token: fixture-token',
+  'sk-fixture-provider-token', 'sk_live_fixture123456', 'sk-ant-api03-fixture123456',
+  'AIzaFixtureProviderCredential12345', 'ghp_fixturecredential123456',
+  'postgres://fixture:credential@db.invalid/app', 'mysql://fixture:credential@db.invalid/app',
+  'rediss://:fixture-credential@db.invalid', 'mongodb+srv://fixture:credential@db.invalid/app',
+  'https://fixture:credential@service.invalid', 'eyJfixture.payload.signature',
+  '-----BEGIN PRIVATE KEY-----',
+];
 const setup = async () => {
   const sqlite = new DatabaseSync(':memory:');
   databases.push(sqlite);
@@ -85,6 +96,24 @@ const plan = (version = 1) => ({
 });
 
 describe('Admin principal persistence', () => {
+  it.each(['bootstrap', 'revoke', 'restore'] as const)('%s rejects credential pastes in all persisted control fields', async (command) => {
+    const { db, sqlite } = await setup();
+    if (command === 'restore') sqlite.exec("UPDATE admin_principals SET status='disabled'");
+    for (const field of ['id', 'requestId', 'reason', 'operatorSafeRef']) {
+      for (const value of credentialPastes) {
+        const input = { id: command === 'bootstrap' ? 'principal-2' : 'principal-1', requestId: 'control-2',
+          reason: '受控恢复', operatorSafeRef: 'cloudflare-account-control', [field]: value,
+          verifiedIdentity: command === 'bootstrap' ? { ...identity, subject: 'second' } : identity,
+          capabilities: ['users.read'], allowedCapabilities: allowed };
+        await expect(({ bootstrap: bootstrapAdminPrincipal, revoke: revokeAdminPrincipal, restore: restoreAdminPrincipal })[command](db, input))
+          .rejects.toThrow(field === 'reason' ? 'ADMIN_PRINCIPAL_TOOL_REASON_UNSAFE' : 'ADMIN_PRINCIPAL_TOOL_CONTEXT_INVALID');
+      }
+    }
+    expect(sqlite.prepare('SELECT count(*) AS n FROM admin_audit_events').get()?.n).toBe(1);
+    expect(sqlite.prepare('SELECT count(*) AS n FROM admin_principals').get()?.n).toBe(1);
+    expect((await resolveAdminPrincipal(db, identity, allowed))?.status).toBe(command === 'restore' ? 'disabled' : 'active');
+  });
+
   it('uses exact stable issuer/subject/kind, validates capability allowlist, and reads revocation every time', async () => {
     const { db, sqlite } = await setup();
     expect((await resolveAdminPrincipal(db, identity, allowed))?.status).toBe('active');
@@ -108,6 +137,22 @@ describe('Admin principal persistence', () => {
 });
 
 describe('Admin native D1 transaction semantics', () => {
+  it('rejects credentials in every persisted context field without claims, audit rows or business effects', async () => {
+    const { db, sqlite } = await setup();
+    for (const field of ['actorPrincipalId', 'capability', 'action', 'authnContextSafeRef', 'requestId',
+      'reason', 'idempotencyKey', 'expectedVersion', 'targetType', 'targetId']) {
+      for (const value of credentialPastes) {
+        await expect(executeAdminOperation(db, context({ [field]: value }), plan())).rejects.toMatchObject({
+          code: field === 'reason' ? 'ADMIN_OPERATION_REASON_UNSAFE' : 'ADMIN_OPERATION_CONTEXT_INVALID', status: 400,
+        });
+      }
+    }
+    expect(sqlite.prepare('SELECT count(*) AS n FROM admin_operations').get()?.n).toBe(0);
+    expect(sqlite.prepare('SELECT count(*) AS n FROM admin_audit_events').get()?.n).toBe(1);
+    expect(sqlite.prepare('SELECT count(*) AS n FROM fixture_effect').get()?.n).toBe(0);
+    expect(sqlite.prepare('SELECT value FROM fixture_resource').get()?.value).toBe('before');
+  });
+
   it('atomically stores business state, effects, success audit and result; retries do not replay', async () => {
     const { db, sqlite } = await setup();
     const result = await executeAdminOperation(db, context(), plan());

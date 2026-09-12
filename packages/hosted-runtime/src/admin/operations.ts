@@ -1,4 +1,5 @@
 import { assertAdminBatchSucceeded, type AdminDatabase, type AdminPreparedStatement } from './database';
+import { AdminAuditTextError, assertSafeAuditText } from './audit-text';
 
 export class AdminOperationError extends Error {
   readonly code: string;
@@ -82,16 +83,17 @@ const fingerprint = async (context: AdminOperationContext): Promise<string> => {
 };
 
 const validateContext = (context: AdminOperationContext): void => {
-  for (const value of [context.actorPrincipalId, context.capability, context.action, context.authnContextSafeRef,
-    context.requestId, context.reason, context.idempotencyKey, context.targetType, context.targetId]) {
-    if (typeof value !== 'string' || !value.trim() || value.length > 1024 || /[\u0000-\u001f\u007f]/u.test(value)) throw new AdminOperationError('ADMIN_OPERATION_CONTEXT_INVALID', 400);
+  try { assertSafeAuditText(context.reason); }
+  catch (error) {
+    throw new AdminOperationError(error instanceof AdminAuditTextError && error.code === 'ADMIN_AUDIT_TEXT_UNSAFE'
+      ? 'ADMIN_OPERATION_REASON_UNSAFE' : 'ADMIN_OPERATION_CONTEXT_INVALID', 400);
   }
-  if (context.expectedVersion !== undefined && (typeof context.expectedVersion !== 'string' || !context.expectedVersion || context.expectedVersion.length > 256)) {
+  try {
+    for (const value of [context.actorPrincipalId, context.capability, context.action, context.authnContextSafeRef,
+      context.requestId, context.idempotencyKey, context.targetType, context.targetId]) assertSafeAuditText(value);
+    if (context.expectedVersion !== undefined) assertSafeAuditText(context.expectedVersion, 256);
+  } catch {
     throw new AdminOperationError('ADMIN_OPERATION_CONTEXT_INVALID', 400);
-  }
-  // Reject common accidental credential pastes. Arbitrary secrets remain the caller's data-minimization responsibility.
-  if (/(?:eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:password|auth_key|access_token|api[_-]?key)\s*[:=]\s*\S+)/iu.test(context.reason)) {
-    throw new AdminOperationError('ADMIN_OPERATION_REASON_UNSAFE', 400);
   }
 };
 

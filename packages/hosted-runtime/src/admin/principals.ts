@@ -1,4 +1,5 @@
 import { assertAdminBatchSucceeded, type AdminDatabase } from './database';
+import { AdminAuditTextError, assertSafeAuditText } from './audit-text';
 
 export type AdminExternalIdentity = { issuer: string; subject: string; kind: 'human' | 'service' };
 export type PersistedAdminPrincipal = {
@@ -53,12 +54,14 @@ type PrincipalToolContext = {
 };
 
 const validateToolContext = (context: PrincipalToolContext): void => {
-  for (const value of [context.id, context.requestId, context.reason, context.operatorSafeRef]) {
-    if (typeof value !== 'string' || !value.trim() || value.length > 1024 || /[\u0000-\u001f\u007f]/u.test(value)) throw new Error('ADMIN_PRINCIPAL_TOOL_CONTEXT_INVALID');
+  try { assertSafeAuditText(context.reason); }
+  catch (error) {
+    throw new Error(error instanceof AdminAuditTextError && error.code === 'ADMIN_AUDIT_TEXT_UNSAFE'
+      ? 'ADMIN_PRINCIPAL_TOOL_REASON_UNSAFE' : 'ADMIN_PRINCIPAL_TOOL_CONTEXT_INVALID');
   }
-  if (/(?:eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:password|auth_key|access_token|api[_-]?key)\s*[:=]\s*\S+)/iu.test(context.reason)) {
-    throw new Error('ADMIN_PRINCIPAL_TOOL_REASON_UNSAFE');
-  }
+  try {
+    for (const value of [context.id, context.requestId, context.operatorSafeRef]) assertSafeAuditText(value);
+  } catch { throw new Error('ADMIN_PRINCIPAL_TOOL_CONTEXT_INVALID'); }
 };
 
 /** Control-tool-only; callers must obtain verifiedIdentity from a verified Access JWT, never decode-only. */

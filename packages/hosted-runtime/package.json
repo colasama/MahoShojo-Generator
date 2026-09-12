@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./admin/audit-text": {
+      "types": "./src/admin/audit-text.ts",
+      "import": "./src/admin/audit-text.ts",
+      "default": "./src/admin/audit-text.ts"
+    },
     "./database-provider": {
       "types": "./src/database-provider.ts",
       "import": "./src/database-provider.ts",
