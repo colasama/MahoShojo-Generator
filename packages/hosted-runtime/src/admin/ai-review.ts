@@ -10,7 +10,8 @@ import { commonInput, fields, idInput, snapshot, type AdminActionContext, type A
 
 const targetsSchema = z.array(z.object({ kind: z.enum(['card', 'update']), id: idInput, expectedVersion: z.string().length(64) }).strict())
   .min(1).max(10).refine((targets) => new Set(targets.map((target) => `${target.kind}:${target.id}`)).size === targets.length);
-const scopeSchema = z.object({ targets: targetsSchema, model: z.string().trim().min(1).max(128) }).strict();
+const providerNameSchema = z.string().trim().min(1).max(128);
+const scopeSchema = z.object({ targets: targetsSchema, provider: providerNameSchema, model: z.string().trim().min(1).max(128) }).strict();
 const enqueueSchema = z.object({ ...commonInput, ...scopeSchema.shape }).strict();
 const resultSchema = z.object({
   reviews: z.array(z.object({ id: z.string().min(1).max(140), suggestion: z.enum(['approved', 'rejected']), reason: z.string().min(1).max(200) }).strict()).min(1).max(10),
@@ -31,11 +32,11 @@ export async function createAdminAiReviewJob(db: AdminDatabase, raw: unknown, co
     (id,operation_id,actor_principal_id,capability,kind,scope_json,status,next_attempt_at,created_at,updated_at,result_expires_at)
     SELECT ?,id,actor_principal_id,'ai.review','ai-review',?,'queued',?,?,?,? FROM admin_operations
     WHERE actor_principal_id=? AND idempotency_key=? AND status='pending' AND {{admin_guard}}`,
-    bindings: [id, JSON.stringify({ targets: input.targets, model: input.model }), now, now, now, new Date(Date.now() + 86400000).toISOString(), context.principalId, input.idempotencyKey] }, result: { jobId: id, count: input.targets.length } });
+    bindings: [id, JSON.stringify({ targets: input.targets, provider: input.provider, model: input.model }), now, now, now, new Date(Date.now() + 86400000).toISOString(), context.principalId, input.idempotencyKey] }, result: { jobId: id, count: input.targets.length } });
 }
 export const ADMIN_AI_REVIEW_ACTION: AdminBusinessAction = {
   name: 'ai.review', label: '生成 AI 审核建议', resource: 'data-cards', capability: 'ai.review',
-  fields: fields([['targets', '目标数组：kind、id、expectedVersion', 'json'], ['model', '已配置模型', 'text']]),
+  fields: fields([['targets', '目标数组：kind、id、expectedVersion', 'json'], ['provider', '已配置供应商', 'text'], ['model', '已配置模型', 'text']]),
   execute: createAdminAiReviewJob,
 };
 
@@ -60,16 +61,16 @@ async function settle(db: AdminDatabase, job: Job, lease: string, input: { statu
       AND NOT EXISTS (SELECT 1 FROM admin_audit_events WHERE id=? AND operation_id=?)`).bind(job.id,lease,input.status,now,auditId,job.operation_id),
   ]);
   assertAdminBatchSucceeded(results);
-  const cursor=input.cursor as {model?:unknown;usage?:unknown;dispatched?:boolean}|null;
+  const cursor=input.cursor as {provider?:unknown;model?:unknown;usage?:unknown;dispatched?:boolean}|null;
   const usage=cursor?.dispatched===true?safeUsage(cursor.usage):null;
   if(results[0]?.meta?.changes===0&&usage){
     // Operator cancellation clears the execution lease. Keep cancellation final, but do not lose known billed usage.
     const marker=crypto.randomUUID(),lateAuditId=crypto.randomUUID();
     assertAdminBatchSucceeded(await db.batch([
-      db.prepare(`UPDATE admin_jobs SET cursor_json=json_set(coalesce(cursor_json,'{}'),'$.model',?,'$.usage',json(?),'$.dispatched',json('true'),'$.lateUsageMarker',?),updated_at=?
+      db.prepare(`UPDATE admin_jobs SET cursor_json=json_set(coalesce(cursor_json,'{}'),'$.provider',?,'$.model',?,'$.usage',json(?),'$.dispatched',json('true'),'$.lateUsageMarker',?),updated_at=?
         WHERE id=? AND operation_id=? AND kind='ai-review' AND status='cancelled' AND json_extract(cursor_json,'$.lateUsageMarker') IS NULL
         AND EXISTS (SELECT 1 FROM admin_audit_events a WHERE a.operation_id=admin_jobs.operation_id AND a.target_id=admin_jobs.id AND a.action='ai.review.dispatch-intent' AND a.result='success')`)
-        .bind(typeof cursor?.model==='string'?cursor.model.slice(0,128):'',JSON.stringify(usage),marker,now,job.id,job.operation_id),
+        .bind(typeof cursor?.provider==='string'?cursor.provider.slice(0,128):'',typeof cursor?.model==='string'?cursor.model.slice(0,128):'',JSON.stringify(usage),marker,now,job.id,job.operation_id),
       db.prepare(`INSERT INTO admin_audit_events (id,operation_id,actor_principal_id,authn_context_safe_ref,capability,action,target_type,target_id,request_id,reason,result,error_code_safe,source_context_safe,created_at)
         SELECT ?,j.operation_id,j.actor_principal_id,'admin-queue','ai.review','ai.review.late-usage','ai-review',j.id,o.request_id,o.reason,'success',NULL,'admin-queue',?
         FROM admin_jobs j JOIN admin_operations o ON o.id=j.operation_id WHERE j.id=? AND j.status='cancelled' AND json_extract(j.cursor_json,'$.lateUsageMarker')=?`)
@@ -94,12 +95,17 @@ export async function runAdminAiJob(db: AdminDatabase, bucket: AdminPrivateBucke
   let dispatched = false;
   const telemetry: AiTelemetry = {};
   let selectedModel = '';
+  let selectedProvider = '';
   try {
     if (Date.parse(job.result_expires_at) <= Date.now()) throw new Error('AI_REVIEW_EXPIRED');
     const scope = scopeSchema.parse(JSON.parse(job.scope_json));
     selectedModel = scope.model;
-    const selected = options.providers.find((provider) => (Array.isArray(provider.model) ? provider.model : [provider.model]).includes(scope.model));
-    if (!selected) throw new Error('AI_REVIEW_MODEL_NOT_CONFIGURED');
+    selectedProvider = scope.provider;
+    const matches = options.providers.filter((provider) => provider.name === scope.provider
+      && (Array.isArray(provider.model) ? provider.model : [provider.model]).includes(scope.model));
+    // Missing legacy identity or duplicate configured pairs must never fall back to configuration order.
+    if (matches.length !== 1) throw new Error('AI_REVIEW_PROVIDER_MODEL_NOT_UNIQUE');
+    const selected = matches[0];
     const targets: DataCardAiReviewTarget[] = [];
     for (const target of scope.targets) {
       const resource = target.kind === 'card' ? 'data-cards' : 'data-card-updates';
@@ -116,7 +122,7 @@ export async function runAdminAiJob(db: AdminDatabase, bucket: AdminPrivateBucke
     }
     if (buildDataCardAiReviewPrompt(targets).length > 64_000) throw new Error('AI_REVIEW_PROMPT_BUDGET_EXCEEDED');
     // Once this state is durable no recovery scan can dispatch this job again, even if this process dies now.
-    lease=await transitionAdminJob(db,id,'ai.review.dispatch-intent',"status='uncertain',error_code_safe='ADMIN_AI_DISPATCH_UNCERTAIN'",[],`kind='ai-review' AND lease_token=? AND status='running' AND julianday(lease_expires_at)>julianday('now') AND ${authority}`,[lease],true);
+    lease=await transitionAdminJob(db,id,'ai.review.dispatch-intent',"status='uncertain',error_code_safe='ADMIN_AI_DISPATCH_UNCERTAIN',cursor_json=?",[JSON.stringify({provider:scope.provider,model:scope.model})],`kind='ai-review' AND lease_token=? AND status='running' AND julianday(lease_expires_at)>julianday('now') AND ${authority}`,[lease],true);
     if(!await db.prepare("SELECT id FROM admin_jobs WHERE id=? AND lease_token=? AND status='uncertain'").bind(id,lease).first())return true;
     dispatchClaimed = true;
     const fetchOnce: typeof fetch = async (request, init) => {
@@ -139,13 +145,13 @@ export async function runAdminAiJob(db: AdminDatabase, bucket: AdminPrivateBucke
     const usage = safeUsage(telemetry.usage);
     const resultRef = `admin/ai-results/${job.id}.json`;
     if(!await db.prepare(`SELECT id FROM admin_jobs WHERE id=? AND lease_token=? AND status='uncertain' AND ${authority}`).bind(id,lease).first()){
-      await settle(db,job,lease,{status:'cancelled',code:'ADMIN_PRINCIPAL_REVOKED',cursor:{model:scope.model,usage,dispatched:true}});return true;
+      await settle(db,job,lease,{status:'cancelled',code:'ADMIN_PRINCIPAL_REVOKED',cursor:{provider:scope.provider,model:scope.model,usage,dispatched:true}});return true;
     }
-    await bucket.put(resultRef, JSON.stringify({ reviews: result.reviews, model: scope.model, usage }));
-    await settle(db, job, lease, { status: 'succeeded', code: null, resultRef, count: targets.length, cursor: { model: scope.model, usage, dispatched: true } });
+    await bucket.put(resultRef, JSON.stringify({ reviews: result.reviews, provider: scope.provider, model: scope.model, usage }));
+    await settle(db, job, lease, { status: 'succeeded', code: null, resultRef, count: targets.length, cursor: { provider: scope.provider, model: scope.model, usage, dispatched: true } });
   } catch {
     // A consumed request with no durable result is never retried, including malformed output and R2 failure.
-    await settle(db, job, lease, { status: dispatchClaimed ? 'uncertain' : 'failed', code: dispatchClaimed ? 'ADMIN_AI_RESULT_UNCERTAIN' : 'ADMIN_AI_PREPARATION_FAILED', cursor: { model: selectedModel, usage: safeUsage(telemetry.usage), dispatched } });
+    await settle(db, job, lease, { status: dispatchClaimed ? 'uncertain' : 'failed', code: dispatchClaimed ? 'ADMIN_AI_RESULT_UNCERTAIN' : 'ADMIN_AI_PREPARATION_FAILED', cursor: { provider: selectedProvider, model: selectedModel, usage: safeUsage(telemetry.usage), dispatched } });
   }
   return true;
 }
@@ -159,5 +165,6 @@ export async function readAdminAiJobResult(db: AdminDatabase, bucket: AdminPriva
   if (!object) throw new AdminOperationError('ADMIN_AI_RESULT_UNAVAILABLE', 404);
   const text = await object.text();
   if (text.length > 32_000) throw new Error('ADMIN_AI_RESULT_INVALID');
-  return z.object({ ...resultSchema.shape, model: z.string().max(128), usage: z.record(z.string(), z.number().int().nonnegative()).nullable() }).strict().parse(JSON.parse(text));
+  // Historical completed results remain readable; null means the provider was not recorded.
+  return z.object({ ...resultSchema.shape, provider: providerNameSchema.nullable().default(null), model: z.string().max(128), usage: z.record(z.string(), z.number().int().nonnegative()).nullable() }).strict().parse(JSON.parse(text));
 }

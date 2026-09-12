@@ -21,7 +21,8 @@ export function ActionPanel({ action, selected, principalId, baseAction, close, 
   const [state, setState] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<Array<{ provider: string; model: string }>>([]);
+  const [provider, setProvider] = useState('');
   const [scope, setScope] = useState('');
   const [confirmation, setConfirmation] = useState<Row | null>(null);
   const [record, setRecord] = useState<SavedOperation | null>(null);
@@ -33,7 +34,7 @@ export function ActionPanel({ action, selected, principalId, baseAction, close, 
   const formAction = batchItems && baseAction ? { ...action, fields: baseAction.fields.filter(field => !['id', 'cardId'].includes(field.name) && !isVersion(field.name)) } : action;
   useEffect(() => {
     let live = true;
-    if (action.name === 'ai.review') api('models').then(data => { if (live) setModels([...new Set<string>(data.items.map((item: Row) => String(item.model)))]); }).catch(e => { if (live) setError(e.message); });
+    if (action.name === 'ai.review') api('models').then(data => { if (live) setModels(data.items); }).catch(e => { if (live) setError(e.message); });
     if (action.name === 'ai-availability.refresh-snapshot') api('availability-summary').then(data => {
       if (live) { setSnapshotVersion(data.storedSnapshot?.updated_at); setSnapshotLoaded(true); }
     }).catch(e => { if (live) setError(e.message); });
@@ -98,12 +99,14 @@ export function ActionPanel({ action, selected, principalId, baseAction, close, 
         if (action.name === 'jobs.cleanup' && preview) value = preview[field.name];
         if (action.name === 'ai-availability.cleanup' && field.name === 'targets' && preview) value = preview.targets;
         if (isVersion(field.name) || field.name === 'expectedTagIds' || (action.name === 'ai.review' && field.name === 'targets') || (action.name === 'jobs.cleanup' && ['target', 'ids'].includes(field.name))) return <input key={field.name} type="hidden" name={field.name} value={value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value)} />;
-        const options = field.name === 'model' ? models.map(model => [model, model] as [string, string]) : choices(baseAction?.name ?? action.name, field.name);
+        const options = action.name === 'ai.review' && field.name === 'provider'
+          ? [...new Set(models.map(item => item.provider))].map(name => [name, name] as [string, string])
+          : field.name === 'model' ? [...new Set(models.filter(item => item.provider === provider).map(item => item.model))].map(model => [model, model] as [string, string]) : choices(baseAction?.name ?? action.name, field.name);
         const defaultValue = value === undefined ? '' : value === null ? (field.type === 'json' ? 'null' : '') : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
         const mayClear = ['prefix', 'description'].includes(field.name);
         return <label key={field.name}>{field.label}{field.required && !mayClear ? ' *' : ''}
           {field.type === 'boolean' ? <select name={field.name} required={field.required} defaultValue={defaultValue}><option value="">请选择{field.required ? '' : '（使用服务器默认值）'}</option><option value="true">是</option><option value="false">否</option></select>
-          : options ? <select name={field.name} required={field.required} defaultValue={defaultValue} onChange={field.name === 'scope' ? event => setScope(event.target.value) : undefined}><option value="">请选择</option>{options.map(([option, label]) => <option key={option} value={option}>{label}</option>)}</select>
+          : options ? <select key={field.name === 'model' ? provider : field.name} name={field.name} required={field.required} defaultValue={defaultValue} onChange={field.name === 'scope' ? event => setScope(event.target.value) : field.name === 'provider' ? event => setProvider(event.target.value) : undefined}><option value="">请选择</option>{options.map(([option, label]) => <option key={option} value={option}>{label}</option>)}</select>
           : field.type === 'json' || ['bodyText', 'description'].includes(field.name) ? <textarea name={field.name} required={field.required && !mayClear} defaultValue={defaultValue} readOnly={action.name === 'ai.review' && field.name === 'targets' && Boolean(selected?.expectedVersion)} />
           : <input name={field.name} type={field.type === 'number' ? 'number' : 'text'} required={field.required && !mayClear} readOnly={readOnlyTarget && ['id', 'cardId'].includes(field.name)} defaultValue={defaultValue} />}
         </label>;

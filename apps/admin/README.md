@@ -34,6 +34,14 @@ node apps/admin/scripts/local.mjs serve --writers
 
 该模式使用独立合成 writer principal，只启用内容、标签和消息操作；不启用 AI 调用、清理、导出或真实外部资源。停止服务后，重新登录会使用新的一小时 JWT。撤权 fixture 要验证恢复时，使用新的隔离测试状态，不以初始化撤销禁用记录。
 
+## 审计与 AI 审核兼容性
+
+审计文本与 mutation/主体控制工具共用 hosted-runtime 的 `admin/audit-text` 校验，拒绝可识别的凭据误粘贴（含 reason、安全引用、请求标识和版本字段）。作业审计沿用已校验的 operation 字段与服务器固定事件值，不接收自由格式日志；普通随机字符串是否含秘密仍需由调用方保证，不能把正则检查当成完整秘密检测。
+
+AI 审核请求必须同时指定 `/models` 返回的 `provider` 与 `model`，工作台按供应商筛选模型。执行时仅允许唯一匹配的配置项；缺失供应商、配置移除或重复组合均在付费调用前失败，不回退其他供应商。作业 scope、dispatch intent、结果与用量保留非敏感的供应商名称，不保存 endpoint 或凭据。
+
+兼容影响：旧的无 `provider` 待执行作业会以 `ADMIN_AI_PREPARATION_FAILED` 结束，需人工明确供应商后创建新操作；旧的 succeeded/uncertain 作业不重放，已完成旧结果仍可读取，`provider: null` 表示当时未记录。仅 JSON contract 扩展，不新增 SQL migration、环境变量或启用 writer；回滚时先关闭 `ai.review` writer，避免旧执行代码忽略供应商。
+
 ## Principal 控制工具
 
 ```sh

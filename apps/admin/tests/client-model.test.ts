@@ -8,6 +8,13 @@ const field = (name: string, type = 'text', required = true): ActionField => ({ 
 const action = (name: string, fields: ActionField[] = []): Action => ({ name, label: name, resource: 'data-cards', fields });
 afterEach(() => vi.unstubAllGlobals());
 describe('管理工作台表单与操作恢复', () => {
+  it('AI 审核表单与幂等指纹保留 provider 和 model 两个维度', async () => {
+    const form = new FormData(); form.set('provider', 'provider-b'); form.set('model', 'shared-model'); form.set('reason', '辅助审核');
+    const payload = parseFields(action('ai.review', [field('provider'), field('model')]), form);
+    expect(payload).toEqual({ provider: 'provider-b', model: 'shared-model', reason: '辅助审核' });
+    expect(await operationFingerprint('ai.review', payload)).not.toBe(await operationFingerprint('ai.review', { ...payload, provider: 'provider-a' }));
+  });
+
   it('仅启用批量动作时使用自身字段目录，兼容旧目录原动作回退', () => {
     const original = action('cards.review', [field('id'), field('expectedVersion'), field('decision')]);
     const batch = { ...action('cards.review.batch', [field('items', 'json')]), itemFields: original.fields };

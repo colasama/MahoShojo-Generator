@@ -21,7 +21,7 @@ async function setup(extraCapabilities: string[] = []) {
     async delete(key) { objects.delete(key); },
   };
   const expectedVersion = await adminActionVersion('data-cards', fixture.sqlite.prepare("SELECT * FROM data_cards WHERE id='card'").get()!);
-  const input = { reason: '人工辅助审核', idempotencyKey: 'ai-once', model: 'fixture-model', targets: [{ kind: 'card', id: 'card', expectedVersion }] };
+  const input = { reason: '人工辅助审核', idempotencyKey: 'ai-once', provider: 'fixture', model: 'fixture-model', targets: [{ kind: 'card', id: 'card', expectedVersion }] };
   const enqueued = await createAdminAiReviewJob(fixture.db, input, fixture.context);
   const jobId = enqueued.result!.jobId;
   return { ...fixture, bucket, objects, jobId, input, expectedVersion };
@@ -33,6 +33,62 @@ const completion = (reviews = [{ id: 'card:card', suggestion: 'approved', reason
 }), { headers: { 'Content-Type': 'application/json' } });
 
 describe('Persistent Admin AI review jobs', () => {
+  it('selects the exact provider/model pair regardless of order and preserves its identity before dispatch', async () => {
+    const test = await setup();
+    const other = { ...providers[0], name: 'other', baseUrl: 'https://other.example.test/v1', apiKey: 'other-fixture-secret' };
+    for (const ordered of [[other, ...providers], [...providers, other]]) {
+      const enqueued = await createAdminAiReviewJob(test.db, { ...test.input, idempotencyKey: crypto.randomUUID() }, test.context);
+      const id = enqueued.result!.jobId;
+      const fetcher = vi.fn<typeof fetch>(async (request, init) => {
+        expect(String(request)).toBe('https://provider.example.test/v1/chat/completions');
+        expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer fixture-secret');
+        const job = test.sqlite.prepare('SELECT scope_json,cursor_json FROM admin_jobs WHERE id=?').get(id)!;
+        expect(JSON.parse(String(job.scope_json))).toMatchObject({ provider: 'fixture', model: 'fixture-model' });
+        expect(JSON.parse(String(job.cursor_json))).toEqual({ provider: 'fixture', model: 'fixture-model' });
+        return completion();
+      });
+      await runAdminAiJob(test.db, test.bucket, id, { providers: ordered, fetch: fetcher });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(await readAdminAiJobResult(test.db, test.bucket, 'operator', id)).toMatchObject({ provider: 'fixture', model: 'fixture-model' });
+      expect(JSON.stringify(test.sqlite.prepare('SELECT * FROM admin_jobs').all())).not.toContain('fixture-secret');
+    }
+    await expect(createAdminAiReviewJob(test.db, { ...test.input, provider: 'other' }, test.context)).rejects.toMatchObject({ code: 'ADMIN_IDEMPOTENCY_CONFLICT' });
+  });
+
+  it.each(['missing', 'unknown', 'mismatched', 'duplicate'] as const)('never dispatches a %s provider identity', async (scenario) => {
+    const test = await setup();
+    const configured = scenario === 'mismatched'
+      ? [{ ...providers[0], model: 'other-model' }, { ...providers[0], name: 'other' }]
+      : scenario === 'duplicate' ? [...providers, { ...providers[0], baseUrl: 'https://other.example.test/v1' }] : providers;
+    if (scenario === 'missing' || scenario === 'unknown') {
+      const scope: Record<string, unknown> = { targets: test.input.targets, model: test.input.model };
+      if (scenario === 'unknown') scope.provider = 'not-configured';
+      test.sqlite.prepare('UPDATE admin_jobs SET scope_json=? WHERE id=?').run(JSON.stringify(scope), test.jobId);
+    }
+    const fetcher = vi.fn<typeof fetch>(async () => completion());
+    await runAdminAiJob(test.db, test.bucket, test.jobId, { providers: configured, fetch: fetcher });
+    expect(test.sqlite.prepare('SELECT status,error_code_safe FROM admin_jobs WHERE id=?').get(test.jobId))
+      .toMatchObject({ status: 'failed', error_code_safe: 'ADMIN_AI_PREPARATION_FAILED' });
+    await runAdminAiJob(test.db, test.bucket, test.jobId, { providers: configured, fetch: fetcher });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(test.objects.size).toBe(0);
+  });
+
+  it('requires provider on new requests and reads historical completed results without guessing their provider', async () => {
+    const test = await setup();
+    await expect(createAdminAiReviewJob(test.db, { ...test.input, idempotencyKey: 'legacy', provider: undefined }, test.context)).rejects.toThrow();
+    expect(test.sqlite.prepare('SELECT count(*) n FROM admin_jobs').get()?.n).toBe(1);
+    const fetcher = vi.fn<typeof fetch>(async () => completion());
+    await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher });
+    const ref = `admin/ai-results/${test.jobId}.json`;
+    const historical = JSON.parse(test.objects.get(ref)!);
+    delete historical.provider;
+    test.objects.set(ref, JSON.stringify(historical));
+    expect(await readAdminAiJobResult(test.db, test.bucket, 'operator', test.jobId)).toMatchObject({ provider: null, model: 'fixture-model' });
+    await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it('enqueues once, claims uncertainty before dispatch, stores usage, and never changes review state', async () => {
     const test = await setup();
     const replay = await createAdminAiReviewJob(test.db, test.input, test.context);
@@ -45,7 +101,7 @@ describe('Persistent Admin AI review jobs', () => {
     expect(await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher })).toBe(true);
     expect(test.sqlite.prepare('SELECT status FROM admin_jobs WHERE id=?').get(test.jobId)?.status).toBe('succeeded');
     const result = await readAdminAiJobResult(test.db, test.bucket, 'operator', test.jobId);
-    expect(result).toMatchObject({ reviews: [{ id: 'card:card', suggestion: 'approved' }], usage: { promptTokens: 100, completionTokens: 25, totalTokens: 125 } });
+    expect(result).toMatchObject({ provider: 'fixture', model: 'fixture-model', reviews: [{ id: 'card:card', suggestion: 'approved' }], usage: { promptTokens: 100, completionTokens: 25, totalTokens: 125 } });
     expect(test.sqlite.prepare('SELECT review_status FROM data_cards').get()?.review_status).toBe('pending');
     await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher });
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -57,6 +113,7 @@ describe('Persistent Admin AI review jobs', () => {
     const fetcher = vi.fn<typeof fetch>(async () => { throw new Error('upstream socket disconnected'); });
     await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher });
     expect(test.sqlite.prepare('SELECT status,error_code_safe FROM admin_jobs WHERE id=?').get(test.jobId)).toMatchObject({ status: 'uncertain', error_code_safe: 'ADMIN_AI_RESULT_UNCERTAIN' });
+    expect(JSON.parse(String(test.sqlite.prepare('SELECT cursor_json FROM admin_jobs WHERE id=?').get(test.jobId)?.cursor_json))).toMatchObject({ provider: 'fixture', model: 'fixture-model', dispatched: true });
     await runAdminAiJob(test.db, test.bucket, test.jobId, { providers, fetch: fetcher });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
@@ -116,7 +173,7 @@ describe('Persistent Admin AI review jobs', () => {
     await runAdminAiJob(test.db,test.bucket,test.jobId,{providers,fetch:fetcher});
     const job=test.sqlite.prepare('SELECT status,cursor_json,result_ref,processed_count FROM admin_jobs WHERE id=?').get(test.jobId)!;
     expect(job).toMatchObject({status:'cancelled',result_ref:null,processed_count:0});
-    expect(JSON.parse(String(job.cursor_json))).toMatchObject({dispatched:true,model:'fixture-model',usage:{promptTokens:100,completionTokens:25,totalTokens:125}});
+    expect(JSON.parse(String(job.cursor_json))).toMatchObject({dispatched:true,provider:'fixture',model:'fixture-model',usage:{promptTokens:100,completionTokens:25,totalTokens:125}});
     expect(test.sqlite.prepare("SELECT count(*) n FROM admin_audit_events WHERE action='ai.review.late-usage'").get()?.n).toBe(1);
     expect(test.objects.size).toBe(0);await expect(readAdminAiJobResult(test.db,test.bucket,'operator',test.jobId)).rejects.toMatchObject({status:403});
     await runAdminAiJob(test.db,test.bucket,test.jobId,{providers,fetch:fetcher});expect(fetcher).toHaveBeenCalledTimes(1);
@@ -132,7 +189,8 @@ describe('Persistent Admin AI review jobs', () => {
     const fetcher=vi.fn<typeof fetch>(async()=>completion());
     await expect(runAdminAiJob(test.db,test.bucket,test.jobId,{providers,fetch:fetcher})).rejects.toThrow();
     const job=test.sqlite.prepare('SELECT status,cursor_json,result_ref FROM admin_jobs WHERE id=?').get(test.jobId)!;
-    expect(job).toMatchObject({status:'cancelled',cursor_json:null,result_ref:null});
+    expect(job).toMatchObject({status:'cancelled',result_ref:null});
+    expect(JSON.parse(String(job.cursor_json))).toEqual({provider:'fixture',model:'fixture-model'});
     expect(test.sqlite.prepare("SELECT count(*) n FROM admin_audit_events WHERE action='ai.review.late-usage'").get()?.n).toBe(0);
     await expect(readAdminAiJobResult(test.db,test.bucket,'operator',test.jobId)).rejects.toMatchObject({status:403});
     await runAdminAiJob(test.db,test.bucket,test.jobId,{providers,fetch:fetcher});expect(fetcher).toHaveBeenCalledTimes(1);
