@@ -4,6 +4,7 @@ import { ADMIN_RESOURCES, type AdminResource, type AdminReadResponse } from '@ma
 import { ActionPanel } from './action-panel';
 import { AiReviewPanel } from './ai-review-panel';
 import { ContentUpdateDiff } from './content-diff';
+import { selectedExportIds } from './export-model';
 import { AuditEvents, Jobs, Observation, OperationHistory, RelatedDetails, Values } from './observations';
 import { api, batchItemAction, cleanQuery, fieldValue, isVersion, textValue, type Action, type Row } from './ui-model';
 import './app.css';
@@ -55,6 +56,10 @@ function App() {
   }
   async function openAction(action: Action) {
     setActionError('');
+    if (action.name === 'jobs.export') {
+      try { const exportIds = selectedExportIds(checked, selected); setSelected({ exportIds, name: `${exportIds.length} 条选中记录` }); }
+      catch (e) { setActionError(e instanceof Error ? e.message : '导出范围无效'); return; }
+    }
     if (action.name === 'ai.review') {
       const ids = checked.length ? [...checked] : selected?.id ? [String(selected.id)] : [];
       if (!ids.length || ids.length > 10) { setActionError('AI 审核每次请选择 1–10 项，或先查看一条详情。'); return; }
@@ -106,7 +111,7 @@ function App() {
         {selected?.id && resource === 'data-card-updates' && <section className="detail"><ContentUpdateDiff selected={selected} /></section>}
         {selected && <RelatedDetails key={String(selected.id)} resource={resource} selected={selected} />}
         {applicable.length > 0 && <section className="detail"><h2>管理操作</h2><p>修改现有记录前先查看详情；批量操作逐项核对版本，最多选择 100 条。未显示的写能力尚未启用或无权限。</p><div className="actions">{applicable.map(action => <button key={action.name} disabled={detailLoading} onClick={() => void openAction(action)}>{action.label}</button>)}</div></section>}
-        <div ref={actionSection}>{active && session && (active.name === 'ai.review' ? <AiReviewPanel key={JSON.stringify(selected?.aiRows)} resource={resource} rows={selected?.aiRows as Row[] ?? []} actions={actions} principalId={session.principalId} close={() => setActive(null)} /> : <ActionPanel key={active.name + ':' + String(selected?.id ?? '') + ':' + String(selected?.expectedVersion ?? '') + ':' + JSON.stringify(selected?.batchItems ?? null)} action={active} baseAction={batchItemAction(active, actions)} selected={actionSelection} principalId={session.principalId} close={() => setActive(null)} applied={() => setRefresh(value => value + 1)} />)}</div>
+        <div ref={actionSection}>{active && session && (active.name === 'ai.review' ? <AiReviewPanel key={JSON.stringify(selected?.aiRows)} resource={resource} rows={selected?.aiRows as Row[] ?? []} actions={actions} principalId={session.principalId} close={() => setActive(null)} /> : <ActionPanel key={active.name + ':' + String(selected?.id ?? '') + ':' + String(selected?.expectedVersion ?? '') + ':' + JSON.stringify(selected?.batchItems ?? null) + ':' + JSON.stringify(selected?.exportIds ?? null)} action={active} baseAction={batchItemAction(active, actions)} selected={actionSelection} principalId={session.principalId} close={() => setActive(null)} applied={() => setRefresh(value => value + 1)} />)}</div>
         {resource === 'analytics' && <Observation path="analytics-summary" title="活跃、频次与历史估算" />}{resource === 'ai-availability' && <Observation path="availability-summary" title="渠道观测与快照新鲜度" />}{resource === 'risk-audits' && <Observation path="risk-summary" title="风险聚合" />}
       </>}{special && error && <p role="alert" className="notice error">{error}</p>}
     </main></div>;

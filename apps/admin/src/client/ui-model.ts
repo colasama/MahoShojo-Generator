@@ -55,7 +55,7 @@ export function fieldValue(action: Action, field: ActionField, selected: Row | n
   if (field.name === 'nativeAllowed') return (parseJson(row?.data) as Row | null)?.nativeAllowed ?? false;
   if (field.name === 'expectedVersion' && action.name === 'analytics.snapshot') return row?.updated_at;
   if (field.name === 'targets' && action.name === 'ai.review' && row?.expectedVersion) return [{ kind: action.resource === 'data-card-updates' ? 'update' : 'card', id: String(row.id), expectedVersion: row.expectedVersion }];
-  if (field.name === 'ids' && action.name === 'jobs.export' && row?.id !== undefined) return [String(row.id)];
+  if (field.name === 'ids' && action.name === 'jobs.export') return row?.exportIds ?? (row?.id !== undefined ? [String(row.id)] : undefined);
   if (field.name === 'target' && action.name === 'jobs.export') return action.resource;
   if (field.name === 'visibility') return row?.is_public;
   const value = row?.[field.name] ?? row?.[aliases[field.name]];

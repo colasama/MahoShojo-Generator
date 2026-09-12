@@ -89,10 +89,12 @@ export function ActionPanel({ action, selected, principalId, baseAction, close, 
     {action.name === 'ai.review' && <p>仅生成审核建议，不自动裁决。请求发出后如果结果不确定，不会再次调用模型；请在作业页检查结果与用量。</p>}
     {action.name === 'jobs.cancel' && <p>取消会停止后续步骤；已完成的业务变更与已经发出的 AI 请求仍可能存在。对于不确定作业，请先核实结果，并在理由中记录核实情况。</p>}
     {action.name === 'jobs.cleanup' && <p>请先完成下方清理预览，再将预览应用到操作；任何目标变更都必须重新预览。</p>}
+    {action.name === 'jobs.export' && <><p>仅导出以下已冻结的记录范围，结果保存 24 小时。下载时会重新检查权限。</p><ul>{(fieldValue(action, { name: 'ids', label: '', type: 'json' }, selected) as string[] ?? []).map(id => <li key={id}>{id}</li>)}</ul></>}
     {batchItems && <><p>共 {batchItems.length} 项；以下修改值应用到每个已选目标。每项版本自动读取并单独校验。各项独立执行，可能部分成功；请逐项核对结果。</p><details><summary>查看已选目标</summary><ul>{batchItems.map((item, index) => <li key={index}>{String(item.id)}</li>)}</ul></details></>}
     <form onSubmit={prepare} className="action-form">
       {formAction.fields.map(field => {
         let value = fieldValue(action, field, selected);
+        if (action.name === 'jobs.export' && ['target', 'ids'].includes(field.name)) return <input key={field.name} type="hidden" name={field.name} value={value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value)} />;
         if (batchItems) value = batchItems.every(item => JSON.stringify(item[field.name]) === JSON.stringify(batchItems[0][field.name])) ? batchItems[0][field.name] : undefined;
         if (field.name === 'expectedVersion' && action.name === 'ai-availability.refresh-snapshot') value = snapshotVersion;
         if (field.name === 'expectedTagIds') value = scopedTags;
@@ -123,6 +125,7 @@ export function ActionPanel({ action, selected, principalId, baseAction, close, 
     {error && <p role="alert" className="notice error">{error}</p>}
     {state && <p role="status" className={'notice ' + (['conflict', 'unknown', 'uncertain'].includes(state) ? 'warning' : '')}>{statusLabels[state] ?? state}{state === 'conflict' && '。请重新读取详情并再次核对。'}</p>}
     {result !== undefined && <pre className="json-data">{textValue(result)}</pre>}
+    {action.name === 'jobs.export' && (result as { result?: { jobId?: string } } | undefined)?.result?.jobId && <p><a className="button" href={'/?view=jobs&jobId=' + encodeURIComponent((result as { result: { jobId: string } }).result.jobId)}>查看导出进度与下载</a></p>}
     {record && <p>操作查询键：<code>{record.key}</code> <button className="quiet" onClick={() => void queryRecord()} disabled={pending}>查询此操作状态</button> <a className="button quiet" href="/?view=operations">全部提交记录</a></p>}
   </section>;
 }
