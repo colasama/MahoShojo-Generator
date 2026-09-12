@@ -375,6 +375,7 @@
       "types": "./src/admin/actions/analytics.ts"
     },
     "./admin/moderation/transitions": "./src/admin/moderation/transitions.ts",
+    "./admin/arena-observation": "./src/admin/arena-observation.ts",
     "./admin/moderation/notifications": "./src/admin/moderation/notifications.ts",
     "./admin/actions/moderation": "./src/admin/actions/moderation.ts"
   },
@@ -397,7 +398,8 @@
     "aws4fetch": "^1.0.20",
     "drizzle-orm": "^0.45.2",
     "pinyin-pro": "^3.27.0",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "jose": "^6.2.10"
   },
   "devDependencies": {
     "@types/node": "^20",
