@@ -1,7 +1,7 @@
 import { inferTemplate } from '@/lib/data-card-converter';
 
 import { shuffleInPlace } from './random';
-import type { PvpCardRef, PvpCombatantType, PvpHandState, PvpRoomRules, PvpSnapshotRef } from './types';
+import type { PvpCardRef, PvpCombatantType, PvpHandState, PvpSnapshotRef } from './types';
 
 export const inferPvpCombatantTypeFromJson = (data: unknown): PvpCombatantType => {
   const template = inferTemplate(data);

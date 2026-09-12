@@ -397,6 +397,7 @@ describe('graceful shutdown child process (POSIX signals / Windows process event
         stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
       });
       let stderr = '';
+      if (!child.stderr) throw new Error('Shutdown fixture stderr pipe is missing');
       child.stderr.setEncoding('utf8');
       child.stderr.on('data', (chunk: string) => {
         stderr += chunk;
