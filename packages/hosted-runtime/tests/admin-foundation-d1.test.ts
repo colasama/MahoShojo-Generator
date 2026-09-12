@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 
 import type { AdminDatabase } from '../src/admin/database';
-import { bootstrapAdminPrincipal, revokeAdminPrincipal } from '../src/admin/principals';
+import { bootstrapAdminPrincipal, revokeAdminPrincipal, restoreAdminPrincipal } from '../src/admin/principals';
 import { executeAdminOperation, type AdminOperationContext } from '../src/admin/operations';
 
 describe('Admin local native D1 batch integration', () => {
@@ -72,4 +72,35 @@ describe('Admin local native D1 batch integration', () => {
     await expect(executeAdminOperation(db, context('revoked'), plan('success'))).rejects.toMatchObject({ status: 403 });
     expect(await db.prepare("SELECT version FROM fixture_resource WHERE id='success'").first()).toEqual({ version: 2 });
   });
+
+  const recoveryInput = (id: string) => ({id, verifiedIdentity: {issuer: 'https://fixture.cloudflareaccess.com', subject: id, kind: 'human' as const},
+    capabilities: ['audit.read'], allowedCapabilities: ['users.write','audit.read'], requestId: crypto.randomUUID(), reason: '受控恢复演练', operatorSafeRef: 'local-control'});
+  const disabledPrincipal = async (id: string) => {
+    await bootstrapAdminPrincipal(db, {...recoveryInput(id), capabilities: ['users.write']});
+    await revokeAdminPrincipal(db, {id, requestId: crypto.randomUUID(), reason: '撤权后恢复演练', operatorSafeRef: 'local-control'});
+  };
+  it('restores only the same disabled human identity with explicit capabilities and one successful audit', async () => {
+    await disabledPrincipal('restore-human');
+    const input = recoveryInput('restore-human');
+    await expect(restoreAdminPrincipal(db, {...input, verifiedIdentity: {...input.verifiedIdentity, subject: 'different-human'}})).rejects.toThrow('ADMIN_PRINCIPAL_RESTORE_DENIED');
+    await expect(restoreAdminPrincipal(db, {...input, verifiedIdentity: {...input.verifiedIdentity, kind: 'service'}})).rejects.toThrow('ADMIN_PRINCIPAL_RESTORE_DENIED');
+    const outcomes = await Promise.allSettled([restoreAdminPrincipal(db, input), restoreAdminPrincipal(db, {...input, requestId: crypto.randomUUID()})]);
+    expect(outcomes.filter(outcome => outcome.status === 'fulfilled')).toHaveLength(1);
+    expect(await db.prepare("SELECT status,capabilities_json FROM admin_principals WHERE id='restore-human'").first()).toEqual({status: 'active', capabilities_json: '["audit.read"]'});
+    expect(await db.prepare("SELECT count(*) AS n FROM admin_audit_events WHERE target_id='restore-human' AND action='admin.principal.restore' AND result='success'").first()).toEqual({n: 1});
+  });
+  it('rolls back disabled-to-active recovery when its success audit fails', async () => {
+    await disabledPrincipal('restore-rollback');
+    await db.prepare("CREATE TRIGGER fail_restore_audit BEFORE INSERT ON admin_audit_events WHEN NEW.action='admin.principal.restore' AND NEW.target_id='restore-rollback' BEGIN SELECT RAISE(ABORT,'fixture audit failure'); END").run();
+    await expect(restoreAdminPrincipal(db, recoveryInput('restore-rollback'))).rejects.toThrow();
+    expect(await db.prepare("SELECT status,capabilities_json FROM admin_principals WHERE id='restore-rollback'").first()).toEqual({status: 'disabled', capabilities_json: '["users.write"]'});
+  });
+  it('never bootstraps a missing identity or broadens an active principal through restore', async () => {
+    await expect(restoreAdminPrincipal(db, recoveryInput('restore-missing'))).rejects.toThrow('ADMIN_PRINCIPAL_RESTORE_DENIED');
+    expect(await db.prepare("SELECT id FROM admin_principals WHERE id='restore-missing'").first()).toBeNull();
+    await bootstrapAdminPrincipal(db, {...recoveryInput('restore-active'), capabilities: ['users.write']});
+    await expect(restoreAdminPrincipal(db, recoveryInput('restore-active'))).rejects.toThrow('ADMIN_PRINCIPAL_RESTORE_DENIED');
+    expect(await db.prepare("SELECT capabilities_json FROM admin_principals WHERE id='restore-active'").first()).toEqual({capabilities_json: '["users.write"]'});
+  });
+
 });

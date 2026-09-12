@@ -107,3 +107,35 @@ export const revokeAdminPrincipal = async (db: AdminDatabase, input: PrincipalTo
       .bind(auditId, input.id),
   ]));
 };
+
+/** Controlled recovery of the same verified human identity. Never inserts or replaces a principal. */
+export const restoreAdminPrincipal = async (
+  db: AdminDatabase,
+  input: PrincipalToolContext & {
+    verifiedIdentity: AdminExternalIdentity;
+    capabilities: readonly string[];
+    allowedCapabilities: readonly string[];
+  },
+): Promise<void> => {
+  validateToolContext(input);
+  validateIdentity(input.verifiedIdentity);
+  if (input.verifiedIdentity.kind !== 'human') throw new Error('ADMIN_PRINCIPAL_RESTORE_DENIED');
+  const capabilities = validateCapabilities(input.capabilities, input.allowedCapabilities);
+  const now = new Date().toISOString(), auditId = crypto.randomUUID();
+  assertAdminBatchSucceeded(await db.batch([
+    db.prepare(`UPDATE admin_principals SET status='active',capabilities_json=?,updated_at=?
+      WHERE id=? AND status='disabled' AND issuer=? AND subject=? AND kind='human'`)
+      .bind(JSON.stringify(capabilities), now, input.id, input.verifiedIdentity.issuer, input.verifiedIdentity.subject),
+    db.prepare(`INSERT INTO admin_audit_events
+      (id,actor_principal_id,authn_context_safe_ref,capability,action,target_type,target_id,request_id,reason,result,error_code_safe,source_context_safe,created_at)
+      SELECT ?,NULL,?,'admin.principals.manage','admin.principal.restore','admin-principal',?,?,?,
+      CASE WHEN changes()=1 THEN 'success' ELSE 'denied' END,
+      CASE WHEN changes()=1 THEN NULL ELSE 'ADMIN_PRINCIPAL_RESTORE_DENIED' END,'control-tool',?`)
+      .bind(auditId, input.operatorSafeRef, input.id, input.requestId, input.reason, now),
+    db.prepare(`UPDATE admin_principals SET status=CASE WHEN EXISTS
+      (SELECT 1 FROM admin_audit_events WHERE id=?) THEN status ELSE 'audit-missing' END WHERE id=?`)
+      .bind(auditId, input.id),
+  ]));
+  const outcome = await db.prepare('SELECT result FROM admin_audit_events WHERE id=?').bind(auditId).first<{result: string}>();
+  if (outcome?.result !== 'success') throw new Error('ADMIN_PRINCIPAL_RESTORE_DENIED');
+};
