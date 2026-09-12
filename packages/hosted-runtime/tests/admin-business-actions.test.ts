@@ -72,12 +72,16 @@ describe('Admin content actions', () => {
   it('applies an update atomically and consumes it; stale card versions retain pending updates', async () => {
     const fixture = await setup();
     fixture.sqlite.exec("INSERT INTO data_card_updates (id,data_card_id,user_id,name,data,created_at,updated_at) VALUES ('update','card',1,'新名','{\"name\":\"新名\"}','2026-01-01','2026-01-01')");
+    fixture.sqlite.exec("INSERT INTO arena_ratings (entity_type,entity_id,queue,rating,games,wins,losses,draws,created_at,updated_at,season_peak_rating,season_peak_games,season_peak_at,season_peak_tier,season_low_rating,season_low_games,season_low_at,last_delta,last_applied_at) VALUES ('data_card','card','strict',1300,4,3,1,0,'2026-01-01','2026-01-01',1400,3,'2026-01-01','金牌',1000,0,'2026-01-01',20,'2026-01-01'),('data_card','card','free',1500,8,5,3,0,'2026-01-01','2026-01-01',1500,8,'2026-01-01','金牌',1000,0,'2026-01-01',10,'2026-01-01')");
     const input = { id: 'update', expectedVersion: await version(fixture, 'data-card-updates', "SELECT * FROM data_card_updates WHERE id='update'"), cardId: 'card', cardVersion: 'stale', decision: 'approved' };
     expect(await run(fixture, 'card-updates.review', input)).toMatchObject({ status: 'conflict' });
     expect(fixture.sqlite.prepare('SELECT count(*) n FROM data_card_updates').get()?.n).toBe(1);
+    expect(fixture.sqlite.prepare("SELECT rating FROM arena_ratings WHERE queue='strict'").get()?.rating).toBe(1300);
     expect(await run(fixture, 'card-updates.review', { ...input, cardVersion: await version(fixture, 'data-cards') })).toMatchObject({ status: 'succeeded' });
     expect(fixture.sqlite.prepare('SELECT name,review_status FROM data_cards').get()).toMatchObject({ name: '新名', review_status: 'approved' });
     expect(fixture.sqlite.prepare('SELECT count(*) n FROM data_card_updates').get()?.n).toBe(0);
+    expect(fixture.sqlite.prepare("SELECT rating,games,season_peak_rating,season_peak_tier,last_delta FROM arena_ratings WHERE queue='strict'").get()).toEqual({ rating: 1000, games: 0, season_peak_rating: 1000, season_peak_tier: '无牌', last_delta: null });
+    expect(fixture.sqlite.prepare("SELECT rating,games FROM arena_ratings WHERE queue='free'").get()).toEqual({ rating: 1500, games: 8 });
   });
 
   it('notifies the pending update owner before consuming a rejected update', async () => {

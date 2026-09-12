@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { defineAction, fields, mutationInput, snapshot, versionInput } from './core';
 import { dataCardModerationMessage } from './messages-helper';
 import type { AdminGuardedStatement } from '../operations';
+import { resetStrictRatingAfterCardUpdate } from './content-rating-reset';
 
 const meta = (name: string, label: string, extra: ReturnType<typeof fields> = []) => ({ name, label, resource: 'data-cards', capability: 'content.write', fields: fields([['id', '数据卡 ID', 'text'], ['expectedVersion', '数据版本', 'text']]).concat(extra) });
 const review = defineAction(meta('cards.review', '审核数据卡', fields([['decision', 'approved 或 rejected', 'text']])),
@@ -53,6 +54,7 @@ const updateReview = defineAction({ name: 'card-updates.review', label: '审核�
     const effects: AdminGuardedStatement[] = input.decision === 'rejected' ? [dataCardModerationMessage({ cardId: input.cardId, updateId: input.id, principalId: context.principalId, reason: input.reason, templateKey: 'user.moderation.data_card_rejected' })] : [];
     effects.push({ name: 'consume-card-update', sql: 'DELETE FROM data_card_updates WHERE id=? AND data_card_id=? AND {{admin_guard}}', bindings: [input.id, input.cardId], expectedChanges: 1 });
     if (input.decision === 'approved') effects.push({ name: 'invalidate-card-metrics', sql: 'DELETE FROM data_card_metrics WHERE data_card_id=? AND {{admin_guard}}', bindings: [input.cardId] });
+    if (input.decision === 'approved') effects.push(resetStrictRatingAfterCardUpdate(input.cardId, now));
     return { targetId: input.id, plan: { primary, effects, result: { id: input.id, cardId: input.cardId, decision: input.decision } } };
   });
 
