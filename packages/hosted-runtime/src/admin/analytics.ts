@@ -65,7 +65,7 @@ export async function collectAdminAnalyticsSnapshot(db: AdminReadDatabase, now =
 export async function readAdminAnalytics(db: AdminReadDatabase, options: AdminAnalyticsOptions = {}, now = new Date()) {
   const lookbackDays = options.lookbackDays ?? 30;
   const activeWindowDays = options.activeWindowDays ?? 7;
-  if (!Number.isInteger(lookbackDays) || lookbackDays < 1 || lookbackDays > 365 || !Number.isInteger(activeWindowDays) || activeWindowDays < 1 || activeWindowDays > 90
+  if (!Number.isInteger(lookbackDays) || lookbackDays < 1 || lookbackDays > 365 || !Number.isInteger(activeWindowDays) || activeWindowDays < 1 || activeWindowDays > 180
     || !['active7d', 'tracked', 'all'].includes(options.sample ?? 'active7d') || !['week', 'month'].includes(options.cohort ?? 'week')) throw new Error('ADMIN_ANALYTICS_INPUT_INVALID');
   const snapshot = await collectAdminAnalyticsSnapshot(db, now);
   const frequency = await readAdminAnalyticsFrequency(db, options.sample ?? 'active7d', now, lookbackDays);
