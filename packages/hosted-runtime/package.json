@@ -328,6 +328,31 @@
       "types": "./src/db/schema/ai-availability.ts",
       "import": "./src/db/schema/ai-availability.ts",
       "default": "./src/db/schema/ai-availability.ts"
+    },
+    "./admin/database": {
+      "default": "./src/admin/database.ts",
+      "import": "./src/admin/database.ts",
+      "types": "./src/admin/database.ts"
+    },
+    "./admin/principals": {
+      "default": "./src/admin/principals.ts",
+      "import": "./src/admin/principals.ts",
+      "types": "./src/admin/principals.ts"
+    },
+    "./admin/operations": {
+      "default": "./src/admin/operations.ts",
+      "import": "./src/admin/operations.ts",
+      "types": "./src/admin/operations.ts"
+    },
+    "./admin/read-models": {
+      "default": "./src/admin/read-models.ts",
+      "import": "./src/admin/read-models.ts",
+      "types": "./src/admin/read-models.ts"
+    },
+    "./admin/actions/core": {
+      "import": "./src/admin/actions/core.ts",
+      "default": "./src/admin/actions/core.ts",
+      "types": "./src/admin/actions/core.ts"
     }
   },
   "scripts": {
@@ -357,6 +382,7 @@
     "esbuild": "^0.28.1",
     "eslint": "^9",
     "typescript": "^5",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "miniflare": "5.20260820.0-alpha"
   }
 }

@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./admin": {
+      "types": "./src/admin.ts",
+      "import": "./src/admin.ts",
+      "default": "./src/admin.ts"
+    },
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts",
