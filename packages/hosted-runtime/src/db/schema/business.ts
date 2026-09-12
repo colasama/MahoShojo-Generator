@@ -1,3 +1,4 @@
+import { adminPrincipals } from './admin';
 import { sql } from 'drizzle-orm';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import type {
@@ -233,6 +234,7 @@ export const reportAppeals = sqliteTable(
     caseResolutionCodeSnapshot: text('case_resolution_code_snapshot').$type<ReportResolutionCode | null>(),
     caseUpdatedAtSnapshot: text('case_updated_at_snapshot').notNull(),
     reviewedByUserId: integer('reviewed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    reviewedByAdminPrincipalId: text('reviewed_by_admin_principal_id').references(() => adminPrincipals.id),
     reviewedAt: text('reviewed_at'),
     withdrawnAt: text('withdrawn_at'),
     createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -305,6 +307,7 @@ export const inspectorDisciplineEvents = sqliteTable(
     sourceEntityType: text('source_entity_type'),
     sourceEntityId: text('source_entity_id'),
     createdByUserId: integer('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdByAdminPrincipalId: text('created_by_admin_principal_id').references(() => adminPrincipals.id),
     createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
@@ -396,6 +399,7 @@ export const siteMessages = sqliteTable(
     priority: text('priority').$type<MessagePriority>().notNull().default('normal'),
     expiresAt: text('expires_at'),
     createdByUserId: integer('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdByAdminPrincipalId: text('created_by_admin_principal_id').references(() => adminPrincipals.id),
     createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -413,6 +417,7 @@ export const userMessages = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     actorUserId: integer('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    createdByAdminPrincipalId: text('created_by_admin_principal_id').references(() => adminPrincipals.id),
     channel: text('channel').$type<UserMessageChannel>().notNull().default('system'),
     messageType: text('message_type').$type<UserMessageType>().notNull(),
     templateKey: text('template_key').notNull(),
