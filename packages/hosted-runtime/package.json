@@ -378,6 +378,8 @@
     "./admin/arena-policy": "./src/admin/arena-policy.ts",
     "./admin/arena-observation": "./src/admin/arena-observation.ts",
     "./admin/moderation/notifications": "./src/admin/moderation/notifications.ts",
+    "./admin/arena-management": "./src/admin/arena-management.ts",
+    "./admin/actions/arena": "./src/admin/actions/arena.ts",
     "./admin/arena-card-range": "./src/admin/arena-card-range.ts",
     "./admin/arena-submission": "./src/admin/arena-submission.ts",
     "./metrics/tech-index": "./src/metrics/tech-index.ts",
