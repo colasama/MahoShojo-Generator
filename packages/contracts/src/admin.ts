@@ -1,5 +1,10 @@
 import { z } from './zod';
 
+export const AdminBatchMutationSchema=z.object({
+  reason:z.string().trim().min(1).max(1000),idempotencyKey:z.string().min(1).max(100),
+  items:z.array(z.record(z.string(),z.unknown())).min(1).max(100).refine(items=>items.every(item=>!Object.hasOwn(item,'reason')&&!Object.hasOwn(item,'idempotencyKey'))),
+}).strict();
+
 /** Version 1 browser-safe read resources. This is not a database table API. */
 export const ADMIN_RESOURCES = [
   'dashboard', 'users', 'user-accounts', 'data-cards', 'data-card-updates',
