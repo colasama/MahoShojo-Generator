@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ADMIN_RESOURCES, type AdminResource, type AdminReadResponse } from '@mahoshojo/contracts/admin';
 import { ActionPanel } from './action-panel';
 import { AiReviewPanel } from './ai-review-panel';
+import { ContentUpdateDiff } from './content-diff';
 import { AuditEvents, Jobs, Observation, OperationHistory, RelatedDetails, Values } from './observations';
 import { api, batchItemAction, cleanQuery, fieldValue, isVersion, textValue, type Action, type Row } from './ui-model';
 import './app.css';
@@ -102,6 +103,7 @@ function App() {
         <div className="pagination"><span>{rows.length} 条记录{checked.length > 0 && ` · 已选 ${checked.length} 条`}</span>{initial.has('cursor') && <a className="button quiet" href={(() => { const first = cleanQuery(initial); first.delete('cursor'); return '/?' + first; })()}>返回第一页</a>}{data?.nextCursor && <a className="button" href={(() => { const next = cleanQuery(initial); next.set('view', resource); next.set('cursor', data.nextCursor!); return '/?' + next; })()}>下一页 →</a>}</div>
         {detailLoading && <p role="status">正在读取详情与版本…</p>}
         {selected && !selected.aiRows && <section className="detail"><div className="section-title"><h2>记录详情</h2><div className="actions">{selected.id !== undefined && <button className="quiet" disabled={detailLoading} onClick={() => void detail(selected)}>刷新详情与版本</button>}<button className="quiet" onClick={() => { setSelected(null); setActive(null); }}>收起</button></div></div><dl>{Object.entries(selected).filter(([key]) => !isVersion(key) && key !== 'batchItems').map(([key, value]) => <div key={key}><dt>{labels[key] ?? key}</dt><dd><Values value={value} /></dd></div>)}</dl></section>}
+        {selected?.id && resource === 'data-card-updates' && <section className="detail"><ContentUpdateDiff selected={selected} /></section>}
         {selected && <RelatedDetails key={String(selected.id)} resource={resource} selected={selected} />}
         {applicable.length > 0 && <section className="detail"><h2>管理操作</h2><p>修改现有记录前先查看详情；批量操作逐项核对版本，最多选择 100 条。未显示的写能力尚未启用或无权限。</p><div className="actions">{applicable.map(action => <button key={action.name} disabled={detailLoading} onClick={() => void openAction(action)}>{action.label}</button>)}</div></section>}
         <div ref={actionSection}>{active && session && (active.name === 'ai.review' ? <AiReviewPanel key={JSON.stringify(selected?.aiRows)} resource={resource} rows={selected?.aiRows as Row[] ?? []} actions={actions} principalId={session.principalId} close={() => setActive(null)} /> : <ActionPanel key={active.name + ':' + String(selected?.id ?? '') + ':' + String(selected?.expectedVersion ?? '') + ':' + JSON.stringify(selected?.batchItems ?? null)} action={active} baseAction={batchItemAction(active, actions)} selected={actionSelection} principalId={session.principalId} close={() => setActive(null)} applied={() => setRefresh(value => value + 1)} />)}</div>
