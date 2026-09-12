@@ -386,6 +386,8 @@
     "./admin/arena-submission": "./src/admin/arena-submission.ts",
     "./metrics/tech-index": "./src/metrics/tech-index.ts",
     "./admin/ai-review-prompt": "./src/admin/ai-review-prompt.ts",
+    "./admin/ai-review": "./src/admin/ai-review.ts",
+    "./admin/actions/metrics": "./src/admin/actions/metrics.ts",
     "./admin/actions/moderation": "./src/admin/actions/moderation.ts",
     "./admin/pvp-presets": "./src/generated/pvp-presets.ts"
   },
