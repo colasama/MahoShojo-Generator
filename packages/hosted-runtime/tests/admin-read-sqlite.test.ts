@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ADMIN_RESOURCES, AdminQuerySchema } from '@mahoshojo/contracts/admin';
 import { readAdminResource, type AdminReadDatabase } from '../src/admin/read-models';
+import { adminActionVersion } from '../src/admin/actions/core';
 
 type SQLite = { exec(_sql: string): void; close(): void; prepare(_sql: string): {
   all(..._values: unknown[]): Record<string, unknown>[];
@@ -70,5 +71,8 @@ describe('Admin reads against current SQLite schema', () => {
     const response = await readAdminResource(db, 'redemption-codes', AdminQuerySchema.parse({ limit: 1 }));
     expect(response.nextCursor).not.toBeNull();
     expect(decodeURIComponent(JSON.stringify(response))).not.toContain('redeem-secret');
+    const detail=await readAdminResource(db,'redemption-codes',AdminQuerySchema.parse({id:'1'}));
+    expect(detail.items[0].expectedVersion).toBe(await adminActionVersion('redemption-codes',sqlite.prepare('SELECT rowid,code,slot_count,created_at FROM redemption_codes WHERE rowid=1').get()));
+    expect(JSON.stringify(detail)).not.toMatch(/redeem-secret|__version/);
   });
 });
